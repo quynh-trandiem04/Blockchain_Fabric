@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ethers.js Practice</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>Tương tác với MetaMask</h1>
+    <button id="connectButton">Kết Nối Ví</button>
+    <button id="checkBalanceButton">Kiểm Tra Số Dư</button>
+    <button id="sendTxButton">Gửi 0.01 ETH</button>
+    <p>Địa chỉ ví: <span id="walletAddress">...</span></p>
+    <p>Số dư: <span id="walletBalance">...</span></p>
+    <p>Trạng thái TX: <span id="txStatus">...</span></p>
+
+    <!-- Import thư viện ethers.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+
+    <script>
+        ;// Khai báo biến toàn cục
+        let provider;
+        let signer;
+        let currentAddress; // Thêm biến để lưu địa chỉ hiện tại
+
+        const connectButton = document.getElementById('connectButton');
+        const checkBalanceButton = document.getElementById('checkBalanceButton');
+        const sendTxButton = document.getElementById('sendTxButton');
+        const walletAddressEl = document.getElementById('walletAddress');
+        const walletBalanceEl = document.getElementById('walletBalance');
+        const txStatusEl = document.getElementById('txStatus');
+
+        connectButton.onclick = async () => {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    console.log('MetaMask đã được cài đặt!');
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    
+                    // Yêu cầu kết nối, thay vì lấy signer ngay
+                    await provider.send("eth_requestAccounts", []);
+
+                    signer = await provider.getSigner();
+                    currentAddress = await signer.getAddress();
+                    
+                    walletAddressEl.innerText = currentAddress;
+                    console.log("ĐÃ KẾT NỐI VỚI VÍ:", currentAddress); // <-- Dòng debug quan trọng
+                    
+                    // Tự động kiểm tra số dư ngay sau khi kết nối
+                    checkBalanceButton.onclick();
+
+                } catch (error) {
+                    console.error("Lỗi khi kết nối ví:", error);
+                    alert("Kết nối ví thất bại. Xem console để biết chi tiết.");
+                }
+            } else {
+                alert('Vui lòng cài đặt MetaMask!');
+            }
+        };
+
+        checkBalanceButton.onclick = async () => {
+            if (!signer) {
+                alert('Vui lòng kết nối ví trước!');
+                return;
+            }
+            console.log(`Đang kiểm tra số dư cho ví: ${currentAddress}`); // <-- Dòng debug
+            const balance = await provider.getBalance(currentAddress);
+            const formattedBalance = ethers.formatEther(balance);
+            
+            console.log(`Số dư (dạng Wei): ${balance}`); // <-- Dòng debug
+            console.log(`Số dư (dạng ETH): ${formattedBalance}`); // <-- Dòng debug
+
+            walletBalanceEl.innerText = formattedBalance + " ETH";
+        };
+
+        sendTxButton.onclick = async () => {
+            if (!signer) {
+                alert('Vui lòng kết nối ví trước!');
+                return;
+            }
+            txStatusEl.innerText = "Đang chờ xác nhận...";
+            try {
+                // Gửi 0.01 ETH tới địa chỉ thứ hai trong Ganache
+                const tx = await signer.sendTransaction({
+                    to: "0xee099cCc4CEc1A43239c5a1968D299bd755b8600", 
+                    value: ethers.parseEther("0.01") // Chuyển 0.01 Ether sang Wei
+                });
+                txStatusEl.innerText = `Đang gửi... Hash: ${tx.hash}`;
+                // Chờ giao dịch được xác nhận
+                await tx.wait();
+                txStatusEl.innerText = `Gửi thành công! Hash: ${tx.hash}`;
+                // Cập nhật lại số dư
+                checkBalanceButton.onclick();
+            } catch (error) {
+                txStatusEl.innerText = `Giao dịch thất bại: ${error.message}`;
+            }
+        };
+    </script>
+</body>
+</html>
