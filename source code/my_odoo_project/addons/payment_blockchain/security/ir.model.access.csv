@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_blockchain_tx_checker_manager,blockchain.tx.checker manager,model_blockchain_tx_checker,account.group_account_manager,1,1,1,1
+access_blockchain_tx_checker_user,blockchain.tx.checker user,model_blockchain_tx_checker,base.group_user,1,0,0,0
+access_blockchain_simulator_public,blockchain.simulator public,model_blockchain_simulator,,1,1,1,1
+access_blockchain_simulator_user,blockchain.simulator user,model_blockchain_simulator,base.group_user,1,1,1,1

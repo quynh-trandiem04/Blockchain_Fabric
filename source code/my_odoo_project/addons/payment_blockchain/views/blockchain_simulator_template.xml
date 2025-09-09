@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Blockchain Simulator Page Template -->
+        <template id="blockchain_simulator_page" name="Blockchain Simulator">
+            <t t-call="website.layout">
+                <div id="wrap" class="oe_structure oe_empty">
+                    <div class="container mt-5">
+                        <div class="row">
+                            <div class="col-12">
+                                <h1 class="text-center mb-5">
+                                    <i class="fa fa-cubes me-3"></i>
+                                    🔗 Blockchain Simulator
+                                </h1>
+                                <p class="text-center text-muted mb-5">
+                                    Mô phỏng cơ chế hoạt động và tính chất của Blockchain
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- Control Panel -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">
+                                            <i class="fa fa-cogs me-2"></i>
+                                            Điều khiển Blockchain
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-3">
+                                                <button id="btn-add-block" class="btn btn-success btn-lg w-100 mb-2">
+                                                    <i class="fa fa-plus me-2"></i>
+                                                    Thêm Block
+                                                </button>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <button id="btn-add-transaction" class="btn btn-info btn-lg w-100 mb-2">
+                                                    <i class="fa fa-exchange me-2"></i>
+                                                    Thêm Giao dịch
+                                                </button>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <button id="btn-tamper" class="btn btn-warning btn-lg w-100 mb-2">
+                                                    <i class="fa fa-exclamation-triangle me-2"></i>
+                                                    Mô phỏng Tấn công
+                                                </button>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <button id="btn-reset" class="btn btn-danger btn-lg w-100 mb-2">
+                                                    <i class="fa fa-refresh me-2"></i>
+                                                    Reset Blockchain
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Blockchain Status -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card" id="status-card">
+                                    <div class="card-header bg-info text-white">
+                                        <h5 class="mb-0">
+                                            <i class="fa fa-info-circle me-2"></i>
+                                            Trạng thái Blockchain
+                                        </h5>
+                                    </div>
+                                    <div class="card-body" id="status-content">
+                                        <div class="text-center">
+                                            <i class="fa fa-spinner fa-spin fa-2x"></i>
+                                            <p class="mt-2">Đang tải trạng thái blockchain...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Blockchain Visualization -->
+                        <div class="row">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-dark text-white">
+                                        <h5 class="mb-0">
+                                            <i class="fa fa-eye me-2"></i>
+                                            Chuỗi Blockchain (Visualization)
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="blockchain-container" class="p-3">
+                                            <!-- Blockchain blocks will be rendered here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mining Animation -->
+                        <div class="row mt-4" id="mining-section" style="display: none;">
+                            <div class="col-12">
+                                <div class="card border-warning">
+                                    <div class="card-body text-center">
+                                        <h5 class="text-warning">
+                                            <i class="fa fa-cogs fa-spin me-2"></i>
+                                            Đang Mining Block...
+                                        </h5>
+                                        <div class="progress mt-3">
+                                            <div id="mining-progress" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" 
+                                                 role="progressbar" style="width: 0%"></div>
+                                        </div>
+                                        <p class="mt-2 text-muted">Proof of Work đang tìm kiếm Nonce phù hợp...</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Educational Content -->
+                        <div class="row mt-5">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-secondary text-white">
+                                        <h5 class="mb-0">
+                                            <i class="fa fa-graduation-cap me-2"></i>
+                                            Tính chất của Blockchain được thể hiện
+                                        </h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <h6><i class="fa fa-shield text-success me-2"></i>Bất biến (Immutability)</h6>
+                                                <p class="small">Khi thay đổi dữ liệu trong một block, hash sẽ thay đổi và phá vỡ chuỗi.</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6><i class="fa fa-eye text-info me-2"></i>Minh bạch (Transparency)</h6>
+                                                <p class="small">Tất cả giao dịch và hash đều hiển thị công khai và có thể kiểm tra.</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6><i class="fa fa-link text-warning me-2"></i>Liên kết chuỗi (Chain Linking)</h6>
+                                                <p class="small">Mỗi block chứa hash của block trước đó, tạo thành chuỗi liên kết.</p>
+                                            </div>
+                                        </div>
+                                        <div class="row mt-3">
+                                            <div class="col-md-4">
+                                                <h6><i class="fa fa-cogs text-primary me-2"></i>Proof of Work</h6>
+                                                <p class="small">Mining process tìm Nonce để hash có số 0 đầu theo difficulty.</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6><i class="fa fa-check-circle text-success me-2"></i>Xác thực (Validation)</h6>
+                                                <p class="small">Mỗi block được xác thực hash và liên kết với block trước.</p>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <h6><i class="fa fa-clock-o text-secondary me-2"></i>Timestamp</h6>
+                                                <p class="small">Mỗi block có timestamp để xác định thứ tự thời gian.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CSS Styles -->
+                <style>
+                    .block-item {
+                        border: 2px solid #007bff;
+                        border-radius: 10px;
+                        padding: 15px;
+                        margin: 10px;
+                        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+                        position: relative;
+                        min-height: 200px;
+                        transition: all 0.3s ease;
+                    }
+                    
+                    .block-item:hover {
+                        transform: translateY(-5px);
+                        box-shadow: 0 8px 25px rgba(0,123,255,0.3);
+                    }
+                    
+                    .block-item.invalid {
+                        border-color: #dc3545;
+                        background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+                    }
+                    
+                    .block-item.genesis {
+                        border-color: #28a745;
+                        background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+                    }
+                    
+                    .block-arrow {
+                        position: absolute;
+                        right: -30px;
+                        top: 50%;
+                        transform: translateY(-50%);
+                        font-size: 24px;
+                        color: #007bff;
+                    }
+                    
+                    .hash-display {
+                        font-family: 'Courier New', monospace;
+                        font-size: 12px;
+                        background: #f8f9fa;
+                        padding: 5px;
+                        border-radius: 3px;
+                        word-break: break-all;
+                        border-left: 3px solid #007bff;
+                    }
+                    
+                    .mining-animation {
+                        animation: pulse 2s infinite;
+                    }
+                    
+                    @keyframes pulse {
+                        0% { opacity: 1; }
+                        50% { opacity: 0.5; }
+                        100% { opacity: 1; }
+                    }
+                    
+                    .blockchain-container {
+                        display: flex;
+                        overflow-x: auto;
+                        padding: 20px 0;
+                    }
+                    
+                    .status-badge {
+                        position: absolute;
+                        top: 10px;
+                        right: 10px;
+                        font-size: 12px;
+                    }
+                </style>
+
+                <!-- JavaScript -->
+                <script type="text/javascript" src="/payment_blockchain/static/src/js/blockchain_simulator.js"></script>
+            </t>
+        </template>
+        
+        <!-- Add menu item for blockchain simulator -->
+        <template id="blockchain_simulator_menu" inherit_id="website.layout">
+            <xpath expr="//ul[hasclass('navbar-nav')]" position="inside">
+                <li class="nav-item">
+                    <a href="/blockchain/simulator" class="nav-link">
+                        <i class="fa fa-cubes me-1"></i>
+                        Blockchain Demo
+                    </a>
+                </li>
+            </xpath>
+        </template>
+    </data>
+</odoo>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <template id="blockchain_demo_page" name="Blockchain Demo">
+            <t t-call="website.layout">
+                <div class="container mt-5">
+                    <h1>🔗 Blockchain Demo</h1>
+                    <p>Trang demo blockchain đang hoạt động!</p>
+                    <div class="alert alert-success">
+                        <strong>Success!</strong> Template được load thành công.
+                    </div>
+                </div>
+            </t>
+        </template>
+    </data>
+</odoo>

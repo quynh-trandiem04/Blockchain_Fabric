@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Add blockchain payment option to website checkout -->
+        <!-- DISABLED TEMPORARILY - Will be configured after module install -->
+        <!--
+        <template id="payment_blockchain_option" inherit_id="website_sale.payment">
+            <xpath expr="//div[@class='row']" position="after">
+                <t t-foreach="acquirers" t-as="acquirer">
+                    <div t-if="acquirer.provider == 'blockchain'" 
+                         class="card mb-3 o_payment_option" 
+                         t-att-data-acquirer-id="acquirer.id">
+                        <div class="card-body">
+                            <label class="mb-0 d-flex align-items-center">
+                                <input type="radio" 
+                                       name="o_payment_acquirer" 
+                                       t-att-value="acquirer.id"
+                                       class="me-3"/>
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center">
+                                        <img src="/payment_blockchain/static/src/img/crypto.png" 
+                                             alt="Crypto" 
+                                             class="me-2" 
+                                             style="height: 24px;"/>
+                                        <span t-esc="acquirer.name or 'Cryptocurrency Payment'"/>
+                                    </div>
+                                    <small class="text-muted">
+                                        Pay with Ethereum using MetaMask
+                                    </small>
+                                </div>
+                            </label>
+                            
+                            <!-- Blockchain payment form (hidden by default) -->
+                            <div class="o_payment_blockchain_form mt-3" 
+                                 style="display: none;"
+                                 t-att-data-acquirer-id="acquirer.id">
+                                <div class="alert alert-info">
+                                    <p class="mb-2">
+                                        <strong>Payment Instructions:</strong>
+                                    </p>
+                                    <ol class="mb-0">
+                                        <li>Make sure MetaMask is installed and connected</li>
+                                        <li>Click "Pay with Crypto" button</li>
+                                        <li>Confirm the transaction in MetaMask</li>
+                                        <li>Wait for confirmation</li>
+                                    </ol>
+                                </div>
+                                
+                                <div class="text-center">
+                                    <button type="button" 
+                                            class="btn btn-warning btn-lg blockchain-payment-btn"
+                                            id="pay-with-crypto"
+                                            t-att-data-order-id="website_sale_order.id"
+                                            t-att-data-amount="website_sale_order.amount_total"
+                                            t-att-data-acquirer-id="acquirer.id"
+                                            style="box-shadow: 0 4px 8px rgba(255,193,7,0.3); border: none;">
+                                        <i class="fa fa-bitcoin me-2"></i>
+                                        🚀 Pay with Cryptocurrency
+                                    </button>
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <i class="fa fa-shield me-1"></i>
+                                            Secure blockchain payment - No credit card required
+                                        </small>
+                                    </div>
+                                </div>
+                                
+                                <div id="blockchain-payment-status" class="mt-3" style="display: none;">
+                                    <!-- Status messages will be shown here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </xpath>
+        </template>
+        
+        <!-- Hide default Pay Now button when blockchain is selected -->
+        <template id="payment_blockchain_hide_pay_now" inherit_id="website_sale.payment">
+            <xpath expr="//button[@type='submit' or contains(@class, 'o_payment_submit_button')]" position="attributes">
+                <attribute name="class">btn btn-primary btn-lg o_payment_submit_button</attribute>
+                <attribute name="id">default-pay-now-btn</attribute>
+            </xpath>
+        </template>
+
+        <!-- JavaScript to handle blockchain payment form visibility and disable Pay Now button -->
+        <template id="payment_blockchain_script" inherit_id="website_sale.payment">
+            <xpath expr="//div[hasclass('oe_website_sale')]" position="inside">
+                <script type="text/javascript">
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Show/hide blockchain payment form when radio button is selected
+                        const paymentRadios = document.querySelectorAll('input[name="o_payment_acquirer"]');
+                        const blockchainForms = document.querySelectorAll('.o_payment_blockchain_form');
+                        const payNowButton = document.querySelector('#default-pay-now-btn, button[type="submit"]:not(.blockchain-payment-btn), .o_payment_submit_button:not(.blockchain-payment-btn)');
+                        const cryptoButton = document.querySelector('#pay-with-crypto');
+                        
+                        // Track payment status
+                        let isBlockchainPaymentProcessing = false;
+                        
+                        function disablePayNowButton(disable = true) {
+                            if (payNowButton) {
+                                payNowButton.disabled = disable;
+                                if (disable) {
+                                    payNowButton.style.opacity = '0.5';
+                                    payNowButton.style.cursor = 'not-allowed';
+                                    payNowButton.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Blockchain Payment Processing...';
+                                } else {
+                                    payNowButton.style.opacity = '1';
+                                    payNowButton.style.cursor = 'pointer';
+                                    payNowButton.innerHTML = 'Pay Now';
+                                }
+                            }
+                        }
+                        
+                        function updateCartAfterPayment(txHash, reference) {
+                            // Clear cart and redirect to confirmation
+                            const url = '/payment/blockchain/success?' + 
+                                       'tx_hash=' + encodeURIComponent(txHash) + 
+                                       '&amp;reference=' + encodeURIComponent(reference || 'blockchain-' + Date.now());
+                            
+                            window.location.href = url;
+                        }
+                        
+                        function checkBlockchainSelection() {
+                            const selectedRadio = document.querySelector('input[name="o_payment_acquirer"]:checked');
+                            if (selectedRadio) {
+                                const selectedCard = document.querySelector('.o_payment_option[data-acquirer-id="' + selectedRadio.value + '"]');
+                                const isBlockchain = selectedCard &amp;&amp; selectedCard.querySelector('.o_payment_blockchain_form');
+                                
+                                // Hide/show Pay Now button based on selection
+                                if (payNowButton) {
+                                    payNowButton.style.display = isBlockchain ? 'none' : 'block';
+                                }
+                                
+                                return isBlockchain;
+                            }
+                            return false;
+                        }
+                        
+                        // Handle crypto button click
+                        if (cryptoButton) {
+                            cryptoButton.addEventListener('click', function() {
+                                isBlockchainPaymentProcessing = true;
+                                disablePayNowButton(true);
+                                
+                                // Add visual feedback to crypto button
+                                this.disabled = true;
+                                this.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Processing Payment...';
+                                this.style.opacity = '0.7';
+                                
+                                // Call your blockchain payment function here
+                                handleBlockchainPaymentProcess().then((result) => {
+                                    if (result &amp;&amp; result.success) {
+                                        updateCartAfterPayment(result.txHash, result.reference);
+                                    } else {
+                                        // Reset buttons on failure
+                                        isBlockchainPaymentProcessing = false;
+                                        disablePayNowButton(false);
+                                        this.disabled = false;
+                                        this.innerHTML = '<i class="fa fa-bitcoin me-2"></i>🚀 Pay with Cryptocurrency';
+                                        this.style.opacity = '1';
+                                    }
+                                }).catch((error) => {
+                                    console.error('Blockchain payment error:', error);
+                                    // Reset buttons on error
+                                    isBlockchainPaymentProcessing = false;
+                                    disablePayNowButton(false);
+                                    this.disabled = false;
+                                    this.innerHTML = '<i class="fa fa-bitcoin me-2"></i>🚀 Pay with Cryptocurrency';
+                                    this.style.opacity = '1';
+                                });
+                            });
+                        }
+                        
+                        // Prevent Pay Now button click during blockchain processing
+                        if (payNowButton) {
+                            payNowButton.addEventListener('click', function(e) {
+                                if (isBlockchainPaymentProcessing) {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    alert('Blockchain payment is currently being processed. Please wait...');
+                                    return false;
+                                }
+                            });
+                        }
+                        
+                        paymentRadios.forEach(function(radio) {
+                            radio.addEventListener('change', function() {
+                                // Hide all blockchain forms
+                                blockchainForms.forEach(function(form) {
+                                    form.style.display = 'none';
+                                });
+                                
+                                // Show the selected blockchain form if it's a blockchain acquirer
+                                if (this.checked) {
+                                    const acquirerId = this.value;
+                                    const blockchainForm = document.querySelector(
+                                        '.o_payment_blockchain_form[data-acquirer-id="' + acquirerId + '"]'
+                                    );
+                                    if (blockchainForm) {
+                                        blockchainForm.style.display = 'block';
+                                    }
+                                }
+                                
+                                // Check and update Pay Now button visibility
+                                checkBlockchainSelection();
+                            });
+                        });
+                        
+                        // Initial check on page load
+                        setTimeout(checkBlockchainSelection, 100);
+                        
+                        // Blockchain payment process function
+                        async function handleBlockchainPaymentProcess() {
+                            try {
+                                // Check MetaMask
+                                if (!window.ethereum) {
+                                    alert("Vui lòng cài đặt MetaMask!");
+                                    return false;
+                                }
+
+                                // Get payment details
+                                const orderAmount = cryptoButton.getAttribute('data-amount');
+                                const orderId = cryptoButton.getAttribute('data-order-id');
+                                
+                                console.log('Processing payment for order:', orderId, 'amount:', orderAmount);
+
+                                // Request account access
+                                const accounts = await window.ethereum.request({
+                                    method: "eth_requestAccounts",
+                                });
+                                console.log("Connected account:", accounts[0]);
+
+                                // Convert amount to ETH (simplified conversion)
+                                const ethAmount = (parseFloat(orderAmount) / 2000).toFixed(6); // Assuming 1 ETH = 2000 USD
+                                const weiAmount = window.ethereum.utils ? 
+                                    window.ethereum.utils.toWei(ethAmount, 'ether') : 
+                                    '0x' + (parseFloat(ethAmount) * Math.pow(10, 18)).toString(16);
+
+                                // Get receiver address (you should configure this)
+                                const receiver = "0xE487403f900e36F4Fd88cDe35d1d9335f0a64bd0";
+
+                                // Send transaction
+                                const txHash = await window.ethereum.request({
+                                    method: "eth_sendTransaction",
+                                    params: [
+                                        {
+                                            from: accounts[0],
+                                            to: receiver,
+                                            value: weiAmount,
+                                        },
+                                    ],
+                                });
+
+                                console.log("Transaction hash:", txHash);
+                                alert(`Giao dịch thành công! TX hash: ${txHash}`);
+                                
+                                // Generate reference for this transaction
+                                const reference = 'blockchain-' + orderId + '-' + Date.now();
+                                
+                                // Add transaction to blockchain simulator
+                                try {
+                                    await fetch('/blockchain/simulator/add_block', {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                        },
+                                        body: JSON.stringify({
+                                            transaction_data: [{
+                                                type: 'payment_transaction',
+                                                tx_hash: txHash,
+                                                amount: parseFloat(orderAmount),
+                                                order_id: orderId,
+                                                reference: reference,
+                                                sender: accounts[0],
+                                                receiver: receiver,
+                                                timestamp: new Date().toISOString(),
+                                                message: `Thanh toán đơn hàng #${orderId} - ${orderAmount} VND`
+                                            }]
+                                        })
+                                    });
+                                    console.log('Transaction added to blockchain simulator');
+                                } catch (simError) {
+                                    console.warn('Could not add to blockchain simulator:', simError);
+                                }
+                                
+                                return {
+                                    success: true,
+                                    txHash: txHash,
+                                    reference: reference
+                                };
+                            } catch (error) {
+                                console.error("Payment error:", error);
+                                alert(`Lỗi thanh toán: ${error.message}`);
+                                return {
+                                    success: false,
+                                    error: error.message
+                                };
+                            }
+                        }
+                    });
+                </script>
+            </xpath>
+        </template>
+
+        <!-- Blockchain Technology Demo Section -->
+        <template id="blockchain_demo_section" inherit_id="website_sale.payment">
+            <xpath expr="//div[hasclass('o_payment_form')]" position="after">
+                <div class="row mt-5">
+                    <div class="col-12">
+                        <div class="card border-info">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">
+                                    <i class="fa fa-cubes me-2"></i>
+                                    🔗 Blockchain Technology Demo
+                                </h5>
+                            </div>
+                            <div class="card-body">
+                                <p class="lead">Hệ thống thanh toán này sử dụng công nghệ Blockchain để đảm bảo:</p>
+                                
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="text-center mb-3">
+                                            <i class="fa fa-shield fa-3x text-success mb-2"></i>
+                                            <h6>Bất biến (Immutability)</h6>
+                                            <p class="small">Giao dịch một khi đã được ghi lại không thể thay đổi được</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center mb-3">
+                                            <i class="fa fa-eye fa-3x text-info mb-2"></i>
+                                            <h6>Minh bạch (Transparency)</h6>
+                                            <p class="small">Tất cả giao dịch đều có thể kiểm tra và xác minh công khai</p>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="text-center mb-3">
+                                            <i class="fa fa-link fa-3x text-warning mb-2"></i>
+                                            <h6>Liên kết chuỗi (Chain Linking)</h6>
+                                            <p class="small">Các block liên kết với nhau tạo thành chuỗi bất biến</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-warning mt-3">
+                                    <h6><i class="fa fa-info-circle me-2"></i>Quy trình thanh toán Blockchain:</h6>
+                                    <ol class="mb-0">
+                                        <li><strong>Khởi tạo:</strong> User chọn "Pay with Cryptocurrency" và MetaMask popup xuất hiện</li>
+                                        <li><strong>Xác nhận:</strong> User xác nhận giao dịch trong MetaMask wallet</li>
+                                        <li><strong>Mining:</strong> Transaction được gửi lên Ethereum network và chờ mining</li>
+                                        <li><strong>Hash ghi nhận:</strong> Transaction hash được trả về và lưu vào hệ thống</li>
+                                        <li><strong>Hoàn tất:</strong> Đơn hàng được xác nhận và giỏ hàng được cập nhật</li>
+                                    </ol>
+                                </div>
+
+                                <div class="alert alert-success mt-3">
+                                    <h6><i class="fa fa-check-circle me-2"></i>Đặc điểm nổi bật của hệ thống:</h6>
+                                    <ul class="mb-0">
+                                        <li><strong>Proof of Work:</strong> Sử dụng thuật toán mining để xác thực giao dịch</li>
+                                        <li><strong>Hash Function:</strong> SHA-256 để tạo hash bất biến cho mỗi block</li>
+                                        <li><strong>Nonce:</strong> Số ngẫu nhiên được tìm kiếm để tạo hash hợp lệ</li>
+                                        <li><strong>Merkle Root:</strong> Hash tổng hợp của tất cả giao dịch trong block</li>
+                                        <li><strong>Timestamp:</strong> Ghi dấu thời gian để đảm bảo thứ tự</li>
+                                    </ul>
+                                </div>
+
+                                <div class="row mt-4">
+                                    <div class="col-12">
+                                        <h6>🔍 Mô phỏng Transaction Hash:</h6>
+                                        <div class="font-monospace bg-light p-3 border rounded">
+                                            <div id="demo-tx-hash">0xa1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456</div>
+                                        </div>
+                                        <small class="text-muted">
+                                            ↑ Đây là ví dụ về transaction hash thực tế sẽ được tạo sau khi thanh toán
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <div class="mt-4 text-center">
+                                    <button class="btn btn-outline-info" onclick="generateDemoHash()">
+                                        <i class="fa fa-refresh me-2"></i>
+                                        Tạo Demo Hash mới
+                                    </button>
+                                    <button class="btn btn-outline-success ms-2" onclick="showBlockStructure()">
+                                        <i class="fa fa-cube me-2"></i>
+                                        Xem cấu trúc Block
+                                    </button>
+                                </div>
+
+                                <div id="block-structure" class="mt-4" style="display: none;">
+                                    <h6>📦 Cấu trúc Block Demo:</h6>
+                                    <div class="bg-light p-3 border rounded font-monospace small">
+                                        <div><strong>Block Number:</strong> <span id="demo-block-number">123</span></div>
+                                        <div><strong>Previous Hash:</strong> <span id="demo-prev-hash">0x000abc...</span></div>
+                                        <div><strong>Current Hash:</strong> <span id="demo-current-hash">0x123def...</span></div>
+                                        <div><strong>Timestamp:</strong> <span id="demo-timestamp">2025-09-05 20:30:00</span></div>
+                                        <div><strong>Nonce:</strong> <span id="demo-nonce">12345</span></div>
+                                        <div><strong>Merkle Root:</strong> <span id="demo-merkle">0x456ghi...</span></div>
+                                        <div><strong>Transactions:</strong> 
+                                            <div class="ms-3">
+                                                <div>- Payment: 0.001 ETH to 0xE487403f900e36F4Fd88cDe35d1d9335f0a64bd0</div>
+                                                <div>- Order ID: #<span id="demo-order-id">12345</span></div>
+                                                <div>- Status: Confirmed</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </template>
+
+        <!-- JavaScript for Blockchain Demo -->
+        <template id="blockchain_demo_js" inherit_id="website_sale.payment">
+            <xpath expr="//div[hasclass('oe_website_sale')]" position="inside">
+                <script type="text/javascript">
+                    // Demo functions for blockchain explanation
+                    function generateDemoHash() {
+                        const chars = '0123456789abcdef';
+                        let hash = '0x';
+                        for (let i = 0; i &lt; 64; i++) {
+                            hash += chars[Math.floor(Math.random() * chars.length)];
+                        }
+                        document.getElementById('demo-tx-hash').textContent = hash;
+                        
+                        // Show animation
+                        const hashDiv = document.getElementById('demo-tx-hash');
+                        hashDiv.style.backgroundColor = '#ffeb3b';
+                        setTimeout(() => {
+                            hashDiv.style.backgroundColor = '#f8f9fa';
+                        }, 1000);
+                        
+                        // Also update block demo if visible
+                        if (document.getElementById('block-structure').style.display !== 'none') {
+                            updateBlockDemo();
+                        }
+                    }
+                    
+                    function showBlockStructure() {
+                        const blockDiv = document.getElementById('block-structure');
+                        if (blockDiv.style.display === 'none') {
+                            blockDiv.style.display = 'block';
+                            updateBlockDemo();
+                        } else {
+                            blockDiv.style.display = 'none';
+                        }
+                    }
+                    
+                    function updateBlockDemo() {
+                        const now = new Date();
+                        document.getElementById('demo-block-number').textContent = Math.floor(Math.random() * 1000) + 100;
+                        document.getElementById('demo-prev-hash').textContent = '0x' + Math.random().toString(16).substr(2, 8) + '...';
+                        document.getElementById('demo-current-hash').textContent = '0x' + Math.random().toString(16).substr(2, 8) + '...';
+                        document.getElementById('demo-timestamp').textContent = now.toLocaleString();
+                        document.getElementById('demo-nonce').textContent = Math.floor(Math.random() * 100000);
+                        document.getElementById('demo-merkle').textContent = '0x' + Math.random().toString(16).substr(2, 8) + '...';
+                        document.getElementById('demo-order-id').textContent = Math.floor(Math.random() * 10000);
+                    }
+                    
+                    // Auto-update demo hash every 10 seconds for dynamic feel
+                    setInterval(function() {
+                        if (Math.random() > 0.7) { // 30% chance every 10 seconds
+                            generateDemoHash();
+                        }
+                    }, 10000);
+                </script>
+            </xpath>
+        </template>
+    </data>
+</odoo>

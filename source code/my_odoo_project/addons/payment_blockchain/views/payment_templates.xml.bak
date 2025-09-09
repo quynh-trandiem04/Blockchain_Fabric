@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Chèn “Pay with MetaMask” khi provider code = blockchain -->
+  <template id="payment_blockchain_form" inherit_id="payment.payment_form">
+    <xpath expr="//div[contains(@class,'o_payment_form')]" position="inside">
+      <t t-if="provider and provider.code == 'blockchain'">
+        <div class="alert alert-info mt-2">
+          <strong>Blockchain / MetaMask</strong><br/>
+          RPC: <t t-esc="provider.blockchain_rpc_url"/> —
+          Chain ID: <t t-esc="provider.blockchain_chain_id"/><br/>
+          Receiver: <code t-esc="provider.blockchain_receiver"/>
+        </div>
+        <button type="button" class="btn btn-primary o-pay-with-blockchain">
+          Pay with MetaMask
+        </button>
+      </t>
+    </xpath>
+  </template>
+</odoo>

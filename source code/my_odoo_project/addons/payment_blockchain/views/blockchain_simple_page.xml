@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Simple Blockchain Simulator Page -->
+        <template id="blockchain_simulator_page" name="Blockchain Simulator">
+            <t t-call="website.layout">
+                <div id="wrap">
+                    <div class="container mt-5">
+                        <h1 class="text-center">🔗 Blockchain Simulator</h1>
+                        <p class="text-center">Mô phỏng cơ chế hoạt động của Blockchain</p>
+                        
+                        <!-- Control Panel -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5>Điều khiển Blockchain</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <button id="btn-add-block" class="btn btn-success me-2">Thêm Block</button>
+                                        <button id="btn-add-transaction" class="btn btn-info me-2">Thêm Giao dịch</button>
+                                        <button id="btn-tamper" class="btn btn-warning me-2">Mô phỏng Tấn công</button>
+                                        <button id="btn-reset" class="btn btn-danger">Reset</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Status -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card" id="status-card">
+                                    <div class="card-header bg-info text-white">
+                                        <h5>Trạng thái Blockchain</h5>
+                                    </div>
+                                    <div class="card-body" id="status-content">
+                                        <div class="text-center">
+                                            <i class="fa fa-spinner fa-spin"></i>
+                                            <p>Đang tải...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Blockchain Visualization -->
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="card">
+                                    <div class="card-header bg-dark text-white">
+                                        <h5>Chuỗi Blockchain</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <div id="blockchain-container" class="p-3">
+                                            <!-- Blockchain will be rendered here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Mining Animation -->
+                        <div class="row mt-4" id="mining-section" style="display: none;">
+                            <div class="col-12">
+                                <div class="card border-warning">
+                                    <div class="card-body text-center">
+                                        <h5 class="text-warning">
+                                            <i class="fa fa-cogs fa-spin"></i>
+                                            Đang Mining Block...
+                                        </h5>
+                                        <div class="progress">
+                                            <div id="mining-progress" class="progress-bar progress-bar-striped progress-bar-animated bg-warning" style="width: 0%"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Include JavaScript -->
+                <script type="text/javascript">
+                    // Basic blockchain simulator functionality
+                    document.addEventListener('DOMContentLoaded', function() {
+                        console.log('Blockchain Simulator Loading...');
+                        
+                        // Initialize if the main class exists
+                        if (window.BlockchainSimulator) {
+                            new BlockchainSimulator();
+                        } else {
+                            console.log('BlockchainSimulator class not found, loading basic functionality...');
+                            initBasicFunctionality();
+                        }
+                    });
+                    
+                    function initBasicFunctionality() {
+                        document.getElementById('btn-add-block').addEventListener('click', function() {
+                            alert('Add Block clicked - Blockchain functionality loading...');
+                        });
+                        
+                        document.getElementById('btn-add-transaction').addEventListener('click', function() {
+                            alert('Add Transaction clicked - Blockchain functionality loading...');
+                        });
+                        
+                        document.getElementById('btn-tamper').addEventListener('click', function() {
+                            alert('Tamper simulation clicked - Blockchain functionality loading...');
+                        });
+                        
+                        document.getElementById('btn-reset').addEventListener('click', function() {
+                            alert('Reset clicked - Blockchain functionality loading...');
+                        });
+                        
+                        // Update status
+                        document.getElementById('status-content').innerHTML = `
+                            <div class="alert alert-info">
+                                <strong>Blockchain Simulator Ready!</strong><br>
+                                Click các nút trên để test chức năng cơ bản.
+                            </div>
+                        `;
+                    }
+                </script>
+            </t>
+        </template>
+    </data>
+</odoo>

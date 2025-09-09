@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Inherit payment acquirer form view to add blockchain fields -->
+        <record id="payment_acquirer_form_blockchain" model="ir.ui.view">
+            <field name="name">payment.acquirer.form.blockchain</field>
+            <field name="model">payment.acquirer</field>
+            <field name="inherit_id" ref="payment.payment_acquirer_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//group[@name='provider_config']" position="after">
+                    <group string="Blockchain Configuration" 
+                           attrs="{'invisible': [('provider', '!=', 'blockchain')]}">
+                        <field name="blockchain_rpc_url" 
+                               placeholder="https://mainnet.infura.io/v3/YOUR-PROJECT-ID"/>
+                        <field name="merchant_wallet_address" 
+                               placeholder="0x1234...abcd"/>
+                        <field name="network_chain_id"/>
+                    </group>
+                </xpath>
+            </field>
+        </record>
+
+        <!-- Add help text for blockchain provider -->
+        <record id="payment_acquirer_blockchain_help" model="ir.ui.view">
+            <field name="name">payment.acquirer.blockchain.help</field>
+            <field name="model">payment.acquirer</field>
+            <field name="inherit_id" ref="payment.payment_acquirer_form"/>
+            <field name="arch" type="xml">
+                <xpath expr="//field[@name='provider']" position="after">
+                    <div class="alert alert-info" 
+                         attrs="{'invisible': [('provider', '!=', 'blockchain')]}">
+                        <p><strong>Blockchain Payment Configuration:</strong></p>
+                        <ul>
+                            <li><strong>RPC URL:</strong> Ethereum node endpoint (e.g., Infura, Alchemy)</li>
+                            <li><strong>Merchant Wallet:</strong> Your Ethereum address to receive payments</li>
+                            <li><strong>Chain ID:</strong> 1 (Mainnet), 5 (Goerli), 11155111 (Sepolia)</li>
+                        </ul>
+                        <p><em>Make sure to install web3.py: pip install web3</em></p>
+                    </div>
+                </xpath>
+            </field>
+        </record>
+    </data>
+</odoo>

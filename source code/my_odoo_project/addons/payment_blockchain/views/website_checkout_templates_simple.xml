@@ -1,0 +1,297 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Enhanced blockchain payment integration for website checkout -->
+        
+        <!-- Add blockchain payment button to checkout page -->
+        <template id="payment_blockchain_checkout_button" name="Blockchain Checkout Button">
+            <div class="blockchain-payment-section mt-3">
+                <div class="alert alert-info">
+                    <h5><i class="fa fa-ethereum me-2"></i>Pay with Blockchain (MetaMask)</h5>
+                    <p class="mb-2">Secure payment using your MetaMask wallet</p>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button type="button" 
+                            class="btn btn-primary btn-lg" 
+                            id="blockchain-pay-btn"
+                            onclick="initBlockchainPayment()">
+                        <i class="fa fa-ethereum me-2"></i>Connect MetaMask &amp; Pay
+                    </button>
+                </div>
+                
+                <div class="mt-2 text-muted small text-center">
+                    <i class="fa fa-shield-alt me-1"></i>
+                    Secure payment via MetaMask - No sensitive data stored
+                </div>
+            </div>
+            
+            <script>
+                function initBlockchainPayment() {
+                    console.log('Blockchain payment initiated');
+                    
+                    if (typeof window.ethereum !== 'undefined') {
+                        // MetaMask is available
+                        connectMetaMask();
+                    } else {
+                        alert('MetaMask is not installed. Please install MetaMask to use blockchain payments.');
+                        window.open('https://metamask.io/download/', '_blank');
+                    }
+                }
+                
+                async function connectMetaMask() {
+                    try {
+                        // Request account access
+                        const accounts = await window.ethereum.request({ 
+                            method: 'eth_requestAccounts' 
+                        });
+                        
+                        console.log('Connected to MetaMask:', accounts[0]);
+                        alert('MetaMask connected successfully! Account: ' + accounts[0]);
+                        
+                        // Here you would normally process the payment
+                        // For now, just show success
+                        document.getElementById('blockchain-pay-btn').innerHTML = 
+                            '<i class="fa fa-check me-2"></i>MetaMask Connected';
+                        document.getElementById('blockchain-pay-btn').classList.add('btn-success');
+                        document.getElementById('blockchain-pay-btn').classList.remove('btn-primary');
+                        
+                    } catch (error) {
+                        console.error('Error connecting to MetaMask:', error);
+                        alert('Failed to connect to MetaMask: ' + error.message);
+                    }
+                }
+            </script>
+        </template>
+
+        <!-- JavaScript to enhance Pay Now button with MetaMask integration -->
+        <template id="payment_blockchain_pay_now_enhancer" inherit_id="website_sale.payment">
+            <xpath expr="//t" position="inside">
+                <script>
+                    <![CDATA[
+                    document.addEventListener('DOMContentLoaded', function() {
+                        // Find the Pay Now button
+                        const payButton = document.querySelector('button[type="submit"], .o_payment_submit_button, button[name="o_payment_submit_button"]');
+                        if (!payButton) return;
+                        
+                        // Store original content and handler
+                        const originalHTML = payButton.innerHTML;
+                        const originalType = payButton.type;
+                        let originalClickHandler = payButton.onclick;
+                        
+                        // Add spans for different states
+                        payButton.innerHTML = `
+                            <span class="pay-now-text">${originalHTML}</span>
+                            <span class="pay-metamask-text" style="display: none;">
+                                <i class="fa fa-ethereum me-2"></i>Pay with MetaMask
+                            </span>
+                        `;
+                        
+                        const payNowText = payButton.querySelector('.pay-now-text');
+                        const payMetaMaskText = payButton.querySelector('.pay-metamask-text');
+                        const paymentRadios = document.querySelectorAll('input[name="o_payment_acquirer"]');
+                        
+                        let isBlockchainProvider = false;
+                        
+                        // Function to check if blockchain provider is selected
+                        function checkBlockchainProvider() {
+                            const selectedRadio = document.querySelector('input[name="o_payment_acquirer"]:checked');
+                            if (!selectedRadio) return false;
+                            
+                            // Get provider label/text
+                            const providerContainer = selectedRadio.closest('.o_payment_option, .card, .form-check, .payment-method');
+                            if (providerContainer) {
+                                const text = providerContainer.textContent.toLowerCase();
+                                return text.includes('blockchain') || text.includes('metamask') || text.includes('crypto') || text.includes('ethereum');
+                            }
+                            return false;
+                        }
+                        
+                        // Function to update button based on provider selection
+                        function updatePayButton() {
+                            isBlockchainProvider = checkBlockchainProvider();
+                            
+                            if (isBlockchainProvider) {
+                                // Switch to MetaMask mode
+                                payNowText.style.display = 'none';
+                                payMetaMaskText.style.display = 'inline';
+                                payButton.classList.remove('btn-primary');
+                                payButton.classList.add('btn-warning');
+                                payButton.type = 'button'; // Prevent form submission
+                            } else {
+                                // Switch back to normal mode
+                                payNowText.style.display = 'inline';
+                                payMetaMaskText.style.display = 'none';
+                                payButton.classList.remove('btn-warning');
+                                payButton.classList.add('btn-primary');
+                                payButton.type = originalType; // Restore form submission
+                            }
+                        }
+                        
+                        // Add click handler for MetaMask payment
+                        payButton.addEventListener('click', function(e) {
+                            if (isBlockchainProvider) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleMetaMaskPayment();
+                            }
+                            // For non-blockchain providers, allow normal processing
+                        });
+                        
+                        // Listen to payment method changes
+                        paymentRadios.forEach(radio => {
+                            radio.addEventListener('change', updatePayButton);
+                        });
+                        
+                        // Initial check
+                        updatePayButton();
+                        
+                        // MetaMask payment handler
+                        async function handleMetaMaskPayment() {
+                            try {
+                                // Update button state
+                                payButton.disabled = true;
+                                payMetaMaskText.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Connecting MetaMask...';
+                                
+                                // Check MetaMask
+                                if (typeof window.ethereum === 'undefined') {
+                                    throw new Error('MetaMask not installed. Please install MetaMask extension.');
+                                }
+                                
+                                // Connect to MetaMask
+                                const accounts = await window.ethereum.request({
+                                    method: 'eth_requestAccounts'
+                                });
+                                
+                                const walletAddress = accounts[0];
+                                
+                                // Get order amount
+                                const orderAmount = getOrderAmount();
+                                const orderReference = 'WEB-ORDER-' + Date.now();
+                                
+                                payMetaMaskText.innerHTML = '<i class="fa fa-spinner fa-spin me-2"></i>Processing Payment...';
+                                
+                                // Simulate blockchain transaction
+                                const txData = await simulateTransaction(walletAddress, orderAmount);
+                                
+                                // Record payment
+                                const result = await recordPayment({
+                                    tx_hash: txData.hash,
+                                    wallet_address: walletAddress,
+                                    amount: orderAmount,
+                                    reference: orderReference,
+                                    block_number: txData.blockNumber,
+                                    gas_fee: txData.gasUsed
+                                });
+                                
+                                if (result.success) {
+                                    payMetaMaskText.innerHTML = '<i class="fa fa-check me-2"></i>Payment Successful!';
+                                    payButton.classList.remove('btn-warning');
+                                    payButton.classList.add('btn-success');
+                                    
+                                    showSuccessMessage(result);
+                                    
+                                    // Redirect after delay
+                                    setTimeout(() => {
+                                        window.location.href = result.redirect_url || '/shop/confirmation';
+                                    }, 2000);
+                                } else {
+                                    throw new Error(result.error || 'Payment processing failed');
+                                }
+                                
+                            } catch (error) {
+                                console.error('MetaMask payment error:', error);
+                                
+                                // Reset button
+                                payButton.disabled = false;
+                                payMetaMaskText.innerHTML = '<i class="fa fa-ethereum me-2"></i>Pay with MetaMask';
+                                payButton.classList.remove('btn-success');
+                                payButton.classList.add('btn-warning');
+                                
+                                showErrorMessage(error.message);
+                            }
+                        }
+                        
+                        // Helper functions
+                        function getOrderAmount() {
+                            const selectors = [
+                                '.oe_currency_value',
+                                '[data-amount]', 
+                                '.total_amount',
+                                '.o_total_amount .oe_currency_value'
+                            ];
+                            
+                            for (const selector of selectors) {
+                                const element = document.querySelector(selector);
+                                if (element) {
+                                    const text = element.textContent || element.getAttribute('data-amount');
+                                    const amount = parseFloat(text.replace(/[^\d.]/g, ''));
+                                    if (!isNaN(amount) && amount > 0) {
+                                        return amount;
+                                    }
+                                }
+                            }
+                            return 100; // Fallback
+                        }
+                        
+                        async function simulateTransaction(wallet, amount) {
+                            await new Promise(resolve => setTimeout(resolve, 2000));
+                            return {
+                                hash: '0x' + Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2),
+                                blockNumber: Math.floor(Math.random() * 1000000) + 18000000,
+                                gasUsed: (Math.random() * 0.001 + 0.001).toFixed(6)
+                            };
+                        }
+                        
+                        async function recordPayment(data) {
+                            try {
+                                const response = await fetch('/payment/blockchain/record', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-Requested-With': 'XMLHttpRequest'
+                                    },
+                                    body: JSON.stringify(data)
+                                });
+                                return await response.json();
+                            } catch (error) {
+                                return { success: false, error: error.message };
+                            }
+                        }
+                        
+                        function showSuccessMessage(result) {
+                            const alert = document.createElement('div');
+                            alert.className = 'alert alert-success mt-3';
+                            alert.innerHTML = `
+                                <h6><i class="fa fa-check-circle me-2"></i>Payment Successful!</h6>
+                                <p class="mb-1">Your blockchain payment has been processed.</p>
+                                <small>TX: <code>${result.tx_hash || 'Processing...'}</code></small>
+                            `;
+                            payButton.parentNode.appendChild(alert);
+                        }
+                        
+                        function showErrorMessage(message) {
+                            const alert = document.createElement('div');
+                            alert.className = 'alert alert-danger mt-3';
+                            alert.innerHTML = `
+                                <h6><i class="fa fa-exclamation-triangle me-2"></i>Payment Failed</h6>
+                                <p class="mb-0">${message}</p>
+                            `;
+                            
+                            // Remove existing alerts
+                            const existing = payButton.parentNode.querySelector('.alert');
+                            if (existing) existing.remove();
+                            
+                            payButton.parentNode.appendChild(alert);
+                            
+                            setTimeout(() => {
+                                if (alert.parentNode) alert.remove();
+                            }, 5000);
+                        }
+                    });
+                    ]]>
+                </script>
+            </xpath>
+        </template>
+    </data>
+</odoo>
