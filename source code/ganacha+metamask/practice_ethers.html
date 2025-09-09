@@ -1,98 +1,136 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
-    <title>Ethers.js Practice</title>
-    <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <title>Ethers.js Practice</title>
 </head>
 <body>
-    <h1>Tương tác với MetaMask</h1>
-    <button id="connectButton">Kết Nối Ví</button>
-    <button id="checkBalanceButton">Kiểm Tra Số Dư</button>
-    <button id="sendTxButton">Gửi 0.01 ETH</button>
-    <p>Địa chỉ ví: <span id="walletAddress">...</span></p>
-    <p>Số dư: <span id="walletBalance">...</span></p>
-    <p>Trạng thái TX: <span id="txStatus">...</span></p>
+  <h1>Tương tác với MetaMask</h1>
+  <button id="connectButton">Kết Nối Ví</button>
+  <button id="checkBalanceButton" disabled>Kiểm Tra Số Dư</button>
+  <button id="sendTxButton" disabled>Gửi 0.01 ETH</button>
 
-    <!-- Import thư viện ethers.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+  <p>Network: <span id="netInfo">chưa kết nối</span></p>
+  <p>Địa chỉ ví: <span id="walletAddress">...</span></p>
+  <p>Số dư: <span id="walletBalance">...</span></p>
+  <p>Trạng thái TX: <span id="txStatus">...</span></p>
 
-    <script>
-        ;// Khai báo biến toàn cục
-        let provider;
-        let signer;
-        let currentAddress; // Thêm biến để lưu địa chỉ hiện tại
+  <!-- ethers v6 -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+  <script>
+    let provider, signer;
 
-        const connectButton = document.getElementById('connectButton');
-        const checkBalanceButton = document.getElementById('checkBalanceButton');
-        const sendTxButton = document.getElementById('sendTxButton');
-        const walletAddressEl = document.getElementById('walletAddress');
-        const walletBalanceEl = document.getElementById('walletBalance');
-        const txStatusEl = document.getElementById('txStatus');
+    const connectBtn = document.getElementById('connectButton');
+    const balBtn = document.getElementById('checkBalanceButton');
+    const sendBtn = document.getElementById('sendTxButton');
+    const addrEl = document.getElementById('walletAddress');
+    const balEl  = document.getElementById('walletBalance');
+    const txEl   = document.getElementById('txStatus');
+    const netEl  = document.getElementById('netInfo');
 
-        connectButton.onclick = async () => {
-            if (typeof window.ethereum !== 'undefined') {
-                try {
-                    console.log('MetaMask đã được cài đặt!');
-                    provider = new ethers.BrowserProvider(window.ethereum);
-                    
-                    // Yêu cầu kết nối, thay vì lấy signer ngay
-                    await provider.send("eth_requestAccounts", []);
+    const GANACHE_CHAIN_DEC = 1337;           // Ganache mặc định
+    const GANACHE_CHAIN_HEX = '0x539';        // 1337 => hex
+    const GANACHE_RPC       = 'http://127.0.0.1:7545';
+    const RECEIVER          = '0x1aC69A4865054dB0eDB80e1A91CAFbe5E48Ea205'; // ví nhận trong Ganache
 
-                    signer = await provider.getSigner();
-                    currentAddress = await signer.getAddress();
-                    
-                    walletAddressEl.innerText = currentAddress;
-                    console.log("ĐÃ KẾT NỐI VỚI VÍ:", currentAddress); // <-- Dòng debug quan trọng
-                    
-                    // Tự động kiểm tra số dư ngay sau khi kết nối
-                    checkBalanceButton.onclick();
+    function enableActions(enabled) {
+      balBtn.disabled  = !enabled;
+      sendBtn.disabled = !enabled;
+    }
 
-                } catch (error) {
-                    console.error("Lỗi khi kết nối ví:", error);
-                    alert("Kết nối ví thất bại. Xem console để biết chi tiết.");
-                }
-            } else {
-                alert('Vui lòng cài đặt MetaMask!');
-            }
-        };
+    async function ensureGanacheNetwork() {
+      // cố gắng switch sang chain 1337; nếu chưa có thì add
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: GANACHE_CHAIN_HEX }],
+        });
+      } catch (err) {
+        if (err.code === 4902 || (err.data && err.data.originalError && err.data.originalError.code === 4902)) {
+          await window.ethereum.request({
+            method: 'wallet_addEthereumChain',
+            params: [{
+              chainId: GANACHE_CHAIN_HEX,
+              chainName: 'Ganache Local',
+              nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+              rpcUrls: [GANACHE_RPC],
+            }],
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
 
-        checkBalanceButton.onclick = async () => {
-            if (!signer) {
-                alert('Vui lòng kết nối ví trước!');
-                return;
-            }
-            console.log(`Đang kiểm tra số dư cho ví: ${currentAddress}`); // <-- Dòng debug
-            const balance = await provider.getBalance(currentAddress);
-            const formattedBalance = ethers.formatEther(balance);
-            
-            console.log(`Số dư (dạng Wei): ${balance}`); // <-- Dòng debug
-            console.log(`Số dư (dạng ETH): ${formattedBalance}`); // <-- Dòng debug
+    async function refreshNetworkInfo() {
+      const net = await provider.getNetwork();
+      netEl.textContent = `chainId=${Number(net.chainId)} (${net.name || 'local'})`;
+    }
 
-            walletBalanceEl.innerText = formattedBalance + " ETH";
-        };
+    connectBtn.onclick = async () => {
+      if (!window.ethereum) return alert('Vui lòng cài đặt MetaMask!');
+      try {
+        // đảm bảo đúng network Ganache
+        await ensureGanacheNetwork();
 
-        sendTxButton.onclick = async () => {
-            if (!signer) {
-                alert('Vui lòng kết nối ví trước!');
-                return;
-            }
-            txStatusEl.innerText = "Đang chờ xác nhận...";
-            try {
-                // Gửi 0.01 ETH tới địa chỉ thứ hai trong Ganache
-                const tx = await signer.sendTransaction({
-                    to: "0xee099cCc4CEc1A43239c5a1968D299bd755b8600", 
-                    value: ethers.parseEther("0.01") // Chuyển 0.01 Ether sang Wei
-                });
-                txStatusEl.innerText = `Đang gửi... Hash: ${tx.hash}`;
-                // Chờ giao dịch được xác nhận
-                await tx.wait();
-                txStatusEl.innerText = `Gửi thành công! Hash: ${tx.hash}`;
-                // Cập nhật lại số dư
-                checkBalanceButton.onclick();
-            } catch (error) {
-                txStatusEl.innerText = `Giao dịch thất bại: ${error.message}`;
-            }
-        };
-    </script>
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send('eth_requestAccounts', []);      // xin quyền
+        signer = await provider.getSigner();
+
+        const addr = await signer.getAddress();
+        addrEl.textContent = addr;
+
+        await refreshNetworkInfo();
+        await checkBalance();    // tự kiểm tra ngay
+        enableActions(true);
+        txEl.textContent = '';
+      } catch (e) {
+        console.error(e);
+        alert('Kết nối thất bại. Xem console để biết chi tiết.');
+      }
+    };
+
+    async function checkBalance() {
+      if (!signer) return alert('Vui lòng kết nối ví trước!');
+      const addr = await signer.getAddress();
+      const bal  = await provider.getBalance(addr);
+      balEl.textContent = `${ethers.formatEther(bal)} ETH`;
+    }
+
+    balBtn.onclick = checkBalance;
+
+    sendBtn.onclick = async () => {
+      if (!signer) return alert('Vui lòng kết nối ví trước!');
+      txEl.textContent = 'Đang chờ xác nhận...';
+      try {
+        const tx = await signer.sendTransaction({
+          to: RECEIVER,
+          value: ethers.parseEther('0.01'),
+        });
+        txEl.textContent = `Đang gửi... Hash: ${tx.hash}`;
+        await tx.wait();
+        txEl.textContent = `Gửi thành công! Hash: ${tx.hash}`;
+        await checkBalance();
+      } catch (e) {
+        console.error(e);
+        txEl.textContent = `Giao dịch thất bại: ${e.message}`;
+      }
+    };
+
+    // lắng nghe đổi account / chain để cập nhật UI
+    if (window.ethereum) {
+      window.ethereum.on('accountsChanged', async () => {
+        if (!provider) return;
+        signer = await provider.getSigner();
+        addrEl.textContent = await signer.getAddress();
+        await checkBalance();
+      });
+      window.ethereum.on('chainChanged', async () => {
+        if (!provider) return;
+        await refreshNetworkInfo();
+        await checkBalance();
+      });
+    }
+  </script>
 </body>
 </html>

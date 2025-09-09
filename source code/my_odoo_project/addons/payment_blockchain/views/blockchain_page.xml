@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Simple Blockchain Demo Page -->
+        <template id="blockchain_demo_simple" name="Blockchain Demo Simple" page="True">
+            <t t-call="website.layout">
+                <div class="container mt-5">
+                    <h1 class="text-center mb-5">🔗 Blockchain Simulator Demo</h1>
+                    <p class="text-center">Mô phỏng tính chất và cơ chế hoạt động của Blockchain</p>
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="alert alert-success">
+                                <strong>✅ Success!</strong> Blockchain Demo page đã hoạt động thành công!
+                            </div>
+                            
+                            <div class="card mt-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5>Demo các tính chất của Blockchain</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <h6>🔒 Immutability (Bất biến)</h6>
+                                            <p>Dữ liệu đã ghi không thể thay đổi được</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6>👁 Transparency (Minh bạch)</h6>
+                                            <p>Tất cả giao dịch đều công khai và có thể kiểm tra</p>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <h6>🔗 Chain Linking</h6>
+                                            <p>Các block liên kết với nhau tạo thành chuỗi</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="card mt-4">
+                                <div class="card-header bg-info text-white">
+                                    <h5>Tích hợp với Payment System</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p>Khi bạn thực hiện thanh toán bằng MetaMask:</p>
+                                    <ol>
+                                        <li>Transaction được gửi lên Ethereum network</li>
+                                        <li>MetaMask xác nhận và tạo transaction hash</li>
+                                        <li>Hash được lưu vào hệ thống Odoo</li>
+                                        <li>Đơn hàng được xác nhận và giỏ hàng được cập nhật</li>
+                                    </ol>
+                                    
+                                    <div class="alert alert-warning mt-3">
+                                        <strong>⚠️ Lưu ý:</strong> Đây là demo trên Ganache/testnet, không sử dụng tiền thật.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </t>
+        </template>
+        
+        <!-- Add menu item -->
+        <record id="blockchain_demo_menu" model="website.menu">
+            <field name="name">Blockchain Demo</field>
+            <field name="url">/blockchain/demo</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">50</field>
+        </record>
+        
+        <!-- Website page record -->
+        <record id="blockchain_demo_page_record" model="website.page">
+            <field name="name">Blockchain Demo</field>
+            <field name="type">qweb</field>
+            <field name="url">/blockchain/demo</field>
+            <field name="website_published" eval="True"/>
+            <field name="key">payment_blockchain.blockchain_demo_simple</field>
+        </record>
+    </data>
+</odoo>

@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!-- Completely override payment method form for blockchain -->
+  <template id="payment_blockchain_method_form" inherit_id="payment.method_form">
+    <xpath expr="//div[@name='o_payment_inline_form']" position="replace">
+      <div name="o_payment_inline_form" t-if="provider_sudo.code == 'blockchain'" class="position-relative">
+        <!-- Blockchain Payment Custom UI -->
+        <div class="alert alert-info blockchain-info">
+          <h5><i class="fa fa-ethereum me-2"></i>Blockchain Payment via MetaMask</h5>
+          <p class="mb-2"><strong>Network:</strong> <t t-esc="provider_sudo.blockchain_rpc_url"/></p>
+          <p class="mb-2"><strong>Chain ID:</strong> <t t-esc="provider_sudo.blockchain_chain_id"/></p>
+          <p class="mb-2"><strong>Receiver:</strong> <code t-esc="provider_sudo.blockchain_receiver"/></p>
+          <p class="mb-0 small text-muted"><strong>Exchange Rate:</strong> 1,000,000 VND = 1 ETH</p>
+        </div>
+        
+        <!-- Amount Preview -->
+        <div class="alert alert-warning" id="eth-amount-preview">
+          <p class="mb-1"><strong>💰 Amount to pay:</strong></p>
+          <p class="mb-0" id="conversion-display">Calculating...</p>
+        </div>
+        
+        <!-- Custom Payment Button - No form submission -->
+        <div class="d-grid gap-2">
+          <button type="button" 
+                  class="btn btn-primary btn-lg o-blockchain-direct-pay" 
+                  data-reference="" 
+                  data-amount=""
+                  onclick="handleDirectBlockchainPayment(this)">
+            <i class="fa fa-ethereum me-2"></i>Pay with MetaMask
+          </button>
+        </div>
+        
+        <div class="mt-3 text-muted small text-center">
+          <i class="fa fa-shield-alt me-1"></i>
+          Secure payment via MetaMask - No sensitive data stored
+        </div>
+      </div>
+      
+      <!-- Standard payment method for other providers -->
+      <div name="o_payment_inline_form" t-else="" class="position-relative d-none">
+        <!-- Default inline form content for other providers -->
+      </div>
+    </xpath>
+  </template>
+</odoo>

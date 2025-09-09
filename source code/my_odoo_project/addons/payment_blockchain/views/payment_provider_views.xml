@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <record id="view_payment_provider_form_blockchain" model="ir.ui.view">
+    <field name="name">payment.provider.form.blockchain</field>
+    <field name="model">payment.provider</field>
+    <field name="inherit_id" ref="payment.payment_provider_form"/>
+    <field name="arch" type="xml">
+      <xpath expr="//sheet" position="inside">
+        <group invisible="code != 'blockchain'">
+          <separator string="Blockchain (MetaMask)"/>
+          <field name="blockchain_rpc_url"/>
+          <field name="blockchain_chain_id"/>
+          <field name="blockchain_receiver"/>
+          <div class="text-muted" style="margin-top:8px;">
+            Enable this provider, set a Journal, then it will appear at checkout.
+          </div>
+        </group>
+      </xpath>
+    </field>
+  </record>
+</odoo>

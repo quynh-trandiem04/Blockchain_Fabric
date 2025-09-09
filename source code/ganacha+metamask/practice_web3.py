@@ -18,7 +18,7 @@ account_1 = w3.eth.accounts[0]
 account_2 = w3.eth.accounts[1]
 
 # !!! QUAN TRỌNG: Đảm bảo đây là private key đúng từ Ganache của bạn !!!
-private_key_1 = "0x25f0e3b775643c42e78bc0189c2f5fb180f56ee4187fecdbd3f40a2a11ec6fbf"
+private_key_1 = "0xf1c0ad9d408aa3b0a69169b9422bb5128365a631c8e4afd00a5e11aec473623a"
 
 # Tạo đối tượng giao dịch
 tx = {

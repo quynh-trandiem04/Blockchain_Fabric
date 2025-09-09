@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <!-- Tạo provider record mặc định -->
+        <record id="payment_provider_blockchain_default" model="payment.provider">
+            <field name="name">Blockchain (MetaMask)</field>
+            <field name="code">blockchain</field>
+            <field name="state">test</field>
+            <field name="is_published">True</field>
+            <field name="blockchain_rpc_url">http://127.0.0.1:7545</field>
+            <field name="blockchain_chain_id">1337</field>
+            <field name="blockchain_receiver"></field>
+        </record>
+
+        <!-- Tạo payment method cho blockchain -->
+        <record id="payment_method_blockchain" model="payment.method">
+            <field name="name">Blockchain</field>
+            <field name="code">blockchain</field>
+            <field name="sequence">1</field>
+            <field name="provider_ids" eval="[(4, ref('payment_provider_blockchain_default'))]"/>
+        </record>
+    </data>
+</odoo>

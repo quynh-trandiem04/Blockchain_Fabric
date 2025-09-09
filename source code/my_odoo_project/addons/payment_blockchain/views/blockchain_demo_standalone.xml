@@ -1,0 +1,370 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <template id="blockchain_demo_standalone" name="Blockchain Demo Page">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure oe_empty">
+                <div class="container my-5">
+                    <!-- Blockchain Education Section -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-primary text-white">
+                            <h3><i class="fa fa-chain"></i> Blockchain Technology Demo</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>What is Blockchain?</h5>
+                                    <p>Blockchain is a distributed ledger technology that maintains a continuously growing list of records (blocks) that are linked and secured using cryptography.</p>
+                                    
+                                    <h6>Key Features:</h6>
+                                    <ul>
+                                        <li><strong>Immutability:</strong> Once data is recorded, it cannot be altered</li>
+                                        <li><strong>Transparency:</strong> All transactions are visible to network participants</li>
+                                        <li><strong>Decentralization:</strong> No single point of control</li>
+                                        <li><strong>Security:</strong> Cryptographic hash functions ensure data integrity</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Hash Function Demo</h5>
+                                    <div class="mb-3">
+                                        <label for="demoInput" class="form-label">Enter text to hash:</label>
+                                        <input type="text" class="form-control" id="demoInput" placeholder="Type something..." />
+                                    </div>
+                                    <button class="btn btn-info" onclick="generateDemoHash()">Generate SHA-256 Hash</button>
+                                    <div class="mt-3">
+                                        <strong>Hash Result:</strong>
+                                        <div id="hashResult" class="p-2 bg-light border rounded text-break" style="font-family: monospace;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Blockchain Simulator -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h4><i class="fa fa-cubes"></i> Blockchain Simulator</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <h5>Blockchain Chain</h5>
+                                    <div id="blockchainChain">
+                                        <div class="alert alert-info">Loading blockchain...</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5>Controls</h5>
+                                    <div class="mb-3">
+                                        <label for="transactionData" class="form-label">Transaction Data:</label>
+                                        <input type="text" class="form-control" id="transactionData" placeholder="Alice pays Bob 10 BTC" />
+                                    </div>
+                                    <button class="btn btn-primary w-100 mb-2" onclick="addBlockToChain()">
+                                        <i class="fa fa-plus"></i> Add Block (Mine)
+                                    </button>
+                                    <button class="btn btn-warning w-100 mb-2" onclick="validateChain()">
+                                        <i class="fa fa-check"></i> Validate Chain
+                                    </button>
+                                    <button class="btn btn-danger w-100 mb-2" onclick="simulateAttack()">
+                                        <i class="fa fa-exclamation-triangle"></i> Simulate Attack
+                                    </button>
+                                    <button class="btn btn-secondary w-100 mb-2" onclick="resetDemo()">
+                                        <i class="fa fa-refresh"></i> Reset Demo
+                                    </button>
+                                    
+                                    <div class="mt-3">
+                                        <h6>Mining Status:</h6>
+                                        <div id="miningStatus" class="small"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Proof of Work Demo -->
+                    <div class="card">
+                        <div class="card-header bg-warning text-dark">
+                            <h4><i class="fa fa-cogs"></i> Proof of Work Mining</h4>
+                        </div>
+                        <div class="card-body">
+                            <p>Proof of Work requires miners to find a nonce (number used once) that makes the block hash start with a certain number of zeros.</p>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="miningDifficulty" class="form-label">Difficulty (leading zeros):</label>
+                                    <input type="range" class="form-range" id="miningDifficulty" min="1" max="4" value="2" />
+                                    <div class="text-center">Difficulty: <span id="difficultyValue">2</span></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="blockData" class="form-label">Block Data:</label>
+                                    <input type="text" class="form-control" id="blockData" placeholder="Block transaction data" />
+                                    <button class="btn btn-success mt-2" onclick="startMining()">
+                                        <i class="fa fa-play"></i> Start Mining
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3">
+                                <h6>Mining Progress:</h6>
+                                <div id="miningProgress" class="small"></div>
+                                <div id="miningResult" class="mt-2 p-2 bg-light border rounded" style="font-family: monospace;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <script>
+                // Hash function demo
+                async function generateDemoHash() {
+                    const input = document.getElementById('demoInput').value;
+                    if (!input) {
+                        alert('Please enter some text to hash');
+                        return;
+                    }
+                    
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(input);
+                    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+                    const hashArray = Array.from(new Uint8Array(hashBuffer));
+                    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                    
+                    document.getElementById('hashResult').innerHTML = hashHex;
+                }
+
+                // Blockchain simulator variables
+                let blockchainSimulator = null;
+
+                // Initialize blockchain demo when page loads
+                document.addEventListener('DOMContentLoaded', function() {
+                    initBlockchainDemo();
+                    updateDifficultyDisplay();
+                });
+
+                function initBlockchainDemo() {
+                    fetch('/payment/blockchain/status')
+                        .then(response => response.json())
+                        .then(data => {
+                            displayBlockchain();
+                        })
+                        .catch(error => {
+                            console.error('Error:', error);
+                            document.getElementById('blockchainChain').innerHTML = 
+                                '<div class="alert alert-danger">Error loading blockchain</div>';
+                        });
+                }
+
+                function displayBlockchain() {
+                    // Simple blockchain display
+                    const chain = [
+                        {
+                            index: 0,
+                            data: "Genesis Block",
+                            hash: "0000abcd1234...",
+                            previousHash: "0",
+                            nonce: 0,
+                            timestamp: new Date().toISOString()
+                        },
+                        {
+                            index: 1,
+                            data: "Alice pays Bob 5 BTC",
+                            hash: "0001bcde2345...",
+                            previousHash: "0000abcd1234...",
+                            nonce: 1347,
+                            timestamp: new Date().toISOString()
+                        },
+                        {
+                            index: 2,
+                            data: "Bob pays Charlie 3 BTC",
+                            hash: "0002cdef3456...",
+                            previousHash: "0001bcde2345...",
+                            nonce: 2891,
+                            timestamp: new Date().toISOString()
+                        }
+                    ];
+
+                    let html = '';
+                    chain.forEach((block, index) => {
+                        const cardClass = index === 0 ? 'border-primary' : 'border-secondary';
+                        html += `
+                            <div class="card mb-2 ${cardClass}" id="block-${index}">
+                                <div class="card-header d-flex justify-content-between">
+                                    <strong>Block #${block.index}</strong>
+                                    <small class="text-muted">${new Date(block.timestamp).toLocaleString()}</small>
+                                </div>
+                                <div class="card-body small">
+                                    <div><strong>Data:</strong> ${block.data}</div>
+                                    <div><strong>Hash:</strong> <code>${block.hash}</code></div>
+                                    <div><strong>Previous Hash:</strong> <code>${block.previousHash}</code></div>
+                                    <div><strong>Nonce:</strong> ${block.nonce}</div>
+                                </div>
+                            </div>
+                        `;
+                    });
+
+                    document.getElementById('blockchainChain').innerHTML = html;
+                    blockchainSimulator = { chain: chain };
+                }
+
+                function addBlockToChain() {
+                    const transactionData = document.getElementById('transactionData').value;
+                    if (!transactionData) {
+                        alert('Please enter transaction data');
+                        return;
+                    }
+
+                    document.getElementById('miningStatus').innerHTML = 
+                        '<div class="text-info"><i class="fa fa-spinner fa-spin"></i> Mining new block...</div>';
+
+                    // Simulate mining delay
+                    setTimeout(() => {
+                        const newBlock = {
+                            index: blockchainSimulator.chain.length,
+                            data: transactionData,
+                            hash: generateRandomHash(true),
+                            previousHash: blockchainSimulator.chain[blockchainSimulator.chain.length - 1].hash,
+                            nonce: Math.floor(Math.random() * 10000),
+                            timestamp: new Date().toISOString()
+                        };
+
+                        blockchainSimulator.chain.push(newBlock);
+                        displayBlockchain();
+                        
+                        document.getElementById('miningStatus').innerHTML = 
+                            '<div class="text-success"><i class="fa fa-check"></i> Block mined successfully!</div>';
+                        document.getElementById('transactionData').value = '';
+                    }, 2000);
+                }
+
+                function validateChain() {
+                    document.getElementById('miningStatus').innerHTML = 
+                        '<div class="text-info"><i class="fa fa-spinner fa-spin"></i> Validating blockchain...</div>';
+
+                    setTimeout(() => {
+                        // Simple validation check
+                        let isValid = true;
+                        for (let i = 1; i < blockchainSimulator.chain.length; i++) {
+                            const currentBlock = blockchainSimulator.chain[i];
+                            const previousBlock = blockchainSimulator.chain[i - 1];
+                            
+                            if (currentBlock.previousHash !== previousBlock.hash) {
+                                isValid = false;
+                                break;
+                            }
+                        }
+
+                        if (isValid) {
+                            document.getElementById('miningStatus').innerHTML = 
+                                '<div class="text-success"><i class="fa fa-check"></i> Blockchain is valid!</div>';
+                        } else {
+                            document.getElementById('miningStatus').innerHTML = 
+                                '<div class="text-danger"><i class="fa fa-times"></i> Blockchain validation failed!</div>';
+                        }
+                    }, 1500);
+                }
+
+                function simulateAttack() {
+                    if (blockchainSimulator.chain.length < 2) {
+                        alert('Need at least 2 blocks to simulate attack');
+                        return;
+                    }
+
+                    // Modify a block to simulate attack
+                    const blockToAttack = 1;
+                    const originalData = blockchainSimulator.chain[blockToAttack].data;
+                    blockchainSimulator.chain[blockToAttack].data = "TAMPERED: " + originalData;
+                    blockchainSimulator.chain[blockToAttack].hash = generateRandomHash(false);
+
+                    // Highlight attacked block
+                    document.getElementById(`block-${blockToAttack}`).className = 'card mb-2 border-danger';
+                    
+                    document.getElementById('miningStatus').innerHTML = 
+                        '<div class="text-warning"><i class="fa fa-exclamation-triangle"></i> Block tampered! Validation will fail.</div>';
+                }
+
+                function resetDemo() {
+                    initBlockchainDemo();
+                    document.getElementById('miningStatus').innerHTML = 
+                        '<div class="text-info"><i class="fa fa-refresh"></i> Demo reset to genesis state</div>';
+                }
+
+                function updateDifficultyDisplay() {
+                    const difficulty = document.getElementById('miningDifficulty').value;
+                    document.getElementById('difficultyValue').textContent = difficulty;
+                }
+
+                function startMining() {
+                    const blockData = document.getElementById('blockData').value;
+                    const difficulty = parseInt(document.getElementById('miningDifficulty').value);
+                    
+                    if (!blockData) {
+                        alert('Please enter block data');
+                        return;
+                    }
+
+                    const target = '0'.repeat(difficulty);
+                    let nonce = 0;
+                    let hash = '';
+                    let attempts = 0;
+
+                    document.getElementById('miningProgress').innerHTML = 'Mining in progress...';
+                    document.getElementById('miningResult').innerHTML = '';
+
+                    const mineBlock = () => {
+                        const blockString = blockData + nonce;
+                        hash = simpleHash(blockString);
+                        attempts++;
+
+                        if (attempts % 100 === 0) {
+                            document.getElementById('miningProgress').innerHTML = 
+                                `Attempt: ${attempts}, Current hash: ${hash}`;
+                        }
+
+                        if (hash.startsWith(target)) {
+                            document.getElementById('miningProgress').innerHTML = 
+                                `<div class="text-success">Mining completed! Found nonce after ${attempts} attempts</div>`;
+                            document.getElementById('miningResult').innerHTML = 
+                                `Block Data: ${blockData}<br>Nonce: ${nonce}<br>Hash: ${hash}`;
+                        } else {
+                            nonce++;
+                            if (attempts < 10000) { // Prevent infinite loop
+                                setTimeout(mineBlock, 1);
+                            } else {
+                                document.getElementById('miningProgress').innerHTML = 
+                                    '<div class="text-warning">Mining stopped after 10000 attempts</div>';
+                            }
+                        }
+                    };
+
+                    mineBlock();
+                }
+
+                function generateRandomHash(startsWithZero = false) {
+                    const chars = '0123456789abcdef';
+                    let hash = startsWithZero ? '000' : '';
+                    for (let i = hash.length; i < 16; i++) {
+                        hash += chars[Math.floor(Math.random() * chars.length)];
+                    }
+                    return hash + '...';
+                }
+
+                function simpleHash(input) {
+                    let hash = 0;
+                    for (let i = 0; i < input.length; i++) {
+                        const char = input.charCodeAt(i);
+                        hash = ((hash << 5) - hash) + char;
+                        hash = hash & hash; // Convert to 32-bit integer
+                    }
+                    return Math.abs(hash).toString(16).padStart(8, '0');
+                }
+
+                // Update difficulty display when slider changes
+                document.addEventListener('DOMContentLoaded', function() {
+                    const difficultySlider = document.getElementById('miningDifficulty');
+                    if (difficultySlider) {
+                        difficultySlider.addEventListener('input', updateDifficultyDisplay);
+                    }
+                });
+            </script>
+        </t>
+    </template>
+</odoo>
