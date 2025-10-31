@@ -1,0 +1,17 @@
+from hfc.fabric import Client
+
+cli = Client(net_profile="connection-org1.json")
+
+admin = cli.get_user(org_name='Org1', name='Admin')
+cli.new_channel('mychannel')
+
+# Query thử chaincode
+response = cli.chaincode_query(
+    requestor=admin,
+    channel_name='mychannel',
+    peers=['peer0.org1.example.com'],
+    cc_name='basic',
+    args=['GetAllAssets']
+)
+
+print(response)
