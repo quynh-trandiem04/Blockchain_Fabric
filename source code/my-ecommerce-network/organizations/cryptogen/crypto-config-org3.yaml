@@ -1,0 +1,8 @@
+PeerOrgs:
+  - Name: ShipperOrg # <-- Tổ chức thứ 3
+    Domain: shipper.com  # <-- Domain thứ 3
+    EnableNodeOUs: true
+    Template:
+      Count: 2 # <-- 2 peer
+    Users:
+      Count: 1

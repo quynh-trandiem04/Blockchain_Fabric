@@ -1,0 +1,386 @@
+#
+# Copyright IBM Corp. All Rights Reserved.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+version: '3.7'
+
+volumes:
+  # Volumes cho 3 Orderer
+  orderer0.example.com:
+  orderer1.example.com:
+  orderer2.example.com:
+  
+  # Volumes cho 6 Peer
+  peer0.ecommerce.com:
+  peer1.ecommerce.com:
+  peer0.seller.com:
+  peer1.seller.com:
+  peer0.shipper.com:
+  peer1.shipper.com:
+
+networks:
+  fabric_network: # <-- Đổi tên từ 'test' sang 'fabric_network'
+    name: fabric_ecommerce_network
+
+services:
+  # ===================================================================
+  # DỊCH VỤ SẮP XẾP RAFT (3 NODES)
+  # ===================================================================
+  orderer0.example.com:
+    container_name: orderer0.example.com
+    image: hyperledger/fabric-orderer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=7050
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:7053
+    working_dir: /root
+    command: orderer
+    volumes:
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/msp:/var/hyperledger/orderer/msp
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/tls/:/var/hyperledger/orderer/tls
+      - orderer0.example.com:/var/hyperledger/production/orderer
+    ports:
+      - 7050:7050
+      - 7053:7053
+    networks:
+      - fabric_network
+
+  orderer1.example.com:
+    container_name: orderer1.example.com
+    image: hyperledger/fabric-orderer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=8050 # <-- Port khác
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:8053 # <-- Port khác
+    working_dir: /root
+    command: orderer
+    volumes:
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/msp:/var/hyperledger/orderer/msp
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/:/var/hyperledger/orderer/tls
+      - orderer1.example.com:/var/hyperledger/production/orderer
+    ports:
+      - 8050:8050
+      - 8053:8053
+    networks:
+      - fabric_network
+
+  orderer2.example.com:
+    container_name: orderer2.example.com
+    image: hyperledger/fabric-orderer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_LOGGING_SPEC=INFO
+      - ORDERER_GENERAL_LISTENADDRESS=0.0.0.0
+      - ORDERER_GENERAL_LISTENPORT=9050 # <-- Port khác
+      - ORDERER_GENERAL_LOCALMSPID=OrdererMSP
+      - ORDERER_GENERAL_LOCALMSPDIR=/var/hyperledger/orderer/msp
+      - ORDERER_GENERAL_TLS_ENABLED=true
+      - ORDERER_GENERAL_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+      - ORDERER_CHANNELPARTICIPATION_ENABLED=true
+      - ORDERER_ADMIN_TLS_ENABLED=true
+      - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
+      - ORDERER_ADMIN_TLS_PRIVATEKEY=/var/hyperledger/orderer/tls/server.key
+      - ORDERER_ADMIN_TLS_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_TLS_CLIENTROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
+      - ORDERER_ADMIN_LISTENADDRESS=0.0.0.0:9053 # <-- Port khác
+    working_dir: /root
+    command: orderer
+    volumes:
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/msp:/var/hyperledger/orderer/msp
+      - ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/:/var/hyperledger/orderer/tls
+      - orderer2.example.com:/var/hyperledger/production/orderer
+    ports:
+      - 9050:9050
+      - 9053:9053
+    networks:
+      - fabric_network
+
+  # ===================================================================
+  # TỔ CHỨC SÀN TMĐT (ECommercePlatformOrg)
+  # ===================================================================
+  peer0.ecommerce.com:
+    container_name: peer0.ecommerce.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg # <-- Lỗi là do thiếu volume cho đường dẫn này
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer0.ecommerce.com
+      - CORE_PEER_ADDRESS=peer0.ecommerce.com:7051
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.ecommerce.com:7052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.ecommerce.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.ecommerce.com:7051
+      - CORE_PEER_LOCALMSPID=ECommercePlatformOrgMSP # <-- Đổi tên MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com:/etc/hyperledger/fabric
+      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - peer0.ecommerce.com:/var/hyperledger/production
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 7051:7051
+    networks:
+      - fabric_network
+
+  peer1.ecommerce.com:
+    container_name: peer1.ecommerce.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer1.ecommerce.com
+      - CORE_PEER_ADDRESS=peer1.ecommerce.com:7061 # <-- Port khác
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:7061 # <-- Port khác
+      - CORE_PEER_CHAINCODEADDRESS=peer1.ecommerce.com:7062 # <-- Port khác
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:7062 # <-- Port khác
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.ecommerce.com:7051 # <-- Bootstrap về peer0
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.ecommerce.com:7061
+      - CORE_PEER_LOCALMSPID=ECommercePlatformOrgMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations/peerOrganizations/ecommerce.com/peers/peer1.ecommerce.com:/etc/hyperledger/fabric
+      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - peer1.ecommerce.com:/var/hyperledger/production
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 7061:7061
+    networks:
+      - fabric_network
+
+  # ===================================================================
+  # TỔ CHỨC NHÀ BÁN HÀNG (SellerOrg)
+  # ===================================================================
+  peer0.seller.com:
+    container_name: peer0.seller.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer0.seller.com
+      - CORE_PEER_ADDRESS=peer0.seller.com:9051 # <-- Port khác
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.seller.com:9052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.seller.com:9051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.seller.com:9051
+      - CORE_PEER_LOCALMSPID=SellerOrgMSP # <-- Đổi tên MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations/peerOrganizations/seller.com/peers/peer0.seller.com:/etc/hyperledger/fabric
+      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - peer0.seller.com:/var/hyperledger/production
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 9051:9051
+    networks:
+      - fabric_network
+
+  peer1.seller.com:
+    container_name: peer1.seller.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer1.seller.com
+      - CORE_PEER_ADDRESS=peer1.seller.com:9061 # <-- Port khác
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:9061
+      - CORE_PEER_CHAINCODEADDRESS=peer1.seller.com:9062
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:9062
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.seller.com:9051 # <-- Bootstrap về peer0
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.seller.com:9061
+      - CORE_PEER_LOCALMSPID=SellerOrgMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations/peerOrganizations/seller.com/peers/peer1.seller.com:/etc/hyperledger/fabric
+      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - peer1.seller.com:/var/hyperledger/production
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 9061:9061
+    networks:
+      - fabric_network
+
+  # ===================================================================
+  # TỔ CHỨC VẬN CHUYỂN (ShipperOrg) - TỔ CHỨC MỚI
+  # ===================================================================
+  peer0.shipper.com:
+    container_name: peer0.shipper.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer0.shipper.com
+      - CORE_PEER_ADDRESS=peer0.shipper.com:11051 # <-- Port khác
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:11051
+      - CORE_PEER_CHAINCODEADDRESS=peer0.shipper.com:11052
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:11052
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.shipper.com:11051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.shipper.com:11051
+      - CORE_PEER_LOCALMSPID=ShipperOrgMSP # <-- Đổi tên MSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com:/etc/hyperledger/fabric
+      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - peer0.shipper.com:/var/hyperledger/production
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 11051:11051
+    networks:
+      - fabric_network
+
+  peer1.shipper.com:
+    container_name: peer1.shipper.com
+    image: hyperledger/fabric-peer:latest
+    labels:
+      service: hyperledger-fabric
+    environment:
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
+      - FABRIC_LOGGING_SPEC=INFO
+      - CORE_PEER_TLS_ENABLED=true
+      - CORE_PEER_PROFILE_ENABLED=false
+      - CORE_PEER_TLS_CERT_FILE=/etc/hyperledger/fabric/tls/server.crt
+      - CORE_PEER_TLS_KEY_FILE=/etc/hyperledger/fabric/tls/server.key
+      - CORE_PEER_TLS_ROOTCERT_FILE=/etc/hyperledger/fabric/tls/ca.crt
+      - CORE_PEER_ID=peer1.shipper.com
+      - CORE_PEER_ADDRESS=peer1.shipper.com:11061 # <-- Port khác
+      - CORE_PEER_LISTENADDRESS=0.0.0.0:11061
+      - CORE_PEER_CHAINCODEADDRESS=peer1.shipper.com:11062
+      - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:11062
+      - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.shipper.com:11051 # <-- Bootstrap về peer0
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.shipper.com:11061
+      - CORE_PEER_LOCALMSPID=ShipperOrgMSP
+      - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations/peerOrganizations/shipper.com/peers/peer1.shipper.com:/etc/hyperledger/fabric
+      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - peer1.shipper.com:/var/hyperledger/production
+    working_dir: /root
+    command: peer node start
+    ports:
+      - 11061:11061
+    networks:
+      - fabric_network
+
+  # ===================================================================
+  # CLI (Dùng để tương tác) - THÊM MỚI
+  # ===================================================================
+  cli:
+    container_name: cli
+    image: hyperledger/fabric-tools:latest
+    labels:
+      service: hyperledger-fabric
+    tty: true
+    stdin_open: true
+    environment:
+      - GOPATH=/opt/gopath
+      - CORE_VM_ENDPOINT=unix:///var/run/docker.sock
+      - FABRIC_LOGGING_SPEC=INFO
+    working_dir: /opt/gopath/src/github.com/hyperledger/fabric/peer
+    command: /bin/bash
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ../organizations:/opt/gopath/src/github.com/hyperledger/fabric/peer/organizations
+      - ../scripts:/opt/gopath/src/github.com/hyperledger/fabric/peer/scripts/
+      - ../channel-artifacts:/opt/gopath/src/github.com/hyperledger/fabric/peer/channel-artifacts
+    depends_on:
+      - peer0.ecommerce.com
+      - peer1.ecommerce.com
+      - peer0.seller.com
+      - peer1.seller.com
+      - peer0.shipper.com
+      - peer1.shipper.com
+    networks:
+      - fabric_network

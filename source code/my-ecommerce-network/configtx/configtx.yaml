@@ -1,0 +1,269 @@
+---
+################################################################################
+#
+#   Section: Organizations
+#
+#   ĐỊNH NGHĨA 4 TỔ CHỨC (1 Orderer, 3 Peer)
+#
+################################################################################
+Organizations:
+    # ---------------------------------------------------------------------------
+    # Tổ chức Orderer
+    # ---------------------------------------------------------------------------
+    - &OrdererOrg
+        Name: OrdererOrg
+        ID: OrdererMSP
+        MSPDir: ../organizations/ordererOrganizations/example.com/msp
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('OrdererMSP.member')"
+            Writers:
+                Type: Signature
+                Rule: "OR('OrdererMSP.member')"
+            Admins:
+                Type: Signature
+                Rule: "OR('OrdererMSP.admin')"
+        
+        # <-- THAY ĐỔI QUAN TRỌNG: Định nghĩa 3 node orderer
+        OrdererEndpoints:
+            - "orderer0.example.com:7050"
+            - "orderer1.example.com:8050"
+            - "orderer2.example.com:9050"
+
+    # ---------------------------------------------------------------------------
+    # Tổ chức Sàn TMĐT (ECommercePlatformOrg)
+    # (Thay thế cho Org1)
+    # ---------------------------------------------------------------------------
+    - &ECommercePlatformOrg
+        Name: ECommercePlatformOrgMSP
+        ID: ECommercePlatformOrgMSP
+        MSPDir: ../organizations/peerOrganizations/ecommerce.com/msp
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('ECommercePlatformOrgMSP.admin', 'ECommercePlatformOrgMSP.peer', 'ECommercePlatformOrgMSP.client')"
+            Writers:
+                Type: Signature
+                Rule: "OR('ECommercePlatformOrgMSP.admin', 'ECommercePlatformOrgMSP.client')"
+            Admins:
+                Type: Signature
+                Rule: "OR('ECommercePlatformOrgMSP.admin')"
+            Endorsement:
+                Type: Signature
+                Rule: "OR('ECommercePlatformOrgMSP.peer')"
+        
+        # <-- THAY ĐỔI: Anchor Peer cho Org ECommerce
+        AnchorPeers:
+            - Host: peer0.ecommerce.com
+              Port: 7051
+
+    # ---------------------------------------------------------------------------
+    # Tổ chức Nhà Bán Hàng (SellerOrg)
+    # (Thay thế cho Org2)
+    # ---------------------------------------------------------------------------
+    - &SellerOrg
+        Name: SellerOrgMSP
+        ID: SellerOrgMSP
+        MSPDir: ../organizations/peerOrganizations/seller.com/msp
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('SellerOrgMSP.admin', 'SellerOrgMSP.peer', 'SellerOrgMSP.client')"
+            Writers:
+                Type: Signature
+                Rule: "OR('SellerOrgMSP.admin', 'SellerOrgMSP.client')"
+            Admins:
+                Type: Signature
+                Rule: "OR('SellerOrgMSP.admin')"
+            Endorsement:
+                Type: Signature
+                Rule: "OR('SellerOrgMSP.peer')"
+
+        # <-- THAY ĐỔI: Anchor Peer cho Org Seller
+        AnchorPeers:
+            - Host: peer0.seller.com
+              Port: 9051
+
+    # ---------------------------------------------------------------------------
+    # Tổ chức Vận Chuyển (ShipperOrg)
+    # (Tổ chức MỚI)
+    # ---------------------------------------------------------------------------
+    - &ShipperOrg
+        Name: ShipperOrgMSP
+        ID: ShipperOrgMSP
+        MSPDir: ../organizations/peerOrganizations/shipper.com/msp
+        Policies:
+            Readers:
+                Type: Signature
+                Rule: "OR('ShipperOrgMSP.admin', 'ShipperOrgMSP.peer', 'ShipperOrgMSP.client')"
+            Writers:
+                Type: Signature
+                Rule: "OR('ShipperOrgMSP.admin', 'ShipperOrgMSP.client')"
+            Admins:
+                Type: Signature
+                Rule: "OR('ShipperOrgMSP.admin')"
+            Endorsement:
+                Type: Signature
+                Rule: "OR('ShipperOrgMSP.peer')"
+
+        # <-- THAY ĐỔI: Anchor Peer cho Org Shipper
+        AnchorPeers:
+            - Host: peer0.shipper.com
+              Port: 11051
+
+################################################################################
+#
+#   SECTION: Capabilities
+#
+################################################################################
+Capabilities:
+    Channel: &ChannelCapabilities
+        V2_0: true
+    Orderer: &OrdererCapabilities
+        V2_0: true
+    Application: &ApplicationCapabilities
+        V2_0: true # <-- Giữ V2_0 là đủ, không cần V2_5 trừ khi bạn cần tính năng purge
+
+################################################################################
+#
+#   SECTION: Application
+#
+################################################################################
+Application: &ApplicationDefaults
+    Organizations:
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Admins"
+        LifecycleEndorsement:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Endorsement"
+        Endorsement:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Endorsement"
+    Capabilities:
+        <<: *ApplicationCapabilities
+
+################################################################################
+#
+#   SECTION: Orderer
+#
+################################################################################
+Orderer: &OrdererDefaults
+    # <-- THAY ĐỔI: Loại Orderer là 'etcdraft'
+    OrdererType: etcdraft
+
+    # <-- THAY ĐỔI: Địa chỉ của 3 node Raft
+    EtcdRaft:
+        Consenters:
+            - Host: orderer0.example.com
+              Port: 7050
+              ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/tls/server.crt
+              ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/tls/server.crt
+            - Host: orderer1.example.com
+              Port: 8050
+              ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/server.crt
+              ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/server.crt
+            - Host: orderer2.example.com
+              Port: 9050
+              ClientTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
+              ServerTLSCert: ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/server.crt
+    
+    BatchTimeout: 2s
+    BatchSize:
+        MaxMessageCount: 10
+        AbsoluteMaxBytes: 99 MB
+        PreferredMaxBytes: 512 KB
+
+    # <-- XÓA: Mục Addresses: không cần thiết khi đã có OrdererEndpoints
+    
+    Organizations:
+        - *OrdererOrg
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Admins"
+        BlockValidation:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+
+################################################################################
+#
+#   CHANNEL
+#
+################################################################################
+Channel: &ChannelDefaults
+    Policies:
+        Readers:
+            Type: ImplicitMeta
+            Rule: "ANY Readers"
+        Writers:
+            Type: ImplicitMeta
+            Rule: "ANY Writers"
+        Admins:
+            Type: ImplicitMeta
+            Rule: "MAJORITY Admins"
+    Capabilities:
+        <<: *ChannelCapabilities
+
+################################################################################
+#
+#   Profile
+#
+#   ĐỊNH NGHĨA KÊNH HỆ THỐNG VÀ KÊNH NGHIỆP VỤ
+#
+################################################################################
+Profiles:
+    # ---------------------------------------------------------------------------
+    # Profile cho Kênh Hệ Thống (System Channel)
+    # Tên: ThreeOrgsOrdererGenesis
+    # ---------------------------------------------------------------------------
+    ThreeOrgsOrdererGenesis:
+        <<: *ChannelDefaults
+        Orderer:
+            <<: *OrdererDefaults
+            Organizations:
+                - *OrdererOrg
+            Capabilities: *OrdererCapabilities
+        Application:
+            <<: *ApplicationDefaults
+            Organizations:
+                - *ECommercePlatformOrg
+                - *SellerOrg
+                - *ShipperOrg
+        # Định nghĩa Consortium (nhóm các tổ chức có thể tạo kênh)
+        Consortiums:
+            SampleConsortium:
+                Organizations:
+                    - *ECommercePlatformOrg
+                    - *SellerOrg
+                    - *ShipperOrg  # <-- Cả 3 Org đều nằm trong consortium
+
+    # ---------------------------------------------------------------------------
+    # Profile cho Kênh Nghiệp Vụ "orderchannel"
+    # Tên: ThreeOrgsChannel
+    # ---------------------------------------------------------------------------
+    ThreeOrgsChannel:
+        <<: *ChannelDefaults
+        Consortium: SampleConsortium
+        Application:
+            <<: *ApplicationDefaults
+            # <-- THAY ĐỔI: Cả 3 Org đều là thành viên của kênh này
+            Organizations:
+                - *ECommercePlatformOrg
+                - *SellerOrg
+                - *ShipperOrg
+            Capabilities: *ApplicationCapabilities
