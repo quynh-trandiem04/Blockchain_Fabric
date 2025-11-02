@@ -22,6 +22,7 @@ volumes:
 networks:
   fabric_network: # <-- Đổi tên từ 'test' sang 'fabric_network'
     name: fabric_ecommerce_network
+    driver: bridge
 
 services:
   # ===================================================================
@@ -29,7 +30,7 @@ services:
   # ===================================================================
   orderer0.example.com:
     container_name: orderer0.example.com
-    image: hyperledger/fabric-orderer:latest
+    image: hyperledger/fabric-orderer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -45,7 +46,13 @@ services:
       - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
       - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
-      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+
+      # --- CẬP NHẬT ĐỂ SỬA LỖI "channel does not exist" (CHO ORDERER 0) ---
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
+      # --- KẾT THÚC CẬP NHẬT ---
+      
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
       - ORDERER_ADMIN_TLS_ENABLED=true
       - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
@@ -56,6 +63,7 @@ services:
     working_dir: /root
     command: orderer
     volumes:
+      - ../channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
       - ../organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/msp:/var/hyperledger/orderer/msp
       - ../organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/tls/:/var/hyperledger/orderer/tls
       - orderer0.example.com:/var/hyperledger/production/orderer
@@ -67,7 +75,7 @@ services:
 
   orderer1.example.com:
     container_name: orderer1.example.com
-    image: hyperledger/fabric-orderer:latest
+    image: hyperledger/fabric-orderer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -83,7 +91,13 @@ services:
       - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
       - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
-      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+
+      # --- CẬP NHẬT ĐỂ SỬA LỖI "channel does not exist" (CHO ORDERER 1) ---
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
+      # --- KẾT THÚC CẬP NHẬT ---
+
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
       - ORDERER_ADMIN_TLS_ENABLED=true
       - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
@@ -94,6 +108,7 @@ services:
     working_dir: /root
     command: orderer
     volumes:
+      - ../channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
       - ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/msp:/var/hyperledger/orderer/msp
       - ../organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/tls/:/var/hyperledger/orderer/tls
       - orderer1.example.com:/var/hyperledger/production/orderer
@@ -105,7 +120,7 @@ services:
 
   orderer2.example.com:
     container_name: orderer2.example.com
-    image: hyperledger/fabric-orderer:latest
+    image: hyperledger/fabric-orderer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -121,7 +136,13 @@ services:
       - ORDERER_GENERAL_CLUSTER_CLIENTCERTIFICATE=/var/hyperledger/orderer/tls/server.crt
       - ORDERER_GENERAL_CLUSTER_CLIENTPRIVATEKEY=/var/hyperledger/orderer/tls/server.key
       - ORDERER_GENERAL_CLUSTER_ROOTCAS=[/var/hyperledger/orderer/tls/ca.crt]
-      - ORDERER_GENERAL_BOOTSTRAPMETHOD=none
+
+      # --- CẬP NHẬT ĐỂ SỬA LỖI "channel does not exist" (CHO ORDERER 2) ---
+      - ORDERER_GENERAL_GENESISMETHOD=file
+      - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
+      - ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
+      # --- KẾT THÚC CẬP NHẬT ---
+
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
       - ORDERER_ADMIN_TLS_ENABLED=true
       - ORDERER_ADMIN_TLS_CERTIFICATE=/var/hyperledger/orderer/tls/server.crt
@@ -132,6 +153,7 @@ services:
     working_dir: /root
     command: orderer
     volumes:
+      - ../channel-artifacts/genesis.block:/var/hyperledger/orderer/genesis.block
       - ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/msp:/var/hyperledger/orderer/msp
       - ../organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/tls/:/var/hyperledger/orderer/tls
       - orderer2.example.com:/var/hyperledger/production/orderer
@@ -146,11 +168,11 @@ services:
   # ===================================================================
   peer0.ecommerce.com:
     container_name: peer0.ecommerce.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:2.5
     labels:
       service: hyperledger-fabric
     environment:
-      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg # <-- Lỗi là do thiếu volume cho đường dẫn này
+      - FABRIC_CFG_PATH=/etc/hyperledger/peercfg
       - FABRIC_LOGGING_SPEC=INFO
       - CORE_PEER_TLS_ENABLED=true
       - CORE_PEER_PROFILE_ENABLED=false
@@ -166,10 +188,11 @@ services:
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.ecommerce.com:7051
       - CORE_PEER_LOCALMSPID=ECommercePlatformOrgMSP # <-- Đổi tên MSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_ecommerce_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com:/etc/hyperledger/fabric
-      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - ./docker/peercfg:/etc/hyperledger/peercfg
       - peer0.ecommerce.com:/var/hyperledger/production
     working_dir: /root
     command: peer node start
@@ -180,7 +203,7 @@ services:
 
   peer1.ecommerce.com:
     container_name: peer1.ecommerce.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -200,10 +223,11 @@ services:
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.ecommerce.com:7061
       - CORE_PEER_LOCALMSPID=ECommercePlatformOrgMSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_ecommerce_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../organizations/peerOrganizations/ecommerce.com/peers/peer1.ecommerce.com:/etc/hyperledger/fabric
-      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - ./docker/peercfg:/etc/hyperledger/peercfg
       - peer1.ecommerce.com:/var/hyperledger/production
     working_dir: /root
     command: peer node start
@@ -217,7 +241,7 @@ services:
   # ===================================================================
   peer0.seller.com:
     container_name: peer0.seller.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -237,10 +261,11 @@ services:
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.seller.com:9051
       - CORE_PEER_LOCALMSPID=SellerOrgMSP # <-- Đổi tên MSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_ecommerce_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../organizations/peerOrganizations/seller.com/peers/peer0.seller.com:/etc/hyperledger/fabric
-      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - ./docker/peercfg:/etc/hyperledger/peercfg
       - peer0.seller.com:/var/hyperledger/production
     working_dir: /root
     command: peer node start
@@ -251,7 +276,7 @@ services:
 
   peer1.seller.com:
     container_name: peer1.seller.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -271,10 +296,11 @@ services:
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.seller.com:9061
       - CORE_PEER_LOCALMSPID=SellerOrgMSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_ecommerce_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../organizations/peerOrganizations/seller.com/peers/peer1.seller.com:/etc/hyperledger/fabric
-      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - ./docker/peercfg:/etc/hyperledger/peercfg
       - peer1.seller.com:/var/hyperledger/production
     working_dir: /root
     command: peer node start
@@ -288,7 +314,7 @@ services:
   # ===================================================================
   peer0.shipper.com:
     container_name: peer0.shipper.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -308,10 +334,11 @@ services:
       - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.shipper.com:11051
       - CORE_PEER_LOCALMSPID=ShipperOrgMSP # <-- Đổi tên MSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_ecommerce_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com:/etc/hyperledger/fabric
-      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - ./docker/peercfg:/etc/hyperledger/peercfg
       - peer0.shipper.com:/var/hyperledger/production
     working_dir: /root
     command: peer node start
@@ -322,7 +349,7 @@ services:
 
   peer1.shipper.com:
     container_name: peer1.shipper.com
-    image: hyperledger/fabric-peer:latest
+    image: hyperledger/fabric-peer:2.5
     labels:
       service: hyperledger-fabric
     environment:
@@ -339,13 +366,14 @@ services:
       - CORE_PEER_CHAINCODEADDRESS=peer1.shipper.com:11062
       - CORE_PEER_CHAINCODELISTENADDRESS=0.0.0.0:11062
       - CORE_PEER_GOSSIP_BOOTSTRAP=peer0.shipper.com:11051 # <-- Bootstrap về peer0
-      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer1.shipper.com:11061
+      - CORE_PEER_GSSIP_EXTERNALENDPOINT=peer1.shipper.com:11061
       - CORE_PEER_LOCALMSPID=ShipperOrgMSP
       - CORE_PEER_MSPCONFIGPATH=/etc/hyperledger/fabric/msp
+      - CORE_VM_DOCKER_HOSTCONFIG_NETWORKMODE=fabric_ecommerce_network
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ../organizations/peerOrganizations/shipper.com/peers/peer1.shipper.com:/etc/hyperledger/fabric
-      - ./docker/peercfg:/etc/hyperledger/peercfg # <-- *** DÒNG SỬA LỖI ***
+      - ./docker/peercfg:/etc/hyperledger/peercfg
       - peer1.shipper.com:/var/hyperledger/production
     working_dir: /root
     command: peer node start
@@ -355,11 +383,11 @@ services:
       - fabric_network
 
   # ===================================================================
-  # CLI (Dùng để tương tác) - THÊM MỚI
+  # CLI (Dùng để tương tác)
   # ===================================================================
   cli:
     container_name: cli
-    image: hyperledger/fabric-tools:latest
+    image: hyperledger/fabric-tools:2.5
     labels:
       service: hyperledger-fabric
     tty: true
@@ -384,3 +412,13 @@ services:
       - peer1.shipper.com
     networks:
       - fabric_network
+    links: 
+      - orderer0.example.com
+      - orderer1.example.com
+      - orderer2.example.com
+      - peer0.ecommerce.com
+      - peer1.ecommerce.com
+      - peer0.seller.com
+      - peer1.seller.com
+      - peer0.shipper.com
+      - peer1.shipper.com
