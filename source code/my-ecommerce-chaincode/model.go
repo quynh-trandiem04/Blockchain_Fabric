@@ -9,14 +9,14 @@ type Order struct {
 	OrderID           string    `json:"orderID"` // Khóa chính
 	Status            string    `json:"status"`
 	PaymentMethod     string    `json:"paymentMethod"`
-	CodStatus         string    `json:"codStatus,omitempty"` // Bỏ qua nếu rỗng (cho đơn PREPAID)
+	CodStatus         string    `json:"codStatus"`
 	Amount            float64   `json:"amount"`
 	SellerID          string    `json:"sellerID"`
 	ShipperID         string    `json:"shipperID"`
 	CustomerID        string    `json:"customerID"`
 	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt         time.Time `json:"updatedAt"`
-	DeliveryTimestamp time.Time `json:"deliveryTimestamp,omitempty"` // Bỏ qua nếu rỗng
+	DeliveryTimestamp time.Time `json:"deliveryTimestamp"`
 	History           []HistoryEntry `json:"history"`
 }
 

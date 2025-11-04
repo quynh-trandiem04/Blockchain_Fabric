@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_order_form_inherit_blockchain" model="ir.ui.view">
+        <field name="name">sale.order.form.blockchain</field>
+        <field name="model">sale.order</field>
+        <field name="inherit_id" ref="sale.view_order_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//header" position="inside">
+                <button name="action_create_order_on_blockchain"
+                        string="Ghi lên Blockchain"
+                        type="object"
+                        class="btn-primary"
+                        invisible="blockchain_tx_id != False"/> </xpath>
+            
+            <xpath expr="//notebook" position="inside">
+                <page string="Blockchain">
+                    <group>
+                        <field name="blockchain_tx_id" readonly="1" string="TX ID Giao dịch"/>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+</odoo>
