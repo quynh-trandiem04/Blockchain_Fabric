@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
@@ -13,18 +14,27 @@ type SmartContract struct {
 	contractapi.Contract
 }
 
-
 // ===================================================================================
 // CÁC HÀM HELPER (Hỗ trợ)
 // ===================================================================================
 
 // getActorOrg trích xuất MSPID (Tên tổ chức) của người gọi hàm
 func getActorOrg(ctx contractapi.TransactionContextInterface) (string, error) {
-	mspID, err := ctx.GetClientIdentity().GetMSPID()
-	if err != nil {
-		return "", fmt.Errorf("không thể lấy MSPID của người gọi: %v", err)
+	stub := ctx.GetStub()
+	if stub == nil {
+		return "", fmt.Errorf("stub is nil")
 	}
-	return mspID, nil
+
+	client, err := cid.New(stub)
+	if err != nil {
+		return "", fmt.Errorf("cid.New failed: %w", err)
+	}
+
+	mspid, err := client.GetMSPID()
+	if err != nil {
+		return "", fmt.Errorf("GetMSPID failed: %w", err)
+	}
+	return mspid, nil
 }
 
 // getOrderState lấy dữ liệu order từ sổ cái và chuyển thành struct *Order
