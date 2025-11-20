@@ -1,0 +1,134 @@
+---
+name: "ecommerce-network-profile"
+version: "1.0.0"
+
+client:
+  organization: ECommercePlatformOrgMSP
+  credentialStore:
+    path: /tmp/hfc-kvs
+    cryptoStore:
+      path: /tmp/hfc-cvs
+    wallet: wallet
+
+organizations:
+  ECommercePlatformOrgMSP:
+    mspid: ECommercePlatformOrgMSP
+    admin:
+      msp_path: ./organizations/peerOrganizations/ecommerce.com/users/Admin@ecommerce.com/msp
+      private_key: ./organizations/peerOrganizations/ecommerce.com/users/Admin@ecommerce.com/msp/keystore/
+    peers:
+      - peer0.ecommerce.com
+      - peer1.ecommerce.com
+    certificateAuthorities:
+      - ca.ecommerce.com
+
+  SellerOrgMSP:
+    mspid: SellerOrgMSP
+    admin:
+      msp_path: ./organizations/peerOrganizations/seller.com/users/Admin@seller.com/msp
+      private_key: ./organizations/peerOrganizations/seller.com/users/Admin@seller.com/msp/keystore/
+    peers:
+      - peer0.seller.com
+      - peer1.seller.com
+    certificateAuthorities:
+      - ca.seller.com
+
+  ShipperOrgMSP:
+    mspid: ShipperOrgMSP
+    admin:
+      msp_path: ./organizations/peerOrganizations/shipper.com/users/Admin@shipper.com/msp
+      private_key: ./organizations/peerOrganizations/shipper.com/users/Admin@shipper.com/msp/keystore/
+    peers:
+      - peer0.shipper.com
+      - peer1.shipper.com
+    certificateAuthorities:
+      - ca.shipper.com
+
+orderers:
+  orderer0.example.com:
+    url: grpcs://orderer0.example.com:7050
+    grpcOptions:
+      ssl-target-name-override: orderer0.example.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+  orderer1.example.com:
+    url: grpcs://orderer1.example.com:8050
+    grpcOptions:
+      ssl-target-name-override: orderer1.example.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+  orderer2.example.com:
+    url: grpcs://orderer2.example.com:9050
+    grpcOptions:
+      ssl-target-name-override: orderer2.example.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+
+peers:
+  # Org ECommerce
+  peer0.ecommerce.com:
+    url: grpcs://peer0.ecommerce.com:7051
+    grpcOptions:
+      ssl-target-name-override: peer0.ecommerce.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com/tls/ca.crt
+  peer1.ecommerce.com:
+    url: grpcs://peer1.ecommerce.com:7061
+    grpcOptions:
+      ssl-target-name-override: peer1.ecommerce.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/ecommerce.com/peers/peer1.ecommerce.com/tls/ca.crt
+      
+  # Org Seller
+  peer0.seller.com:
+    url: grpcs://peer0.seller.com:9051
+    grpcOptions:
+      ssl-target-name-override: peer0.seller.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/seller.com/peers/peer0.seller.com/tls/ca.crt
+  peer1.seller.com:
+    url: grpcs://peer1.seller.com:9061
+    grpcOptions:
+      ssl-target-name-override: peer1.seller.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/seller.com/peers/peer1.seller.com/tls/ca.crt
+
+  # Org Shipper
+  peer0.shipper.com:
+    url: grpcs://peer0.shipper.com:11051
+    grpcOptions:
+      ssl-target-name-override: peer0.shipper.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com/tls/ca.crt
+  peer1.shipper.com:
+    url: grpcs://peer1.shipper.com:11061
+    grpcOptions:
+      ssl-target-name-override: peer1.shipper.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/shipper.com/peers/peer1.shipper.com/tls/ca.crt
+
+certificateAuthorities:
+  ca.ecommerce.com:
+    url: https://ca.ecommerce.com:7054
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/ecommerce.com/ca/ca.ecommerce.com-cert.pem
+    caName: ca.ecommerce.com
+  ca.seller.com:
+    url: https://ca.seller.com:8054
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/seller.com/ca/ca.seller.com-cert.pem
+    caName: ca.seller.com
+  ca.shipper.com:
+    url: https://ca.shipper.com:9054
+    tlsCACerts:
+      path: ./organizations/peerOrganizations/shipper.com/ca/ca.shipper.com-cert.pem
+    caName: ca.shipper.com

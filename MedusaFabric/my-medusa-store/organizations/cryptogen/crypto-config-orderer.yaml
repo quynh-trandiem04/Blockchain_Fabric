@@ -1,0 +1,21 @@
+# ---------------------------------------------------------------------------
+# "OrdererOrgs" - Định nghĩa tổ chức quản lý các node Orderer
+# ---------------------------------------------------------------------------
+OrdererOrgs:
+  - Name: Orderer
+    Domain: example.com
+    EnableNodeOUs: true
+    # ---------------------------------------------------------------------------
+    # "Specs" - Định nghĩa 3 node Orderer cho cụm Raft
+    # ---------------------------------------------------------------------------
+    Specs:
+      - Hostname: orderer0
+        SANS:
+          - localhost
+      - Hostname: orderer1
+        SANS:
+          - localhost
+      - Hostname: orderer2
+        SANS:
+          - localhost
+

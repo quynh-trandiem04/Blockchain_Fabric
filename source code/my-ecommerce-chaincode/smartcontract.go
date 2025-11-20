@@ -78,7 +78,7 @@ func getTimeNow(ctx contractapi.TransactionContextInterface) (time.Time, error) 
 
 // InitLedger (Tùy chọn): Thêm một số dữ liệu mẫu để test.
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
-	// Bạn có thể để trống hàm này hoặc thêm dữ liệu test
+	// để trống hàm này hoặc thêm dữ liệu test
 	return nil
 }
 
@@ -87,7 +87,8 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 // Chính sách (EP): OR('ECommercePlatformOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
-	orderID string, paymentMethod string, amount float64, sellerID string, shipperID string, customerID string) error {
+    orderID string, paymentMethod string, sellerID string, shipperID string, 
+    sellerDataBlob string, shipperDataBlob string) error {
 
 	// 1. Kiểm tra Access Control (ACL)
 	actorOrg, err := getActorOrg(ctx)
@@ -119,19 +120,20 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 		codStatus = "NOT_COLLECTED"
 	}
 
-	// 5. Tạo đối tượng Order
+	// 5. Tạo đối tượng Order 
 	order := Order{
 		DocType:       "Order",
 		OrderID:       orderID,
 		Status:        "CREATED",
 		PaymentMethod: paymentMethod,
 		CodStatus:     codStatus,
-		Amount:        amount,
 		SellerID:      sellerID,
 		ShipperID:     shipperID,
-		CustomerID:    customerID,
 		CreatedAt:     txTime,
 		UpdatedAt:     txTime,
+		SellerSensitiveData:  sellerDataBlob,
+        ShipperSensitiveData: shipperDataBlob,
+
 		History: []HistoryEntry{
 			{
 				TxID:      ctx.GetStub().GetTxID(),
