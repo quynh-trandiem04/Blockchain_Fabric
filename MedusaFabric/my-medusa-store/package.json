@@ -27,7 +27,10 @@
     "@medusajs/auth": "^2.11.3",
     "@medusajs/cli": "2.11.3",
     "@medusajs/framework": "2.11.3",
+    "@medusajs/icons": "^2.11.3",
     "@medusajs/medusa": "2.11.3",
+    "@medusajs/ui": "^4.0.27",
+    "@tanstack/react-query": "^5.90.10",
     "fabric-network": "^2.2.20",
     "js-yaml": "^4.1.1",
     "jsonwebtoken": "^9.0.2"
@@ -36,6 +39,7 @@
     "@medusajs/test-utils": "2.11.3",
     "@swc/core": "^1.7.28",
     "@swc/jest": "^0.2.36",
+    "@types/express": "^5.0.5",
     "@types/jest": "^29.5.13",
     "@types/node": "^20.12.11",
     "@types/react": "^18.3.2",

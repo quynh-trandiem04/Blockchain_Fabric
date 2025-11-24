@@ -61,8 +61,6 @@ class FabricService {
             return {}; 
         }
     }
-
-    // ... (Giữ nguyên toàn bộ các phương thức _getContract, createOrder, queryOrder, decrypt...) ...
     
     async _getContract() {
         if (this.connected) return { gateway: this.gateway, contract: this.contract };
@@ -91,27 +89,35 @@ class FabricService {
 
     async createOrder(data) {
         const { contract } = await this._getContract();
+        
         const sellerPayload = JSON.stringify({
-            customerName: data.customerName, product_lines: data.product_lines,
-            amount_untaxed: data.amount_untaxed, amount_total: data.amount_total
+            customerName: data.customerName, 
+            product_lines: data.product_lines,
+            amount_untaxed: data.amount_untaxed, 
+            amount_total: data.amount_total
         });
+
         const shipperPayload = JSON.stringify({
-            customerName: data.customerName, shipping_address: data.shipping_address,
-            shipping_phone: data.shipping_phone, cod_amount: data.cod_amount
+            customerName: data.customerName, 
+            shipping_address: data.shipping_address,
+            shipping_phone: data.shipping_phone, 
+            shipping_fee: data.shipping_total,
+            cod_amount: data.cod_amount
         });
+
         const encryptedSellerBlob = hybridEncrypt(sellerPayload, this.config.SELLER_PUBLIC);
         const encryptedShipperBlob = hybridEncrypt(shipperPayload, this.config.SHIPPER_PUBLIC);
 
-        // 3. Gọi hàm 'CreateOrder' (Cách mới để lấy TX ID)
+        // === FIX: CÁCH LẤY TX ID CHUẨN ===
         
-        // Bước A: Tạo đối tượng giao dịch (nhưng chưa gửi)
+        // 1. Tạo Transaction Object
         const transaction = contract.createTransaction('CreateOrder');
         
-        // Bước B: Lấy Transaction ID ngay lập tức
-        const generatedTxId = transaction.getTransactionId();
-        console.log(`Generated TX ID: ${generatedTxId}`);
+        // 2. Lấy ID Giao dịch ngay lập tức
+        const txId = transaction.getTransactionId();
+        console.log(`[FabricService] Generated TX ID: ${txId}`);
 
-        // Bước C: Gửi giao dịch với các tham số
+        // 3. Gửi giao dịch (Submit)
         await transaction.submit(
             data.orderID, 
             data.paymentMethod, 
@@ -121,8 +127,8 @@ class FabricService {
             encryptedShipperBlob
         );
 
-        // Bước D: Trả về Transaction ID thực sự
-        return generatedTxId;
+        // 4. Trả về ID để Subscriber/API sử dụng
+        return txId;
     }
 
     async queryOrder(orderId) {
@@ -134,21 +140,58 @@ class FabricService {
     async decryptSellerData(orderId) {
         const orderData = await this.queryOrder(orderId);
         const encryptedBlobString = orderData.seller_sensitive_data;
-        if (!encryptedBlobString || encryptedBlobString === "SELLER_BLOB_FOR_CLI_TEST") {
-            throw new Error("Invalid or CLI test data.");
+        
+        if (!encryptedBlobString || encryptedBlobString.includes("TEST")) {
+              delete orderData.seller_sensitive_data;
+             delete orderData.shipper_sensitive_data;
+             return { ...orderData, decrypted: false };
         }
+
         const decryptedPayload = hybridDecrypt(encryptedBlobString, this.config.SELLER_PRIVATE);
-        return JSON.parse(decryptedPayload);
+        const decryptedJson = JSON.parse(decryptedPayload);
+
+        const finalResult = {
+            ...orderData,   
+            ...decryptedJson
+        };
+
+        delete finalResult.seller_sensitive_data;
+        delete finalResult.shipper_sensitive_data;
+        return finalResult;
     }
 
     async decryptShipperData(orderId) {
         const orderData = await this.queryOrder(orderId);
         const encryptedBlobString = orderData.shipper_sensitive_data;
-        if (!encryptedBlobString || encryptedBlobString === "SHIPPER_BLOB_FOR_CLI_TEST") {
-            throw new Error("Invalid or CLI test data.");
+        
+        if (!encryptedBlobString || encryptedBlobString.includes("TEST")) {
+             delete orderData.seller_sensitive_data;
+             delete orderData.shipper_sensitive_data;
+             return { ...orderData, decrypted: false };
         }
+
         const decryptedPayload = hybridDecrypt(encryptedBlobString, this.config.SHIPPER_PRIVATE);
-        return JSON.parse(decryptedPayload);
+        const decryptedJson = JSON.parse(decryptedPayload);
+
+        const finalResult = {
+            ...orderData,
+            ...decryptedJson
+        };
+
+        delete finalResult.seller_sensitive_data;
+        delete finalResult.shipper_sensitive_data;
+
+        return finalResult;
+    }
+
+    async confirmPayment(orderId) {
+        const { contract } = await this._getContract();
+        
+        console.log(`[FabricService] Confirming payment for order: ${orderId}`);
+ 
+        const result = await contract.submitTransaction('ConfirmPayment', orderId);
+
+        return result ? result.toString() : 'CONFIRMED_VALID';
     }
 }
 
