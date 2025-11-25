@@ -14,10 +14,12 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
 
   const checkFabricStatus = async () => {
     try {
+      console.log("Checking Fabric Status for Order ID:", data.id);
       const res = await fetch(`${API_BASE}/${data.id}/status`, {
         method: "GET",
+        credentials: "include",
       });
-
+      console.log("Fabric Status Response:", res);
       if (res.ok) {
         const json = await res.json();
         setFabricStatus(json);
@@ -25,6 +27,8 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
       } else {
         if (res.status === 404) {
              setFabricStatus(null); 
+        } else if (res.status === 401) {
+             setErrorMsg("Lỗi 401: Hết phiên đăng nhập");
         } else {
              setErrorMsg(`Lỗi: ${res.status}`);
         }
@@ -45,6 +49,7 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
       const res = await fetch(`${API_BASE}/${data.id}/confirm-payment`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
       });
 
       const result = await res.json();
