@@ -1,3 +1,5 @@
+// my-medusa-store-storefront/src/middleware.ts
+
 import { HttpTypes } from "@medusajs/types"
 import { NextRequest, NextResponse } from "next/server"
 

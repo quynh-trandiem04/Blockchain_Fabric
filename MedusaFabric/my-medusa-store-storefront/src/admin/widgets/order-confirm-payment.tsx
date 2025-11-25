@@ -1,4 +1,4 @@
-// src\admin\widgets\order-confirm-payment.tsx
+// my-medusa-store/src/admin/widgets/order-confirm-payment.tsx
 
 import { defineWidgetConfig } from "@medusajs/admin-sdk";
 import { Button, Container, Text, Toaster, toast } from "@medusajs/ui";

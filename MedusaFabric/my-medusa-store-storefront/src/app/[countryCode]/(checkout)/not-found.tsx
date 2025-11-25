@@ -1,3 +1,5 @@
+// my-medusa-store-storefront/src/app/[countryCode]/(checkout)/not-found.tsx
+
 import InteractiveLink from "@modules/common/components/interactive-link"
 import { Metadata } from "next"
 
