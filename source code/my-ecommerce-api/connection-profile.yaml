@@ -13,10 +13,8 @@ client:
 organizations:
   ECommercePlatformOrgMSP:
     mspid: ECommercePlatformOrgMSP
-    # Đường dẫn tới thư mục MSP của Admin (đã được tạo bởi cryptogen)
     admin:
       msp_path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/ecommerce.com/users/Admin@ecommerce.com/msp
-      # SDK sẽ tự tìm key trong thư mục keystore
       private_key: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/ecommerce.com/users/Admin@ecommerce.com/msp/keystore/
     peers:
       - peer0.ecommerce.com
@@ -51,18 +49,21 @@ orderers:
     url: grpcs://localhost:7050
     grpcOptions:
       ssl-target-name-override: orderer0.example.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
   orderer1.example.com:
     url: grpcs://localhost:8050
     grpcOptions:
       ssl-target-name-override: orderer1.example.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
   orderer2.example.com:
     url: grpcs://localhost:9050
     grpcOptions:
       ssl-target-name-override: orderer2.example.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
 
@@ -72,12 +73,14 @@ peers:
     url: grpcs://localhost:7051
     grpcOptions:
       ssl-target-name-override: peer0.ecommerce.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com/tls/ca.crt
   peer1.ecommerce.com:
     url: grpcs://localhost:7061
     grpcOptions:
       ssl-target-name-override: peer1.ecommerce.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/ecommerce.com/peers/peer1.ecommerce.com/tls/ca.crt
       
@@ -86,12 +89,14 @@ peers:
     url: grpcs://localhost:9051
     grpcOptions:
       ssl-target-name-override: peer0.seller.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/seller.com/peers/peer0.seller.com/tls/ca.crt
   peer1.seller.com:
     url: grpcs://localhost:9061
     grpcOptions:
       ssl-target-name-override: peer1.seller.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/seller.com/peers/peer1.seller.com/tls/ca.crt
 
@@ -100,18 +105,20 @@ peers:
     url: grpcs://localhost:11051
     grpcOptions:
       ssl-target-name-override: peer0.shipper.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com/tls/ca.crt
   peer1.shipper.com:
     url: grpcs://localhost:11061
     grpcOptions:
       ssl-target-name-override: peer1.shipper.com
+      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/shipper.com/peers/peer1.shipper.com/tls/ca.crt
 
 certificateAuthorities:
   ca.ecommerce.com:
-    url: https://localhost:7054 # (Chúng ta không dùng CA, nhưng SDK cần)
+    url: https://localhost:7054
     tlsCACerts:
       path: /home/hadoopquynhthu/my-ecommerce-network/organizations/peerOrganizations/ecommerce.com/ca/ca.ecommerce.com-cert.pem
     caName: ca.ecommerce.com

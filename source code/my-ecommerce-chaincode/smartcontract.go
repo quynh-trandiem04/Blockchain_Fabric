@@ -78,12 +78,13 @@ func getTimeNow(ctx contractapi.TransactionContextInterface) (time.Time, error) 
 
 // InitLedger (Tùy chọn): Thêm một số dữ liệu mẫu để test.
 func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) error {
-	// để trống hàm này hoặc thêm dữ liệu test
+	// Bạn có thể để trống hàm này hoặc thêm dữ liệu test
 	return nil
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 1] CreateOrder: Sàn TMĐT tạo một đơn hàng mới
+// [HÀM 1] 
+// : Sàn TMĐT tạo một đơn hàng mới
 // Chính sách (EP): OR('ECommercePlatformOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
@@ -95,9 +96,9 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 	if err != nil {
 		return err
 	}
-	if actorOrg != "ECommercePlatformOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ tổ chức 'ECommercePlatformOrgMSP' mới được phép tạo đơn hàng")
-	}
+	// if actorOrg != "ECommercePlatformOrgMSP" {
+	// 	return fmt.Errorf("lỗi: chỉ tổ chức 'ECommercePlatformOrgMSP' mới được phép tạo đơn hàng")
+	// }
 
 	// 2. Kiểm tra Pre-condition: Đơn hàng chưa tồn tại
 	exists, err := s.orderExists(ctx, orderID)
@@ -120,8 +121,8 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 		codStatus = "NOT_COLLECTED"
 	}
 
-	// 5. Tạo đối tượng Order 
-	order := Order{
+	// 5. Tạo đối tượng Order
+	order := Order{	
 		DocType:       "Order",
 		OrderID:       orderID,
 		Status:        "CREATED",
@@ -131,9 +132,8 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 		ShipperID:     shipperID,
 		CreatedAt:     txTime,
 		UpdatedAt:     txTime,
-		SellerSensitiveData:  sellerDataBlob,
-        ShipperSensitiveData: shipperDataBlob,
-
+	        SellerSensitiveData:  sellerDataBlob,
+        	ShipperSensitiveData: shipperDataBlob,
 		History: []HistoryEntry{
 			{
 				TxID:      ctx.GetStub().GetTxID(),
@@ -674,3 +674,4 @@ func (s *SmartContract) QueryOrder(ctx contractapi.TransactionContextInterface, 
 
 // (Bạn có thể thêm các hàm Rich Query (truy vấn phức tạp) cho CouchDB ở đây)
 // Ví dụ: func (s *SmartContract) QueryOrdersBySeller(ctx contractapi.TransactionContextInterface, sellerID string) ([]*Order, error) { ... }
+
