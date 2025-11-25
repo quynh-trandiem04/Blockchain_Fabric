@@ -1,3 +1,5 @@
+// my-medusa-store/src/subscribers/order-placed.ts
+
 import { 
   type SubscriberConfig, 
   type SubscriberArgs,

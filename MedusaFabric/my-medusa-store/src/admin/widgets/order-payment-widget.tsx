@@ -1,3 +1,5 @@
+// my-medusa-store/src/admin/widgets/order-payment-widget.tsx
+
 import { defineWidgetConfig } from "@medusajs/admin-sdk";
 import { Button, Container, Heading, Text, toast, Badge } from "@medusajs/ui";
 import { DetailWidgetProps, AdminOrder } from "@medusajs/framework/types";
