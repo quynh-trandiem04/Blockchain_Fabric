@@ -8,6 +8,8 @@ const ROLE_ADMIN = 'ecommerceplatformorgmsp';
 const ROLE_SELLER = 'sellerorgmsp';
 const ROLE_SHIPPER = 'shipperorgmsp';
 
+const STOREFRONT_URL = "http://localhost:8000"; 
+
 const RoleGuardWidget = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [debugInfo, setDebugInfo] = useState<any>({});
@@ -50,56 +52,54 @@ const RoleGuardWidget = () => {
 
       // --- LOGIC PHÂN QUYỀN MỚI ---
 
-      // 1. Ưu tiên cao nhất: Email Admin cứng (Super Admin)
-      if (email.includes('admin') || email.includes('thuquynh')) {
-          decision = "ALLOW";
-          reason = "Email Admin Whitelist";
-      }
-      // 2. Check Role Admin tổ chức (metadata: ecommerceplatformorgmsp)
-      else if (normalizedRole === ROLE_ADMIN) {
+      // 1. Admin role
+      if (normalizedRole === ROLE_ADMIN) {
           decision = "ALLOW";
           reason = "Role Admin hợp lệ";
       }
-      // 3. Check Seller
+      // 2. Check Seller
       else if (normalizedRole === ROLE_SELLER) {
           decision = "BLOCK_SELLER";
-          reason = "Là Seller -> Chặn";
+          reason = "Là Seller -> Chuyển về Dashboard Seller";
       }
-      // 4. Check Shipper
+      // 3. Check Shipper
       else if (normalizedRole === ROLE_SHIPPER) {
           decision = "BLOCK_SHIPPER";
-          reason = "Là Shipper -> Chặn";
+          reason = "Là Shipper -> Chuyển về Dashboard Shipper";
       }
-      // 5. Trường hợp Rỗng (Khách) hoặc Role lạ -> CHẶN HẾT
+      // 4. Trường hợp Rỗng (Khách) hoặc Role lạ 
       else {
           decision = "BLOCK_GUEST";
-          reason = !normalizedRole ? "Tài khoản Khách (Không có Role)" : `Role lạ: ${normalizedRole}`;
+          reason = "Khách hàng -> Chuyển về Trang chủ mua sắm";
       }
 
-      setDebugInfo({
-          email,
-          originalRole: metaRole,
-          normalizedRole,
-          decision,
-          reason
-      });
+      setDebugInfo({ email, reason });
 
-      // NẾU QUYẾT ĐỊNH LÀ BLOCK -> THỰC THI NGAY
+      // NẾU QUYẾT ĐỊNH LÀ BLOCK -> ĐIỀU HƯỚNG SANG PORT 8000
       if (decision.startsWith("BLOCK")) {
           setShouldBlock(true);
           
           // Tự động Redirect
           setTimeout(() => {
-              if (decision === "BLOCK_SELLER") window.location.href = "/app/partner";
-              else if (decision === "BLOCK_SHIPPER") window.location.href = "/app/shipper";
-              else window.location.href = "/app/login"; // Khách hoặc role lạ -> Về login
+              if (decision === "BLOCK_SELLER") {
+                  // Về trang Seller
+                  window.location.href = `${STOREFRONT_URL}/dk/partner`;
+              } 
+              else if (decision === "BLOCK_SHIPPER") {
+                  // Về trang Shipper
+                  window.location.href = `${STOREFRONT_URL}/dk/shipper`;
+              } 
+              else {
+                  // Khách/Lạ -> Về trang chủ Storefront
+                  window.location.href = `${STOREFRONT_URL}/`;
+              }
           }, 1500);
       }
   };
 
   if (isLoading) return null;
 
-  // --- MÀN HÌNH CHẶN (BLOCKING UI) ---
+  // --- MÀN HÌNH CHẶN & CHUYỂN HƯỚNG ---
   if (shouldBlock) {
       return (
         <div style={{
@@ -107,26 +107,32 @@ const RoleGuardWidget = () => {
             background: 'rgba(255, 255, 255, 0.98)', zIndex: 9999,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
         }}>
-            <Heading level="h1" className="text-red-600 text-4xl mb-4">⛔ TRUY CẬP BỊ TỪ CHỐI</Heading>
-            <div className="bg-gray-100 p-6 rounded-lg border border-gray-300 text-center">
-                <Text className="text-lg font-bold mb-2">Tài khoản: {debugInfo.email}</Text>
-                <Text className="mb-4">Lý do: <Badge color="red">{debugInfo.reason}</Badge></Text>
-                <Text className="text-gray-500 italic">Đang chuyển hướng...</Text>
+            <Heading level="h1" className="text-red-600 text-4xl mb-4">⛔ ĐANG CHUYỂN HƯỚNG</Heading>
+            <div className="bg-gray-100 p-6 rounded-lg border border-gray-300 text-center max-w-md">
+                <Text className="text-lg font-bold mb-2">Xin chào: {debugInfo.email}</Text>
+                <Text className="mb-4 text-gray-700">{debugInfo.reason}</Text>
+                
+                <div className="flex justify-center my-4">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+                
+                <Text className="text-gray-500 italic text-xs">
+                    Đang đưa bạn về <b>{STOREFRONT_URL}</b>...
+                </Text>
             </div>
+            {/* Nút thoát hiểm nếu redirect treo */}
             <Button variant="secondary" className="mt-6" onClick={() => window.location.href = "/app/login"}>
-                Đăng xuất ngay
+                Đăng xuất khỏi Admin
             </Button>
         </div>
       );
   }
 
-  // --- NẾU LÀ ADMIN (ALLOW) ---
-  // Return null để ẩn widget đi, trả lại giao diện sạch cho Admin
+  // Nếu là Admin -> Ẩn widget đi
   return null;
 };
 
 export const config = defineWidgetConfig({
-  // FIX 1: Sửa tên zone 'pricing' thành 'price_list'
   zone: [
     "order.list.before",
     "order.details.before",
