@@ -140,7 +140,7 @@ export const config = defineWidgetConfig({
     "product.details.before",
     "customer.list.before",
     "customer.details.before",
-    "price_list.list.before" 
+    "price_list.list.before" ,
   ],
 });
 

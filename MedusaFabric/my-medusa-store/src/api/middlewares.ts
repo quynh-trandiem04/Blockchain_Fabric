@@ -1,5 +1,4 @@
 // my-medusa-store/src/api/middlewares.ts
-
 import { defineMiddlewares } from "@medusajs/medusa";
 import { MedusaRequest, MedusaResponse, MedusaNextFunction } from "@medusajs/framework/http";
 import { Modules } from "@medusajs/utils";
