@@ -3,6 +3,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
 
@@ -25,9 +26,13 @@ export default function ShipperDashboard() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   
-  // State quản lý đăng nhập & quyền
+  // Router & Params
+  const router = useRouter()
+  const params = useParams()
+  const countryCode = params?.countryCode || "us"
+
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isCheckingRole, setIsCheckingRole] = useState(true) // <--- QUAN TRỌNG: Mặc định đang check
+  const [isCheckingRole, setIsCheckingRole] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false) 
   
   // State dữ liệu
@@ -46,7 +51,12 @@ export default function ShipperDashboard() {
               headers: { "Authorization": `Bearer ${token}` }
           })
 
-          if (!res.ok) throw new Error("Token invalid");
+          if (!res.ok) {
+              console.warn("Token không hợp lệ/hết hạn. Chuyển hướng về Shop.");
+              localStorage.removeItem("medusa_token");
+              router.push(`/${countryCode}`);
+              return;
+          }
           
           const { user } = await res.json()
           const role = user.metadata?.fabric_role;
@@ -54,7 +64,7 @@ export default function ShipperDashboard() {
           console.log(`   -> User Role: ${role}`);
 
           // CHỈ CHO PHÉP SHIPPER
-          if (role !== 'shipperorgmsp' && user.email !== 'superadmin@test.com') {
+          if (role !== 'shipperorgmsp' || role === undefined) {
               console.error(`   ⛔ [BLOCK] Role '${role}' bị từ chối.`);
               setIsAuthorized(false)
           } else {
@@ -209,7 +219,8 @@ export default function ShipperDashboard() {
                 <div className="text-5xl mb-4">⛔</div>
                 <h1 className="text-2xl font-bold text-red-600 mb-2">TRUY CẬP BỊ TỪ CHỐI</h1>
                 <p className="text-gray-600 mb-6">
-                    Tài khoản này không phải là <b>SHIPPER</b>.
+                    Tài khoản này không có quyền truy cập trang <b>SHIPPER</b>.
+                    <br/>Vui lòng liên hệ Admin hoặc đăng nhập tài khoản khác.
                 </p>
                 <button onClick={handleLogout} className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-bold transition">
                     Đăng xuất

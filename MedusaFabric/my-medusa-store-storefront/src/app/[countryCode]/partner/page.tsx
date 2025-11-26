@@ -3,6 +3,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useParams } from "next/navigation"
+
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
 
@@ -23,6 +25,12 @@ interface OrderRow {
 export default function SellerDashboard() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+
+  // Khởi tạo Router và Params
+  const router = useRouter()
+  const params = useParams()
+  const countryCode = params?.countryCode || "us"
+
   
   // State quản lý đăng nhập & quyền
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -45,8 +53,12 @@ export default function SellerDashboard() {
               headers: { "Authorization": `Bearer ${token}` }
           })
           
+          // Nếu Token lỗi (User khách hoặc hết hạn) -> Redirect về trang mua hàng
           if (!res.ok) {
-              throw new Error("Token không hợp lệ hoặc hết hạn");
+              console.warn("Token không hợp lệ. Chuyển hướng về Storefront.");
+              localStorage.removeItem("medusa_token");
+              router.push(`/${countryCode}`); // Chuyển về trang chủ
+              return;
           }
 
           const { user } = await res.json()
@@ -54,8 +66,8 @@ export default function SellerDashboard() {
           
           console.log(`   -> User: ${user.email} | Role: ${role}`);
 
-          // LOGIC CHẶN: Chỉ cho phép sellerorgmsp hoặc superadmin
-          if (role !== 'sellerorgmsp' && user.email !== 'superadmin@test.com') {
+          // LOGIC CHẶN: Chỉ cho phép sellerorgmsp
+          if (role !== 'sellerorgmsp' || role === undefined) {
               console.error(`   ⛔ [BLOCK] Role '${role}' bị từ chối.`);
               setIsAuthorized(false) 
           } else {
