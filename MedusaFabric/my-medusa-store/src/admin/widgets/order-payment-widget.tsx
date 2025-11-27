@@ -55,10 +55,10 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
       const result = await res.json();
 
       if (res.ok) {
-        toast.success("Thành công", { description: "Đã xác nhận thanh toán." });
+        toast.success("Success", { description: "Payment completed" });
         await checkFabricStatus();
       } else {
-        toast.error("Lỗi", { description: result.error || "Thất bại." });
+        toast.error("Error", { description: result.error || "Failed." });
       }
     } catch (err) {
       toast.error("Lỗi kết nối");
@@ -91,13 +91,13 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
 
         {fabricStatus && fabricStatus.paymentMethod === "PREPAID" && fabricStatus.status === "CREATED" && (
              <Button variant="secondary" onClick={handleConfirmPayment} isLoading={isLoading}>
-                Xác nhận Thanh toán
+                Confirm payment
             </Button>
         )}
 
         {fabricStatus && fabricStatus.status === "PAID" && (
              <Button disabled variant="transparent" className="text-green-600 font-bold">
-                ✓ Đã Thanh Toán
+                ✓ Payment completed
             </Button>
         )}
       </div>

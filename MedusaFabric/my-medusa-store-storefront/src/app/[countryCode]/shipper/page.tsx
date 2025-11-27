@@ -15,10 +15,18 @@ interface OrderRow {
     email: string;
     currency_code: string;
     total: number; 
-    payment_method_id: string;
   };
   status: "Pending" | "Success" | "Error";
-  decryptedData: any; 
+  // Blockchain Data
+  decryptedData: {
+      customerName: string;
+      shipping_address: string;
+      shipping_phone: string;
+      shipping_fee: number;
+      cod_amount: number;
+      status: string;        // Blockchain Status
+      paymentMethod: string; // COD/PREPAID
+  } | null; 
   error?: string;
 }
 
@@ -41,9 +49,31 @@ export default function ShipperDashboard() {
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
 
+  // Helper Badge
+  const getBlockchainStatusBadge = (status: string) => {
+      const styles: Record<string, string> = {
+          CREATED: "bg-gray-100 text-gray-700",
+          PAID: "bg-green-100 text-green-700",
+          SHIPPED: "bg-blue-100 text-blue-700",
+          DELIVERED: "bg-teal-100 text-teal-700",
+          DELIVERED_COD_PENDING: "bg-orange-100 text-orange-700",
+          COD_REMITTED: "bg-indigo-100 text-indigo-700",
+          SETTLED: "bg-purple-100 text-purple-700",
+          CANCELLED: "bg-red-100 text-red-700",
+      };
+      
+      if (!status) return null;
+
+      return (
+          <span className={`text-[10px] font-bold px-2 py-1 rounded border border-transparent ${styles[status] || "bg-gray-100"} uppercase`}>
+              {status.replace(/_/g, " ")}
+          </span>
+      );
+  }
+
   // --- 1. HÀM KIỂM TRA ROLE ---
   const checkUserRole = async (token: string) => {
-      console.log("🔍 [FE CHECK] Đang kiểm tra quyền truy cập Shipper...");
+      console.log("🔍 [FE CHECK] Shipper Auth...");
       setIsCheckingRole(true);
 
       try {
@@ -91,12 +121,6 @@ export default function ShipperDashboard() {
     } catch (e) { return `${amount} ${code}`; }
   }
 
-  const getPaymentLabel = (id: string) => {
-      if (id === 'manual' || id === 'pp_system_default') return 'PREPAID';
-      return id.toUpperCase();
-  }
-
-  // --- 2. EFFECT KHỞI TẠO ---
   useEffect(() => {
     const token = localStorage.getItem("medusa_token")
     if (token) { 
@@ -143,7 +167,7 @@ export default function ShipperDashboard() {
     if (!token) return
 
     try {
-        const ordersRes = await fetch(`${BACKEND_URL}/admin/orders?limit=20&offset=0&fields=id,display_id,created_at,email,total,currency_code,payment_collections.payment_sessions`, {
+        const ordersRes = await fetch(`${BACKEND_URL}/admin/orders?limit=20&offset=0&fields=id,display_id,created_at,email,total,currency_code,payment_collections.payment_sessions,fulfillment_status,status`, {
             headers: { "Authorization": `Bearer ${token}` }
         })
 
@@ -168,7 +192,6 @@ export default function ShipperDashboard() {
                     email: order.email,
                     currency_code: order.currency_code || "USD",
                     total: order.total,
-                    payment_method_id: providerId
                 },
                 status: "Pending",
                 decryptedData: null
@@ -290,11 +313,19 @@ export default function ShipperDashboard() {
                                 </div>
                                 <div className="text-xs text-gray-500 mt-1">{order.created_at}</div>
                             </div>
-                            <div className="text-right">
-                                <span className="block text-[10px] font-bold uppercase text-gray-500 mb-1 bg-gray-200 px-2 rounded">
-                                    {getPaymentLabel(order.publicData.payment_method_id)}
-                                </span>
-                                {order.status === "Success" && <span className="text-[10px] text-green-600 font-bold border border-green-200 px-2 py-1 rounded bg-green-50">🔒 Secured</span>}
+
+                           {/* STATUS TỪ BLOCKCHAIN */}
+                           <div className="text-right flex flex-col items-end gap-1">
+                               {order.status === "Success" && order.decryptedData ? (
+                                   <>
+                                       <span className="block text-[10px] font-bold uppercase text-gray-500 mb-1 bg-gray-200 px-2 rounded">
+                                           {order.decryptedData.paymentMethod}
+                                       </span>
+                                       {getBlockchainStatusBadge(order.decryptedData.status)}
+                                   </>
+                               ) : (
+                                   <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded">SYNCING...</span>
+                               )}
                             </div>
                         </div>
 
@@ -339,9 +370,7 @@ export default function ShipperDashboard() {
                             <div className="px-5 py-4 bg-orange-50 border-t border-orange-100 flex justify-between items-center">
                                 <div>
                                     <span className="text-xs font-bold text-orange-800 uppercase tracking-wide block">Cần thu hộ (COD)</span>
-                                    {order.decryptedData.cod_amount === 0 && (
-                                        <span className="text-[10px] text-green-600 font-bold">(Đã thanh toán)</span>
-                                    )}
+                                    {order.decryptedData.cod_amount === 0}
                                 </div>
                                 <span className="text-xl font-bold text-orange-700">
                                     {formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}

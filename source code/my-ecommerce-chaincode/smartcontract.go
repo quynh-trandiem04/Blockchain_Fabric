@@ -243,7 +243,7 @@ func (s *SmartContract) CancelOrder(ctx contractapi.TransactionContextInterface,
 
 // -----------------------------------------------------------------------------------
 // [HÀM 4] ShipOrder: Nhà Bán & Vận chuyển bàn giao hàng
-// Chính sách (EP): AND('SellerOrg.member', 'ShipperOrg.member')
+// Chính sách (EP): OR('SellerOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ShipOrder(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL (Logic này kiểm tra NGƯỜI GỬI, EP `AND` sẽ được Fabric kiểm tra lúc commit)
@@ -251,8 +251,8 @@ func (s *SmartContract) ShipOrder(ctx contractapi.TransactionContextInterface, o
 	if err != nil {
 		return err
 	}
-	if actorOrg != "SellerOrgMSP" && actorOrg != "ShipperOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'SellerOrgMSP' hoặc 'ShipperOrgMSP' mới được gọi hàm này")
+	if actorOrg != "SellerOrgMSP" {
+		return fmt.Errorf("lỗi: chỉ 'SellerOrgMSP' mới được gọi hàm này")
 	}
 
 	// 2. Lấy đơn hàng
@@ -674,4 +674,5 @@ func (s *SmartContract) QueryOrder(ctx contractapi.TransactionContextInterface, 
 
 // (Bạn có thể thêm các hàm Rich Query (truy vấn phức tạp) cho CouchDB ở đây)
 // Ví dụ: func (s *SmartContract) QueryOrdersBySeller(ctx contractapi.TransactionContextInterface, sellerID string) ([]*Order, error) { ... }
+
 

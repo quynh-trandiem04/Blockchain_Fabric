@@ -44,7 +44,7 @@ class FabricService {
     // Constructor nhận container (dependency injection)
     constructor() {
         this.config = this._loadKeys();
-        this.connected = false;
+        this.gateways = {}; 
     }
 
     _loadKeys() {
@@ -61,31 +61,53 @@ class FabricService {
             return {}; 
         }
     }
-    
-    async _getContract() {
-        if (this.connected) return { gateway: this.gateway, contract: this.contract };
+
+    async _getContract(orgName = 'admin') {
+        // Mapping tên Org sang tên User trong Wallet
+        // Giả sử bạn đã enroll các user này vào wallet:
+        // 'admin' -> Admin của EcommercePlatform (Mặc định)
+        // 'seller' -> Admin hoặc User của SellerOrg
+        const identityMap = {
+            'admin': 'admin', 
+            'sellerorgmsp': 'seller_admin',   // <--- Khớp với IDENTITY_LABEL trong enrollSeller.js
+            'shipperorgmsp': 'shipper_admin', // <--- Khớp với IDENTITY_LABEL trong enrollShipper.js
+            'ecommerceplatformorgmsp': 'admin'
+        };
+
+        const userId = identityMap[orgName] || 'admin';
+
+        // Nếu đã có kết nối cho user này thì dùng lại
+        if (this.gateways[userId]) {
+            const network = await this.gateways[userId].getNetwork(CHANNEL_NAME);
+            return { contract: network.getContract(CC_NAME) };
+        }
 
         const ccpPath = path.join(ARTIFACTS_PATH, 'connection-profile.yaml');
         const ccp = yaml.load(fs.readFileSync(ccpPath, 'utf8'));
         const walletPath = path.join(ARTIFACTS_PATH, 'wallet');
         const wallet = await Wallets.newFileSystemWallet(walletPath);
-        const identity = await wallet.get('admin');
+        const identity = await wallet.get(userId);
 
-        if (!identity) throw new Error('Fabric Admin identity not found. Run enrollAdmin.js.');
+        if (!identity) {
+            console.warn(`⚠️ Warning: Identity '${userId}' not found in wallet. Fallback to 'admin'.`);
+            // Nếu không tìm thấy user seller, thử fallback về admin (nhưng sẽ bị lỗi quyền nếu chaincode chặn)
+            if (userId !== 'admin') return this._getContract('admin');
+            throw new Error(`Identity '${userId}' not found. Run enrollment script.`);
+        }
 
-        this.gateway = new Gateway();
-        await this.gateway.connect(ccp, {
+        const gateway = new Gateway();
+        await gateway.connect(ccp, {
             wallet,
-            identity: 'admin',
-            discovery: { enabled: true, asLocalhost: false }
+            identity: userId,
+            discovery: { enabled: true, asLocalhost: false } // Đổi asLocalhost: true nếu chạy local docker
         });
 
-        const network = await this.gateway.getNetwork(CHANNEL_NAME);
-        this.contract = network.getContract(CC_NAME);
-        this.connected = true;
+        console.log(`✅ Fabric Gateway connected as: ${userId}`);
+        this.gateways[userId] = gateway;
 
-        return { gateway: this.gateway, contract: this.contract };
-    }
+        const network = await gateway.getNetwork(CHANNEL_NAME);
+        return { contract: network.getContract(CC_NAME) };
+}
 
     async createOrder(data) {
         const { contract } = await this._getContract();
@@ -193,6 +215,15 @@ class FabricService {
 
         return result ? result.toString() : 'CONFIRMED_VALID';
     }
-}
 
+    async shipOrder(orderId, role = 'sellerorgmsp') {
+        const { contract } = await this._getContract(role);
+        
+        console.log(`[FabricService] Executing ShipOrder for: ${orderId} as ${role}`);
+        
+        const result = await contract.submitTransaction('ShipOrder', orderId);
+        
+        return result ? result.toString() : 'SHIPPED_SUCCESS';
+    }
+}
 module.exports = FabricService;
