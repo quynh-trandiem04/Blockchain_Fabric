@@ -225,5 +225,16 @@ class FabricService {
         
         return result ? result.toString() : 'SHIPPED_SUCCESS';
     }
+
+    async confirmDelivery(orderId) {
+        const { contract } = await this._getContract('shipperorgmsp'); 
+        
+        console.log(`[FabricService] Executing ConfirmDelivery for: ${orderId}`);
+        
+        const result = await contract.submitTransaction('ConfirmDelivery', orderId);
+        
+        return result ? result.toString() : 'DELIVERY_CONFIRMED';
+    }
+    
 }
 module.exports = FabricService;

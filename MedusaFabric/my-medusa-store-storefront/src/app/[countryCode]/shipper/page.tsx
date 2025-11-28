@@ -15,6 +15,9 @@ interface OrderRow {
     email: string;
     currency_code: string;
     total: number; 
+    payment_method_id: string;
+    fulfillment_status: string;
+    status: string;
   };
   status: "Pending" | "Success" | "Error";
   // Blockchain Data
@@ -42,34 +45,36 @@ export default function ShipperDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isCheckingRole, setIsCheckingRole] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false) 
-  
+
   // State dữ liệu
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
+  const [isDelivering, setIsDelivering] = useState<string | null>(null); // State loading cho nút
 
   // Helper Badge
   const getBlockchainStatusBadge = (status: string) => {
       const styles: Record<string, string> = {
-          CREATED: "bg-gray-100 text-gray-700",
-          PAID: "bg-green-100 text-green-700",
-          SHIPPED: "bg-blue-100 text-blue-700",
-          DELIVERED: "bg-teal-100 text-teal-700",
-          DELIVERED_COD_PENDING: "bg-orange-100 text-orange-700",
-          COD_REMITTED: "bg-indigo-100 text-indigo-700",
-          SETTLED: "bg-purple-100 text-purple-700",
-          CANCELLED: "bg-red-100 text-red-700",
+          CREATED: "bg-gray-100 text-gray-700 border-gray-300",
+          PAID: "bg-green-100 text-green-700 border-green-300",
+          SHIPPED: "bg-blue-100 text-blue-700 border-blue-300",
+          DELIVERED: "bg-teal-100 text-teal-700 border-teal-300",
+          DELIVERED_COD_PENDING: "bg-orange-100 text-orange-700 border-orange-300",
+          COD_REMITTED: "bg-indigo-100 text-indigo-700 border-indigo-300",
+          SETTLED: "bg-purple-100 text-purple-700 border-purple-300",
+          CANCELLED: "bg-red-100 text-red-700 border-red-300",
       };
       
-      if (!status) return null;
+      if (!status) return <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-1 rounded border border-gray-200">SYNCING...</span>;
 
       return (
-          <span className={`text-[10px] font-bold px-2 py-1 rounded border border-transparent ${styles[status] || "bg-gray-100"} uppercase`}>
+          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${styles[status] || "bg-gray-50 text-gray-500"} uppercase shadow-sm`}>
               {status.replace(/_/g, " ")}
           </span>
       );
   }
+
 
   // --- 1. HÀM KIỂM TRA ROLE ---
   const checkUserRole = async (token: string) => {
@@ -119,6 +124,47 @@ export default function ShipperDashboard() {
     try {
       return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: code }).format(amount); 
     } catch (e) { return `${amount} ${code}`; }
+  }
+//   const getPaymentLabel = (id: string) => {
+//       if (id === 'manual' || id === 'pp_system_default') return 'PREPAID';
+//       return id.toUpperCase();
+//   }
+  const getPaymentLabel = (id: string) => {
+      if (id === 'manual' || id === 'pp_system_default' || id === 'PREPAID') return 'PREPAID';
+      if (id === 'COD') return 'COD';
+      if (id === 'unknown') return 'Checking...';
+      return id.toUpperCase();
+  }
+
+  // --- HÀM GỌI API GIAO HÀNG ---
+  const handleConfirmDelivery = async (orderId: string) => {
+      if(!confirm("Xác nhận đã giao hàng thành công cho khách?")) return;
+
+      setIsDelivering(orderId);
+      const token = localStorage.getItem("medusa_token");
+
+      try {
+          const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/deliver`, {
+              method: "POST",
+              headers: { 
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+              }
+          });
+
+          const result = await res.json();
+
+          if (res.ok) {
+              alert("✅ Xác nhận giao hàng thành công!");
+              loadShipperOrders(token || ""); 
+          } else {
+              alert("❌ Lỗi: " + (result.error || "Thất bại"));
+          }
+      } catch (err) {
+          alert("❌ Lỗi kết nối server");
+      } finally {
+          setIsDelivering(null);
+      }
   }
 
   useEffect(() => {
@@ -182,7 +228,13 @@ export default function ShipperDashboard() {
 
         await Promise.all(
           medusaOrders.map(async (order: any) => {
-            const providerId = order.payment_collections?.[0]?.payment_sessions?.[0]?.provider_id || 'unknown';
+            let providerId = 'unknown';
+            if (order.payment_collections && order.payment_collections.length > 0) {
+                const sessions = order.payment_collections[0].payment_sessions;
+                if (sessions && sessions.length > 0) {
+                    providerId = sessions[0].provider_id;
+                }
+            }
 
             const row: OrderRow = {
                 id: order.id,
@@ -192,6 +244,9 @@ export default function ShipperDashboard() {
                     email: order.email,
                     currency_code: order.currency_code || "USD",
                     total: order.total,
+                    payment_method_id: providerId,
+                    fulfillment_status: order.fulfillment_status,
+                    status: order.status
                 },
                 status: "Pending",
                 decryptedData: null
@@ -205,12 +260,15 @@ export default function ShipperDashboard() {
                 }
               })
               if (res.ok) {
+                const data = await res.json()
                 row.status = "Success"
-                row.decryptedData = await res.json()
+                row.decryptedData = data
+                if (row.publicData.payment_method_id === 'unknown' && data.paymentMethod) {
+                    row.publicData.payment_method_id = data.paymentMethod;
+                }
               } else {
-                const err = await res.json()
                 row.status = "Error"
-                row.error = err.error || "Không có quyền"
+                row.error = "Chưa đồng bộ Blockchain"
               }
             } catch (e) { row.status = "Error" }
             loadedOrders.push(row)
@@ -314,25 +372,33 @@ export default function ShipperDashboard() {
                                 <div className="text-xs text-gray-500 mt-1">{order.created_at}</div>
                             </div>
 
-                           {/* STATUS TỪ BLOCKCHAIN */}
+                           {/* STATUS & PAYMENT TỪ BLOCKCHAIN */}
                            <div className="text-right flex flex-col items-end gap-1">
+                                {/* <span className="block text-[10px] font-bold uppercase text-gray-500 mb-1 bg-gray-200 px-2 rounded">
+                                   {getPaymentLabel(order.publicData.payment_method_id)}
+                                </span> */}
+                               {/* --- HIỂN THỊ STATUS BADGE CHO SHIPPER --- */}
                                {order.status === "Success" && order.decryptedData ? (
                                    <>
+                                       {/* Status nằm trên */}
+                                       {getBlockchainStatusBadge(order.decryptedData.status)}
+                                       
+                                       {/* Payment Method nằm dưới */}
                                        <span className="block text-[10px] font-bold uppercase text-gray-500 mb-1 bg-gray-200 px-2 rounded">
                                            {order.decryptedData.paymentMethod}
                                        </span>
-                                       {getBlockchainStatusBadge(order.decryptedData.status)}
-                                   </>
-                               ) : (
+                                   </>                               
+                                ) : (
                                    <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded">SYNCING...</span>
                                )}
-                            </div>
-                        </div>
+                           </div>
+                       </div>
 
                         {/* Body Card */}
-                        <div className="p-5 flex-grow flex flex-col gap-3">
-                            {order.decryptedData ? (
-                                <>
+                        <div className="p-5 flex-grow flex flex-col gap-3">
+                           {order.decryptedData ? (
+                               <div className="flex flex-col h-full">
+                                   <div className="space-y-4">
                                     <div className="flex items-start gap-3">
                                         <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-lg flex-shrink-0">📍</div>
                                         <div>
@@ -354,8 +420,44 @@ export default function ShipperDashboard() {
                                             {formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code)}
                                         </span>
                                     </div>
-                                </>
-                            ) : (
+                                </div>
+
+                                   {/* --- NÚT BẤM (CẬP NHẬT) --- */}
+                                   <div className="mt-auto pt-4 border-t border-dashed border-gray-200">
+                                        {/* ĐIỀU KIỆN HIỆN NÚT: PREPAID và SHIPPED */}
+                                        {order.decryptedData.paymentMethod === 'PREPAID' && order.decryptedData.status === 'SHIPPED' ? (
+                                            
+                                            <button 
+                                                onClick={() => handleConfirmDelivery(order.id)}
+                                                disabled={isDelivering === order.id}
+                                                className={`w-full py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition shadow-sm
+                                                    ${isDelivering === order.id 
+                                                        ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
+                                                        : "bg-teal-600 hover:bg-teal-700 text-white"
+                                                    }`}
+                                            >
+                                                {isDelivering === order.id ? <>Processing...</> : <>✅ Xác nhận Giao Hàng</>}
+                                            </button>
+
+                                        ) : (
+                                            /* Trạng thái khác */
+                                            <div className="text-center">
+                                                {['DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(order.decryptedData.status) ? (
+                                                    <div className="flex items-center justify-center gap-1 text-teal-700 font-medium text-xs bg-teal-50 px-3 py-1 rounded-full border border-teal-100">
+                                                        <span>🎉</span> Giao thành công
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-xs text-gray-400 italic">
+                                                        {order.decryptedData.paymentMethod === 'COD' 
+                                                            ? "Đơn COD cần quy trình thu tiền riêng" 
+                                                            : "Chưa đến bước giao hàng"}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                   </div>
+                               </div>
+                           ) : (
                                 <div className="text-center py-8 flex flex-col items-center justify-center h-full text-gray-300">
                                     <span className="text-3xl mb-2">🔒</span>
                                     <span className="text-xs">
@@ -369,12 +471,10 @@ export default function ShipperDashboard() {
                         {order.status === "Success" && order.decryptedData && (
                             <div className="px-5 py-4 bg-orange-50 border-t border-orange-100 flex justify-between items-center">
                                 <div>
-                                    <span className="text-xs font-bold text-orange-800 uppercase tracking-wide block">Cần thu hộ (COD)</span>
-                                    {order.decryptedData.cod_amount === 0}
-                                </div>
-                                <span className="text-xl font-bold text-orange-700">
-                                    {formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}
-                                </span>
+                                   <span className="text-xs font-bold text-orange-800 uppercase tracking-wide block">Cần thu hộ (COD)</span>
+                                   {order.decryptedData.cod_amount === 0 && <span className="text-[10px] text-green-600 font-bold">(Đã thanh toán)</span>}
+                               </div>
+                               <span className="text-xl font-bold text-orange-700">{formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}</span>
                             </div>
                         )}
                     </div>
