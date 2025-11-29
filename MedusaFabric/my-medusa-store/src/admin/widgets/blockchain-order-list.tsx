@@ -236,6 +236,12 @@ const BlockchainOrderList = () => {
                     <option value="PAID">Paid</option>
                     <option value="SHIPPED">Shipped</option>
                     <option value="DELIVERED">Delivered</option>
+                    <option value="SETTLED">Settled</option>
+                    <option value="COD_REMITTED">COD Remitted</option>
+                    <option value="DELIVERED_COD_PENDING">Delivered COD Pending</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="RETURNED">Returned</option>
+                    <option value="RETURN_REQUESTED">Return Requested</option>
                 </select>
                     <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#f9fafb', cursor: 'pointer' }}>
                     <option value="ALL">All Payment</option>

@@ -235,6 +235,15 @@ class FabricService {
         
         return result ? result.toString() : 'DELIVERY_CONFIRMED';
     }
-    
+
+    async payoutToSeller(orderId) {
+        const { contract } = await this._getContract('admin'); 
+        
+        console.log(`[FabricService] Executing PayoutToSeller for: ${orderId}`);
+        
+        const result = await contract.submitTransaction('PayoutToSeller', orderId);
+        
+        return result ? result.toString() : 'PAYOUT_SUCCESS';
+    }    
 }
 module.exports = FabricService;
