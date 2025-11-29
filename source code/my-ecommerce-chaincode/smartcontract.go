@@ -390,7 +390,7 @@ func (s *SmartContract) ConfirmCODDelivery(ctx contractapi.TransactionContextInt
 
 // -----------------------------------------------------------------------------------
 // [HÀM 7] RemitCOD: Vận chuyển nộp tiền COD cho Sàn
-// Chính sách (EP): AND('ECommercePlatformOrg.member', 'ShipperOrg.member')
+// Chính sách (EP): OR('ECommercePlatformOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -398,8 +398,8 @@ func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, or
 	if err != nil {
 		return err
 	}
-	if actorOrg != "ECommercePlatformOrgMSP" && actorOrg != "ShipperOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'ECommercePlatformOrgMSP' hoặc 'ShipperOrgMSP' mới được gọi hàm này")
+	if actorOrg != "ECommercePlatformOrgMSP" {
+		return fmt.Errorf("lỗi: chỉ 'ECommercePlatformOrgMSP' mới được gọi hàm này")
 	}
 
 	// 2. Lấy đơn hàng
@@ -434,8 +434,8 @@ func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, or
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 8] PayoutToSeller: Sàn thanh toán cho Nhà Bán (sau 7 ngày)
-// Chính sách (EP): AND('ECommercePlatformOrg.member', 'SellerOrg.member')
+// [HÀM 8] PayoutToSeller: Sàn thanh toán cho Nhà Bán (sau 7 ngày -> DEMO: 5 phút)
+// Chính sách (EP): OR('ECommercePlatformOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) PayoutToSeller(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -443,8 +443,8 @@ func (s *SmartContract) PayoutToSeller(ctx contractapi.TransactionContextInterfa
 	if err != nil {
 		return err
 	}
-	if actorOrg != "ECommercePlatformOrgMSP" && actorOrg != "SellerOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'ECommercePlatformOrgMSP' hoặc 'SellerOrgMSP' mới được gọi hàm này")
+	if actorOrg != "ECommercePlatformOrgMSP" {
+		return fmt.Errorf("lỗi: chỉ 'ECommercePlatformOrgMSP'mới được gọi hàm này")
 	}
 
 	// 2. Lấy đơn hàng
@@ -470,13 +470,14 @@ func (s *SmartContract) PayoutToSeller(ctx contractapi.TransactionContextInterfa
 		return fmt.Errorf("đơn hàng đã được thanh toán (SETTLED) từ trước")
 	}
 
-	// 5. KIỂM TRA LOGIC THỜI GIAN 7 NGÀY (Rất quan trọng)
+    // 5. KIỂM TRA LOGIC THỜI GIAN (DEMO: 5 PHÚT)
 	if order.DeliveryTimestamp.IsZero() {
 		return fmt.Errorf("lỗi: không tìm thấy mốc thời gian giao hàng (deliveryTimestamp)")
 	}
 
-	// Tính 7 ngày sau khi giao hàng (7 * 24 giờ)
-	payoutUnlockTime := order.DeliveryTimestamp.Add(time.Hour * 24 * 7)
+    // Thay vì 7 ngày (time.Hour * 24 * 7), ta dùng 5 phút (time.Minute * 5)
+    // Nhưng thông báo lỗi vẫn giữ nguyên là "7 ngày"
+    payoutUnlockTime := order.DeliveryTimestamp.Add(time.Minute * 5) 
 
 	if txTime.Before(payoutUnlockTime) {
 		return fmt.Errorf("chưa đủ 7 ngày kể từ khi giao hàng. Không thể thanh toán. Mở khóa lúc: %v", payoutUnlockTime)
@@ -497,7 +498,7 @@ func (s *SmartContract) PayoutToSeller(ctx contractapi.TransactionContextInterfa
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 9] RequestReturn: Sàn yêu cầu trả hàng (trong 7 ngày)
+// [HÀM 9] RequestReturn: Sàn yêu cầu trả hàng (trong 7 ngày -> DEMO: 5 phút)
 // Chính sách (EP): OR('ECommercePlatformOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) RequestReturn(ctx contractapi.TransactionContextInterface, orderID string) error {
@@ -527,13 +528,13 @@ func (s *SmartContract) RequestReturn(ctx contractapi.TransactionContextInterfac
 		return fmt.Errorf("lỗi: chỉ có thể trả hàng khi đơn ở trạng thái 'DELIVERED'. Trạng thái hiện tại: %s", order.Status)
 	}
 
-	// 5. KIỂM TRA LOGIC THỜI GIAN 7 NGÀY (Rất quan trọng)
+    // 5. KIỂM TRA LOGIC THỜI GIAN (DEMO: 5 PHÚT)
 	if order.DeliveryTimestamp.IsZero() {
 		return fmt.Errorf("lỗi: không tìm thấy mốc thời gian giao hàng (deliveryTimestamp)")
 	}
 
-	// Tính 7 ngày sau khi giao hàng (7 * 24 giờ)
-	returnDeadline := order.DeliveryTimestamp.Add(time.Hour * 24 * 7)
+    // Thời hạn trả hàng cũng giảm xuống 5 phút để test case "hết hạn trả hàng"
+    returnDeadline := order.DeliveryTimestamp.Add(time.Minute * 5)
 
 	if txTime.After(returnDeadline) {
 		return fmt.Errorf("đã quá 7 ngày kể từ khi giao hàng. Không thể trả hàng. Hạn chót: %v", returnDeadline)
@@ -555,7 +556,7 @@ func (s *SmartContract) RequestReturn(ctx contractapi.TransactionContextInterfac
 
 // -----------------------------------------------------------------------------------
 // [HÀM 10] ShipReturn: Vận chuyển lấy hàng trả từ khách
-// Chính sách (EP): AND('ShipperOrg.member', 'ECommercePlatformOrg.member')
+// Chính sách (EP): OR('ShipperOrgMSP.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ShipReturn(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -563,8 +564,8 @@ func (s *SmartContract) ShipReturn(ctx contractapi.TransactionContextInterface, 
 	if err != nil {
 		return err
 	}
-	if actorOrg != "ShipperOrgMSP" && actorOrg != "ECommercePlatformOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'ShipperOrgMSP' hoặc 'ECommercePlatformOrgMSP' mới được gọi hàm này")
+	if actorOrg != "ShipperOrgMSP" {
+		return fmt.Errorf("lỗi: chỉ 'ShipperOrgMSP' mới được gọi hàm này")
 	}
 
 	// 2. Lấy đơn hàng
@@ -600,7 +601,7 @@ func (s *SmartContract) ShipReturn(ctx contractapi.TransactionContextInterface, 
 
 // -----------------------------------------------------------------------------------
 // [HÀM 11] ConfirmReturnReceived: Nhà Bán nhận lại hàng trả
-// Chính sách (EP): AND('SellerOrg.member', 'ECommercePlatformOrg.member')
+// Chính sách (EP): OR('SellerOrg.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ConfirmReturnReceived(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -608,8 +609,8 @@ func (s *SmartContract) ConfirmReturnReceived(ctx contractapi.TransactionContext
 	if err != nil {
 		return err
 	}
-	if actorOrg != "SellerOrgMSP" && actorOrg != "ECommercePlatformOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'SellerOrgMSP' hoặc 'ECommercePlatformOrgMSP' mới được gọi hàm này")
+	if actorOrg != "SellerOrgMSP" {
+		return fmt.Errorf("lỗi: chỉ 'SellerOrgMSP' mới được gọi hàm này")
 	}
 
 	// 2. Lấy đơn hàng
@@ -674,5 +675,6 @@ func (s *SmartContract) QueryOrder(ctx contractapi.TransactionContextInterface, 
 
 // (Bạn có thể thêm các hàm Rich Query (truy vấn phức tạp) cho CouchDB ở đây)
 // Ví dụ: func (s *SmartContract) QueryOrdersBySeller(ctx contractapi.TransactionContextInterface, sellerID string) ([]*Order, error) { ... }
+
 
 

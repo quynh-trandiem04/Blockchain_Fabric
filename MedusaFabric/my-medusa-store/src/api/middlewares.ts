@@ -4,10 +4,9 @@ import { MedusaRequest, MedusaResponse, MedusaNextFunction } from "@medusajs/fra
 import { Modules } from "@medusajs/utils";
 
 const ALLOWED_ADMIN_ROLES = ['ecommerceplatformorgmsp'];
-
 // CHỈ CHẶN CÁC API DỮ LIỆU
 const PROTECTED_API_ROUTES = [
-    '/admin/orders',
+    // '/admin/orders',
     '/admin/products',
     '/admin/customers',
     '/admin/users',
@@ -17,9 +16,10 @@ const PROTECTED_API_ROUTES = [
 const protectApiData = async (req: MedusaRequest, res: MedusaResponse, next: MedusaNextFunction) => {
   const path = req.path;
   
+  console.log(`🛡️ Middleware Check for Path: ${path}`);
   // 1. CHỈ QUAN TÂM ROUTE BẮT ĐẦU BẰNG /admin (API)
   if (!path.startsWith('/admin')) {
-      return next();
+    return next();
   }
 
   // 2. CHO QUA CÁC ROUTE AN TOÀN
@@ -29,17 +29,20 @@ const protectApiData = async (req: MedusaRequest, res: MedusaResponse, next: Med
 
   // 3. LẤY USER TỪ SESSION
   const actorId = (req as any).auth_context?.actor_id || (req as any).user?.id;
+  console.log(`🛡️ Middleware Actor ID: ${actorId}`);
   if (!actorId) return next();
 
   try {
     // Check quyền trong DB
     const userModuleService = req.scope.resolve(Modules.USER);
     const user = await userModuleService.retrieveUser(actorId, { select: ["id", "email", "metadata"] });
+    console.log("🛡️ Middleware User Retrieved:", user?.email);
     if (!user) return next();
 
     const role = (user.metadata?.fabric_role as string || "").toLowerCase();
     const email = (user.email || "").toLowerCase();
     const isAdmin = ALLOWED_ADMIN_ROLES.includes(role);
+    console.log(`🔍 Middleware Check: ${email} | Role: ${role} | Path: ${path}`);
 
     if (isAdmin) return next();
 
@@ -53,6 +56,7 @@ const protectApiData = async (req: MedusaRequest, res: MedusaResponse, next: Med
     
     next();
   } catch (error) {
+    console.error("Middleware Error:", error);
     next();
   }
 };

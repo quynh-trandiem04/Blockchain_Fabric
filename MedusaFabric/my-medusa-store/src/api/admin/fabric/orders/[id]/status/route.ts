@@ -27,7 +27,6 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         paymentMethod: orderData.paymentMethod,
         codStatus: orderData.codStatus,
         txID: orderData.history?.[0]?.txID || "",
-        // Không trả về seller_sensitive_data hay shipper_sensitive_data
     };
 
     res.json(publicData);

@@ -172,10 +172,10 @@ export default function SellerDashboard() {
               // Đóng modal nếu đang mở đúng đơn hàng đó
               if (selectedOrder?.id === orderId) setSelectedOrder(null);
           } else {
-              alert("❌ Lỗi: " + (result.error || "Thất bại"));
+              alert(" Lỗi: " + (result.error || "Thất bại"));
           }
       } catch (err) {
-          alert("❌ Lỗi kết nối server");
+          alert(" Lỗi kết nối server");
       } finally {
           setIsShipping(null);
       }
@@ -309,7 +309,6 @@ export default function SellerDashboard() {
       return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
             <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md border border-red-100">
-                <div className="text-5xl mb-4">⛔</div>
                 <h1 className="text-2xl font-bold text-red-600 mb-2">TRUY CẬP BỊ TỪ CHỐI</h1>
                 <p className="text-gray-600 mb-6">
                     Tài khoản này không có quyền truy cập trang <b>SELLER</b>.
@@ -329,7 +328,6 @@ export default function SellerDashboard() {
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
            <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
              <div className="text-center mb-8">
-                <span className="text-4xl">🏪</span>
                 <h2 className="text-2xl font-bold mt-2 text-gray-800">Cổng Seller</h2>
                 <p className="text-gray-500 text-sm">Đăng nhập để quản lý đơn hàng</p>
              </div>
@@ -344,7 +342,7 @@ export default function SellerDashboard() {
                   <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="••••••••" required />
                </div>
                
-               {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center">⚠️ {loginError}</div>}
+               {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center"> {loginError}</div>}
                
                <button type="submit" disabled={isLoadingLogin} className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-bold transition flex justify-center items-center">
                   {isLoadingLogin ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span> : "Đăng nhập"}
@@ -422,7 +420,7 @@ export default function SellerDashboard() {
                                     disabled={isShipping === selectedOrder.id}
                                     className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-lg transition"
                                 >
-                                    {isShipping === selectedOrder.id ? "Đang xử lý..." : "📦 BÀN GIAO VẬN CHUYỂN NGAY"}
+                                    {isShipping === selectedOrder.id ? "Đang xử lý..." : " BÀN GIAO VẬN CHUYỂN NGAY"}
                                 </button>
                             ) : (
                                 <div className="text-center text-gray-400 text-sm italic">Trạng thái hiện tại: {selectedOrder.decryptedData.status}</div>
@@ -435,12 +433,11 @@ export default function SellerDashboard() {
       )}
       <nav className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-20">
         <div className="flex items-center gap-2">
-            <span className="text-2xl">🏪</span>
             <h1 className="text-xl font-bold text-blue-700">Kênh Người Bán</h1>
         </div>
         <div className="flex gap-3">
              <button onClick={() => loadSellerOrders()} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium transition">
-                {isLoadingData ? "Đang tải..." : "🔄 Làm mới"}
+                {isLoadingData ? "Đang tải..." : "Làm mới"}
              </button>
              <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium transition">Đăng xuất</button>
         </div>
@@ -540,7 +537,7 @@ export default function SellerDashboard() {
                                                         : "bg-indigo-600 hover:bg-indigo-700 text-white"
                                                     }`}
                                             >
-                                                {isShipping === order.id ? <>Running...</> : <>📦 Giao Vận Chuyển</>}
+                                                {isShipping === order.id ? <>Running...</> : <> Giao Vận Chuyển</>}
                                             </button>
 
                                         ) : (
@@ -548,7 +545,7 @@ export default function SellerDashboard() {
                                             <div className="flex flex-col items-center gap-2 text-center">
                                                 {['SHIPPED', 'DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(order.decryptedData.status) ? (
                                                     <div className="flex items-center justify-center gap-1 text-green-600 font-medium text-xs bg-green-50 px-3 py-1 rounded-full border border-green-100 mb-1">
-                                                        <span>🚚</span> Đã bàn giao vận chuyển
+                                                        <span></span> Đã bàn giao vận chuyển
                                                     </div>
                                                 ) : (
                                                     <div className="text-xs text-gray-400 italic mt-1">
@@ -561,7 +558,6 @@ export default function SellerDashboard() {
                                 </div>
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                                    <span className="text-2xl mb-2">🔒</span>
                                     <span className="text-xs text-gray-500">{order.error || "Đang đồng bộ Blockchain..."}</span>
                                 </div>
                             )}

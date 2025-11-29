@@ -155,13 +155,13 @@ export default function ShipperDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-              alert("✅ Xác nhận giao hàng thành công!");
+              alert(" Xác nhận giao hàng thành công!");
               loadShipperOrders(token || ""); 
           } else {
-              alert("❌ Lỗi: " + (result.error || "Thất bại"));
+              alert(" Lỗi: " + (result.error || "Thất bại"));
           }
       } catch (err) {
-          alert("❌ Lỗi kết nối server");
+          alert(" Lỗi kết nối server");
       } finally {
           setIsDelivering(null);
       }
@@ -297,7 +297,6 @@ export default function ShipperDashboard() {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
             <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md border border-red-100">
-                <div className="text-5xl mb-4">⛔</div>
                 <h1 className="text-2xl font-bold text-red-600 mb-2">TRUY CẬP BỊ TỪ CHỐI</h1>
                 <p className="text-gray-600 mb-6">
                     Tài khoản này không có quyền truy cập trang <b>SHIPPER</b>.
@@ -317,7 +316,6 @@ export default function ShipperDashboard() {
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
            <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
              <div className="text-center mb-8">
-                <span className="text-4xl">🚚</span>
                 <h2 className="text-2xl font-bold mt-2 text-gray-800">Cổng Vận Chuyển</h2>
                 <p className="text-gray-500 text-sm">Đăng nhập để nhận đơn hàng</p>
              </div>
@@ -325,7 +323,7 @@ export default function ShipperDashboard() {
                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="shipper@myfabric.com" required />
                  <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="••••••••" required />
                  
-                 {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center">⚠️ {loginError}</div>}
+                 {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center"> {loginError}</div>}
                  
                  <button type="submit" disabled={isLoadingLogin} className="w-full bg-orange-600 text-white p-3 rounded-lg hover:bg-orange-700 font-bold transition flex justify-center items-center">
                     {isLoadingLogin ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span> : "Truy cập"}
@@ -341,12 +339,11 @@ export default function ShipperDashboard() {
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       <nav className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-20">
         <div className="flex items-center gap-3">
-            <span className="text-2xl">🚚</span>
             <h1 className="text-xl font-bold text-orange-700">Cổng Vận Chuyển</h1>
         </div>
         <div className="flex gap-3">
             <button onClick={() => loadShipperOrders()} className="px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 font-medium transition">
-                {isLoadingData ? "Đang tải..." : "🔄 Làm mới"}
+                {isLoadingData ? "Đang tải..." : "Làm mới"}
             </button>
             <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium transition">Thoát</button>
         </div>
@@ -436,7 +433,7 @@ export default function ShipperDashboard() {
                                                         : "bg-teal-600 hover:bg-teal-700 text-white"
                                                     }`}
                                             >
-                                                {isDelivering === order.id ? <>Processing...</> : <>✅ Xác nhận Giao Hàng</>}
+                                                {isDelivering === order.id ? <>Processing...</> : <> Xác nhận Giao Hàng</>}
                                             </button>
 
                                         ) : (
@@ -444,7 +441,7 @@ export default function ShipperDashboard() {
                                             <div className="text-center">
                                                 {['DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(order.decryptedData.status) ? (
                                                     <div className="flex items-center justify-center gap-1 text-teal-700 font-medium text-xs bg-teal-50 px-3 py-1 rounded-full border border-teal-100">
-                                                        <span>🎉</span> Giao thành công
+                                                        <span></span> Giao thành công
                                                     </div>
                                                 ) : (
                                                     <div className="text-xs text-gray-400 italic">
@@ -459,7 +456,6 @@ export default function ShipperDashboard() {
                                </div>
                            ) : (
                                 <div className="text-center py-8 flex flex-col items-center justify-center h-full text-gray-300">
-                                    <span className="text-3xl mb-2">🔒</span>
                                     <span className="text-xs">
                                         {order.error || "Dữ liệu được mã hóa"}
                                     </span>
