@@ -2,10 +2,34 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
+
+// --- ICONS ---
+const Icons = {
+  Sort: () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3.125 6.875H10.625" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M3.125 13.125H7.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M13.75 14.375L16.875 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M16.875 14.375L13.75 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M15.3125 5.625V14.375" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  Check: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  ),
+  XMark: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  )
+};
 
 interface OrderRow {
   id: string;
@@ -27,11 +51,16 @@ interface OrderRow {
       shipping_phone: string;
       shipping_fee: number;
       cod_amount: number;
-      status: string;        // Blockchain Status
-      paymentMethod: string; // COD/PREPAID
+      status: string;        
+      paymentMethod: string; 
+      product_lines: any[]; // Thêm trường này để hiển thị chi tiết
+      updatedAt?: string; 
   } | null; 
   error?: string;
 }
+
+type SortKey = 'display_id' | 'created_at' | 'updated_at';
+type SortDirection = 'asc' | 'desc';
 
 export default function ShipperDashboard() {
   const [email, setEmail] = useState("")
@@ -51,9 +80,75 @@ export default function ShipperDashboard() {
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
-  const [isDelivering, setIsDelivering] = useState<string | null>(null); // State loading cho nút
+  const [isDelivering, setIsDelivering] = useState<string | null>(null);
+  
+  // State Modal Chi tiết
+  const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
 
-  // Helper Badge
+  // State Filter & Sort
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [paymentFilter, setPaymentFilter] = useState("ALL");
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close sort menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- LOGIC FILTER & SORT ---
+  const processedOrders = useMemo(() => {
+      // 1. Filter
+      let filtered = orders.filter(o => {
+          const status = o.decryptedData?.status || "";
+          const payment = o.decryptedData?.paymentMethod || "";
+          
+          // Search text (ID or Email or Phone)
+          const matchSearch = 
+            o.display_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            o.publicData.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (o.decryptedData?.shipping_phone || "").includes(searchQuery);
+
+          const matchStatus = statusFilter === "ALL" || status === statusFilter;
+          const matchPayment = paymentFilter === "ALL" || payment === paymentFilter;
+
+          return matchSearch && matchStatus && matchPayment;
+      });
+
+      // 2. Sort
+      return filtered.sort((a, b) => {
+          let aVal: any;
+          let bVal: any;
+
+          if (sortKey === 'display_id') {
+              aVal = parseInt(a.display_id.replace('#', ''));
+              bVal = parseInt(b.display_id.replace('#', ''));
+          } else if (sortKey === 'updated_at') {
+              // Ưu tiên lấy updated từ blockchain, nếu không có thì lấy created_at
+              aVal = new Date(a.decryptedData?.updatedAt || a.created_at).getTime();
+              bVal = new Date(b.decryptedData?.updatedAt || b.created_at).getTime();
+          } else {
+              // created_at
+              aVal = new Date(a.created_at).getTime();
+              bVal = new Date(b.created_at).getTime();
+          }
+
+          if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+          return 0;
+      });
+  }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
+
+  // ... (Giữ nguyên các hàm Helper Badge, formatPrice, getPaymentLabel, checkUserRole) ...
   const getBlockchainStatusBadge = (status: string) => {
       const styles: Record<string, string> = {
           CREATED: "bg-gray-100 text-gray-700 border-gray-300",
@@ -66,10 +161,10 @@ export default function ShipperDashboard() {
           CANCELLED: "bg-red-100 text-red-700 border-red-300",
       };
       
-      if (!status) return <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-1 rounded border border-gray-200">SYNCING...</span>;
+      if (!status) return <span className="text-[10px] text-gray-400">...</span>;
 
       return (
-          <span className={`text-[10px] font-bold px-2 py-1 rounded border ${styles[status] || "bg-gray-50 text-gray-500"} uppercase shadow-sm`}>
+          <span className={`text-[10px] font-bold px-2 py-1 rounded border border-transparent ${styles[status] || "bg-gray-100"} uppercase shadow-sm`}>
               {status.replace(/_/g, " ")}
           </span>
       );
@@ -312,6 +407,7 @@ export default function ShipperDashboard() {
 
   // 3. Login State
   if (!isLoggedIn) {
+      // (Phần Login giữ nguyên)
       return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
            <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
@@ -320,14 +416,10 @@ export default function ShipperDashboard() {
                 <p className="text-gray-500 text-sm">Đăng nhập để nhận đơn hàng</p>
              </div>
              <form onSubmit={handleLogin} className="space-y-5">
-                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="shipper@myfabric.com" required />
-                 <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none" placeholder="••••••••" required />
-                 
-                 {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100 flex items-center"> {loginError}</div>}
-                 
-                 <button type="submit" disabled={isLoadingLogin} className="w-full bg-orange-600 text-white p-3 rounded-lg hover:bg-orange-700 font-bold transition flex justify-center items-center">
-                    {isLoadingLogin ? <span className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></span> : "Truy cập"}
-                 </button>
+                 <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg" placeholder="shipper@myfabric.com" required />
+                 <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-gray-300 p-3 rounded-lg" placeholder="Password" required />
+                 {loginError && <div className="text-red-600 text-sm">{loginError}</div>}
+                 <button type="submit" disabled={isLoadingLogin} className="w-full bg-orange-600 text-white p-3 rounded-lg hover:bg-orange-700 font-bold">Login</button>
              </form>
            </div>
         </div>
@@ -336,147 +428,246 @@ export default function ShipperDashboard() {
 
   // 4. Dashboard State
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
-      <nav className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-20">
-        <div className="flex items-center gap-3">
-            <h1 className="text-xl font-bold text-orange-700">Cổng Vận Chuyển</h1>
-        </div>
-        <div className="flex gap-3">
-            <button onClick={() => loadShipperOrders()} className="px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 font-medium transition">
-                {isLoadingData ? "Đang tải..." : "Làm mới"}
-            </button>
-            <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium transition">Thoát</button>
-        </div>
-      </nav>
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 relative">
+      
+      {/* --- MODAL CHI TIẾT ĐƠN HÀNG (CARD STYLE) --- */}
+      {selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in duration-200 overflow-hidden">
+                
+                {/* Modal Header */}
+                <div className="bg-orange-50 px-6 py-4 border-b border-orange-100 flex justify-between items-start">
+                    <div>
+                        <h2 className="text-lg font-bold text-gray-900">{selectedOrder.display_id}</h2>
+                        <p className="text-xs text-gray-500 mt-1 font-mono">{selectedOrder.id}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{(selectedOrder.created_at)}</p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                        <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-600 mb-1">
+                            <Icons.XMark />
+                        </button>
+                        {selectedOrder.decryptedData && (
+                             <span className="px-2 py-1 bg-white rounded text-[10px] font-bold text-gray-500 border border-orange-200 shadow-sm">
+                                {selectedOrder.decryptedData.status}
+                             </span>
+                        )}
+                    </div>
+                </div>
+                
+                {/* Modal Body */}
+                <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto">
+                    {/* Customer Info */}
+                    <div className="flex items-start gap-3">
+                         <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-lg flex-shrink-0">📍</div>
+                        <div>
+                             <div className="font-bold text-gray-900 text-sm">{selectedOrder.decryptedData?.customerName}</div>
+                             <div className="text-sm text-gray-600 mt-1 leading-snug bg-gray-50 p-2 rounded border border-gray-200">
+                                 {selectedOrder.decryptedData?.shipping_address}
+                             </div>
+                             <div className="text-sm text-orange-700 mt-2 font-medium flex items-center gap-1">
+                                 📞 {selectedOrder.decryptedData?.shipping_phone}
+                             </div>
+                        </div>
+                    </div>
 
-      <div className="p-6 max-w-7xl mx-auto">
-         {orders.length === 0 && !isLoadingData ? (
-              <div className="text-center py-20 text-gray-500">
-                  Chưa có đơn vận chuyển nào.
-              </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {orders.map((order) => (
-                    <div key={order.id} className="bg-white rounded-xl border border-orange-100 shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col">
+                    {/* Financials */}
+                    <div className="space-y-3 pt-4 border-t border-dashed border-gray-200">
+                        <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-500 font-medium uppercase">Phí vận chuyển</span>
+                            <span className="text-sm font-bold text-gray-800">
+                                {formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}
+                            </span>
+                        </div>
                         
-                        {/* Header Card */}
-                        <div className="bg-orange-50/50 px-5 py-4 border-b border-orange-100 flex justify-between items-start">
-                            <div>
-                                <div className="font-bold text-lg text-gray-800">{order.display_id}</div>
-                                <div className="text-[10px] text-gray-500 font-mono mt-0.5 select-all" title="Real Blockchain ID">
-                                    {order.id}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1">{order.created_at}</div>
-                            </div>
-
-                           {/* STATUS & PAYMENT TỪ BLOCKCHAIN */}
-                           <div className="text-right flex flex-col items-end gap-1">
-                                {/* <span className="block text-[10px] font-bold uppercase text-gray-500 mb-1 bg-gray-200 px-2 rounded">
-                                   {getPaymentLabel(order.publicData.payment_method_id)}
-                                </span> */}
-                               {/* --- HIỂN THỊ STATUS BADGE CHO SHIPPER --- */}
-                               {order.status === "Success" && order.decryptedData ? (
-                                   <>
-                                       {/* Status nằm trên */}
-                                       {getBlockchainStatusBadge(order.decryptedData.status)}
-                                       
-                                       {/* Payment Method nằm dưới */}
-                                       <span className="block text-[10px] font-bold uppercase text-gray-500 mb-1 bg-gray-200 px-2 rounded">
-                                           {order.decryptedData.paymentMethod}
-                                       </span>
-                                   </>                               
-                                ) : (
-                                   <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded">SYNCING...</span>
-                               )}
-                           </div>
-                       </div>
-
-                        {/* Body Card */}
-                        <div className="p-5 flex-grow flex flex-col gap-3">
-                           {order.decryptedData ? (
-                               <div className="flex flex-col h-full">
-                                   <div className="space-y-4">
-                                    <div className="flex items-start gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 text-lg flex-shrink-0">📍</div>
-                                        <div>
-                                            <div className="font-bold text-gray-900 text-sm">{order.decryptedData.customerName}</div>
-                                            <div className="text-sm text-gray-600 mt-1 leading-relaxed bg-orange-50 p-2 rounded border border-orange-100">
-                                                {order.decryptedData.shipping_address}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3 pl-1 text-sm text-gray-700">
-                                        <span>📞</span> 
-                                        <span className="font-medium">{order.decryptedData.shipping_phone}</span>
-                                    </div>
-                                    
-                                    {/* PHÍ SHIP (Hiển thị cho Shipper xem doanh thu vận chuyển) */}
-                                    <div className="flex justify-between items-center pt-2 border-t border-dashed border-gray-200 mt-2">
-                                        <span className="text-xs text-gray-500 uppercase font-semibold">Phí vận chuyển</span>
-                                        <span className="text-sm font-bold text-orange-800">
-                                            {formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code)}
-                                        </span>
-                                    </div>
-                                </div>
-
-                                   {/* --- NÚT BẤM (CẬP NHẬT) --- */}
-                                   <div className="mt-auto pt-4 border-t border-dashed border-gray-200">
-                                        {/* ĐIỀU KIỆN HIỆN NÚT: PREPAID và SHIPPED */}
-                                        {order.decryptedData.paymentMethod === 'PREPAID' && order.decryptedData.status === 'SHIPPED' ? (
-                                            
-                                            <button 
-                                                onClick={() => handleConfirmDelivery(order.id)}
-                                                disabled={isDelivering === order.id}
-                                                className={`w-full py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition shadow-sm
-                                                    ${isDelivering === order.id 
-                                                        ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
-                                                        : "bg-teal-600 hover:bg-teal-700 text-white"
-                                                    }`}
-                                            >
-                                                {isDelivering === order.id ? <>Processing...</> : <> Xác nhận Giao Hàng</>}
-                                            </button>
-
-                                        ) : (
-                                            /* Trạng thái khác */
-                                            <div className="text-center">
-                                                {['DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(order.decryptedData.status) ? (
-                                                    <div className="flex items-center justify-center gap-1 text-teal-700 font-medium text-xs bg-teal-50 px-3 py-1 rounded-full border border-teal-100">
-                                                        <span></span> Giao thành công
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-xs text-gray-400 italic">
-                                                        {order.decryptedData.paymentMethod === 'COD' 
-                                                            ? "Đơn COD cần quy trình thu tiền riêng" 
-                                                            : "Chưa đến bước giao hàng"}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                   </div>
-                               </div>
-                           ) : (
-                                <div className="text-center py-8 flex flex-col items-center justify-center h-full text-gray-300">
-                                    <span className="text-xs">
-                                        {order.error || "Dữ liệu được mã hóa"}
-                                    </span>
-                                </div>
-                            )}
+                        <div className="flex justify-between items-center bg-orange-50 p-3 rounded-lg border border-orange-100">
+                            <span className="text-xs font-bold text-orange-800 uppercase">Cần thu hộ (COD)</span>
+                            <span className="text-lg font-bold text-orange-700">
+                                {formatPrice(selectedOrder.decryptedData?.cod_amount, selectedOrder.publicData.currency_code)}
+                            </span>
                         </div>
 
-                        {/* Footer Card: COD (Quan trọng nhất với Shipper) */}
-                        {order.status === "Success" && order.decryptedData && (
-                            <div className="px-5 py-4 bg-orange-50 border-t border-orange-100 flex justify-between items-center">
-                                <div>
-                                   <span className="text-xs font-bold text-orange-800 uppercase tracking-wide block">Cần thu hộ (COD)</span>
-                                   {order.decryptedData.cod_amount === 0 && <span className="text-[10px] text-green-600 font-bold">(Đã thanh toán)</span>}
-                               </div>
-                               <span className="text-xl font-bold text-orange-700">{formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}</span>
+                        </div>
+                    </div>
+
+                    {/* Nút hành động */}
+                    <div className="pt-2">
+                        {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' ? (
+                            <button 
+                                onClick={() => handleConfirmDelivery(selectedOrder.id)}
+                                disabled={isDelivering === selectedOrder.id}
+                            className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold shadow-md transition flex items-center justify-center gap-2"
+                            >
+                            {isDelivering === selectedOrder.id ? "Đang xử lý..." : "XÁC NHẬN ĐÃ GIAO HÀNG"}
+                            </button>
+                        ) : (
+                             <div className="text-center flex justify-center">
+                             {['DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(selectedOrder.decryptedData?.status || "") ? (
+                                     <span className="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium bg-teal-50 text-teal-700 border border-teal-100">
+                                         Successfully Delivered
+                                     </span>
+                             ) : (
+                                     <span className="text-xs text-gray-400 italic">Chờ xử lý...</span>
+                                 )}
                             </div>
                         )}
                     </div>
-                ))}
+                </div>
             </div>
-          )}
+      )}
+
+      {/* --- MAIN LAYOUT --- */}
+      <nav className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-20">
+        <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-gray-900">Shipper Dashboard</h1>
+        </div>
+        <div className="flex gap-3">
+            <button onClick={() => loadShipperOrders()} className="px-4 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium transition">
+                {isLoadingData ? "..." : "Làm mới"}
+            </button>
+            <button onClick={handleLogout} className="px-4 py-1.5 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium transition">Thoát</button>
+        </div>
+      </nav>
+
+      <div className="p-8 max-w-7xl mx-auto">
+         
+         {/* --- TOOLBAR --- */}
+         <div className="flex flex-wrap gap-4 mb-6 items-center justify-between">
+             <div className="flex gap-3 items-center">
+                {/* Search */}
+                <input 
+                    placeholder="Search" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-orange-500 outline-none w-64 bg-white shadow-sm" 
+                />
+                {/* Filter Status */}
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white shadow-sm cursor-pointer outline-none">
+                    <option value="ALL">All Status</option>
+                    <option value="CREATED">Created</option>
+                    <option value="PAID">Paid</option>
+                    <option value="SHIPPED">Shipped</option>
+                    <option value="DELIVERED">Delivered</option>
+                    <option value="SETTLED">Settled</option>
+                    <option value="COD_REMITTED">COD Remitted</option>
+                    <option value="DELIVERED_COD_PENDING">Delivered COD Pending</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="RETURNED">Returned</option>
+                    <option value="RETURN_REQUESTED">Return Requested</option>
+               </select>
+                {/* Filter Payment */}
+                <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white shadow-sm cursor-pointer outline-none">
+                    <option value="ALL">All Payment</option>
+                    <option value="PREPAID">Prepaid</option>
+                    <option value="COD">COD</option>
+                </select>
+              </div>
+
+             {/* Sort */}
+             <div className="relative" ref={sortMenuRef}>
+                <button 
+                    onClick={() => setShowSortMenu(!showSortMenu)}
+                    className="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition shadow-sm"
+                >
+                    <Icons.Sort />
+                </button>
+                
+                {showSortMenu && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">Sort By</div>
+                        {[
+                            { label: 'Display ID', key: 'display_id' },
+                            { label: 'Created Date', key: 'created_at' },
+                            { label: 'Updated Date', key: 'updated_at' },
+                        ].map((item) => (
+                            <div key={item.key} onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortKey === item.key ? 'font-medium text-orange-600' : 'text-gray-700'}`}>
+                                {item.label} {sortKey === item.key && <Icons.Check />}
+                            </div>
+                        ))}
+                        <div className="h-px bg-gray-100 my-1"></div>
+                        {[ { label: 'Ascending', dir: 'asc' }, { label: 'Descending', dir: 'desc' } ].map((item) => (
+                            <div key={item.dir} onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortDir === item.dir ? 'font-medium text-orange-600' : 'text-gray-700'}`}>
+                                {item.label} {sortDir === item.dir && <Icons.Check />}
+                            </div>
+                        ))}
+                    </div>
+                )}
+             </div>
+         </div>
+
+         {/* --- TABLE VIEW (MEDUSA STYLE) --- */}
+         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 font-medium">Order</th>
+                        <th className="px-6 py-3 font-medium">Date</th>
+                        <th className="px-6 py-3 font-medium">Customer</th>
+                        <th className="px-6 py-3 font-medium">Status</th>
+                        <th className="px-6 py-3 font-medium">Payment</th>
+                        <th className="px-6 py-3 font-medium text-right">Shipping Fee</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                    {processedOrders.length === 0 && !isLoadingData ? (
+                        <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-500">No orders found.</td></tr>
+                    ) : (
+                        processedOrders.map((order) => (
+                            <tr 
+                                key={order.id} 
+                                onClick={() => setSelectedOrder(order)}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors group"
+                            >
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                    {order.display_id}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-500">
+                                    {(order.created_at)}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-700">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs font-bold">
+                                            {(order.decryptedData?.customerName || order.publicData.email).charAt(0).toUpperCase()}
+                                        </div>
+                                        {order.publicData.email || order.decryptedData?.customerName}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    {order.status === "Success" && order.decryptedData ? (
+                                        getBlockchainStatusBadge(order.decryptedData.status)
+                                    ) : (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                            SYNCING
+                                        </span>
+                                    )}
+                                </td>
+                                <td className="px-6 py-4">
+                                    {order.status === "Success" && order.decryptedData ? (
+                                        <span className="inline-block text-[10px] font-mono text-gray-500 border border-gray-200 px-2 py-0.5 rounded">
+                                            {order.decryptedData.paymentMethod}
+                                        </span>
+                                    ) : null}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-right text-gray-700 font-medium">
+                                    {order.decryptedData 
+                                        ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) 
+                                        : "-"}
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+            
+            {/* Footer Pagination Giả Lập */}
+            <div className="px-6 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+                <span className="text-xs text-gray-500">Showing {processedOrders.length} results</span>
+                <div className="flex gap-2">
+                    <button disabled className="px-3 py-1 border border-gray-300 rounded text-xs text-gray-400 bg-gray-50 cursor-not-allowed">Prev</button>
+                    <button disabled className="px-3 py-1 border border-gray-300 rounded text-xs text-gray-400 bg-gray-50 cursor-not-allowed">Next</button>
+                    </div>
+            </div>
+         </div>
+
       </div>
     </div>
   )

@@ -6,7 +6,7 @@ import { Modules } from "@medusajs/utils";
 const ALLOWED_ADMIN_ROLES = ['ecommerceplatformorgmsp'];
 // CHỈ CHẶN CÁC API DỮ LIỆU
 const PROTECTED_API_ROUTES = [
-    // '/admin/orders',
+    '/admin/orders',
     '/admin/products',
     '/admin/customers',
     '/admin/users',
