@@ -2,11 +2,34 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 
-
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
+
+// --- ICONS ---
+const Icons = {
+  Sort: () => (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M3.125 6.875H10.625" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M3.125 13.125H7.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M13.75 14.375L16.875 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M16.875 14.375L13.75 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M15.3125 5.625V14.375" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  Check: () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12"></polyline>
+    </svg>
+  ),
+  XMark: () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  )
+};
 
 interface OrderRow {
   id: string; 
@@ -29,12 +52,15 @@ interface OrderRow {
       amount_untaxed: number;
       shipping_fee: number;
       cod_amount: number;
-      // --- QUAN TRỌNG: Status từ Blockchain ---
-      status: string;       // CREATED, PAID, SHIPPED...
-      paymentMethod: string; // COD, PREPAID
+      status: string;       
+      paymentMethod: string;
+      updatedAt?: string; 
   } | null; 
   error?: string;
 }
+
+type SortKey = 'display_id' | 'created_at' | 'updated_at';
+type SortDirection = 'asc' | 'desc';
 
 export default function SellerDashboard() {
   const [email, setEmail] = useState("")
@@ -44,11 +70,10 @@ export default function SellerDashboard() {
   const router = useRouter()
   const params = useParams()
   const countryCode = params?.countryCode || "us"
-  const [isShipping, setIsShipping] = useState<string | null>(null); 
   
   // State quản lý đăng nhập & quyền
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isCheckingRole, setIsCheckingRole] = useState(true) // <--- QUAN TRỌNG: Mặc định là đang kiểm tra
+  const [isCheckingRole, setIsCheckingRole] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false) 
   
   // State dữ liệu
@@ -56,9 +81,32 @@ export default function SellerDashboard() {
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
+  const [isShipping, setIsShipping] = useState<string | null>(null); 
+  
+  // State Modal
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
 
-  // --- HELPER: BADGE CHO TRẠNG THÁI BLOCKCHAIN ---
+  // State Filter & Sort
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [paymentFilter, setPaymentFilter] = useState("ALL");
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const [showSortMenu, setShowSortMenu] = useState(false);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+
+  // Click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
+        setShowSortMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- HELPERS ---
   const getBlockchainStatusBadge = (status: string) => {
       const styles: Record<string, string> = {
           // Trạng thái thường
@@ -95,8 +143,41 @@ export default function SellerDashboard() {
       return <span className="text-[10px] text-gray-400">{method}</span>;
   }
 
+  // --- LOGIC FILTER & SORT ---
+  const processedOrders = useMemo(() => {
+      let filtered = orders.filter(o => {
+          const status = o.decryptedData?.status || "";
+          const payment = o.decryptedData?.paymentMethod || "";
+          const matchSearch = 
+            o.display_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            o.publicData.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (o.decryptedData?.shipping_phone || "").includes(searchQuery);
+          const matchStatus = statusFilter === "ALL" || status === statusFilter;
+          const matchPayment = paymentFilter === "ALL" || payment === paymentFilter;
+          return matchSearch && matchStatus && matchPayment;
+      });
 
-  // --- 1. HÀM KIỂM TRA ROLE (QUAN TRỌNG) ---
+      return filtered.sort((a, b) => {
+          let aVal: any;
+          let bVal: any;
+          if (sortKey === 'display_id') {
+              aVal = parseInt(a.display_id.replace('#', ''));
+              bVal = parseInt(b.display_id.replace('#', ''));
+          } else if (sortKey === 'updated_at') {
+              const timeA = a.decryptedData?.updatedAt ? new Date(a.decryptedData.updatedAt).getTime() : new Date(a.created_at).getTime();
+              const timeB = b.decryptedData?.updatedAt ? new Date(b.decryptedData.updatedAt).getTime() : new Date(b.created_at).getTime();
+              aVal = timeA; bVal = timeB;
+          } else {
+              aVal = new Date(a.created_at).getTime();
+              bVal = new Date(b.created_at).getTime();
+          }
+          if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
+          if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+          return 0;
+      });
+  }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
+
+  // --- ACTIONS ---
   const checkUserRole = async (token: string) => {
       console.log("🔍 [FE CHECK] Đang kiểm tra quyền truy cập...");
       setIsCheckingRole(true); // Bắt đầu kiểm tra
@@ -355,17 +436,25 @@ export default function SellerDashboard() {
 
   // 4. Màn hình Dashboard Chính (Khi đã Login + Đúng Role)
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
-      {/* --- MODAL CHI TIẾT SẢN PHẨM --- */}
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800 relative">
+      
+      {/* --- MODAL CHI TIẾT --- */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">Chi tiết đơn hàng {selectedOrder.display_id}</h2>
-                        <p className="text-sm text-gray-500 mt-1">{selectedOrder.created_at}</p>
+                        <p className="text-sm text-gray-500 mt-1">{(selectedOrder.created_at)}</p>
                     </div>
-                    <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    <div className="flex flex-col items-end gap-1">
+                        <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-600 mb-1 text-2xl">&times;</button>
+                        {selectedOrder.decryptedData && (
+                            <span className="px-2 py-1 bg-white rounded text-[10px] font-bold text-gray-500 border border-gray-200 shadow-sm">
+                            {selectedOrder.decryptedData.status}
+                            </span>
+                        )}
+                    </div>
                 </div>
                 
                 <div className="p-6 space-y-6">
@@ -423,7 +512,7 @@ export default function SellerDashboard() {
                                     {isShipping === selectedOrder.id ? "Đang xử lý..." : " BÀN GIAO VẬN CHUYỂN NGAY"}
                                 </button>
                             ) : (
-                                <div className="text-center text-gray-400 text-sm italic">Trạng thái hiện tại: {selectedOrder.decryptedData.status}</div>
+                                <div className="text-center text-gray-400 text-sm italic"></div>
                             )
                         )}
                     </div>
@@ -431,153 +520,142 @@ export default function SellerDashboard() {
             </div>
         </div>
       )}
-      <nav className="bg-white border-b px-6 py-4 flex justify-between items-center shadow-sm sticky top-0 z-20">
-        <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-blue-700">Kênh Người Bán</h1>
+
+      {/* --- DASHBOARD (TABLE VIEW) --- */}
+      <nav className="bg-white border-b px-8 py-4 flex justify-between items-center shadow-sm sticky top-0 z-20">
+        <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-blue-700">Kênh Người Bán</h1>
         </div>
         <div className="flex gap-3">
-             <button onClick={() => loadSellerOrders()} className="px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium transition">
-                {isLoadingData ? "Đang tải..." : "Làm mới"}
+             <button onClick={() => loadSellerOrders()} className="px-4 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-sm font-medium transition">
+                {isLoadingData ? "..." : "Làm mới"}
              </button>
-             <button onClick={handleLogout} className="px-4 py-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 font-medium transition">Đăng xuất</button>
+             <button onClick={handleLogout} className="px-4 py-1.5 bg-gray-900 text-white rounded-md hover:bg-gray-800 text-sm font-medium transition">Thoát</button>
         </div>
       </nav>
 
-      <div className="p-6 max-w-7xl mx-auto">
-          {orders.length === 0 && !isLoadingData ? (
-              <div className="text-center py-20 text-gray-500">
-                  Chưa có đơn hàng nào cần xử lý.
-              </div>
-          ) : (
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
-                {orders.map((order) => (
-                    <div key={order.id} className="bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden hover:shadow-md transition-shadow duration-300">
-                        
-                        {/* Header Card */}
-                        <div className="px-5 py-4 bg-gray-50 border-b border-gray-100 flex justify-between items-start">
-                            <div>
-                                <span className="font-bold text-gray-900 text-lg">{order.display_id}</span>
-                                <div className="text-[10px] text-gray-400 font-mono mt-1 select-all" title="Blockchain ID">
-                                    {order.id}
+      <div className="p-8 max-w-7xl mx-auto">
+         
+         {/* Toolbar */}
+         <div className="flex flex-wrap gap-4 mb-6 items-center justify-between">
+             <div className="flex gap-3 items-center">
+                <input 
+                    placeholder="Search" 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none w-64 bg-white shadow-sm" 
+                />
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white shadow-sm cursor-pointer outline-none">
+                    <option value="ALL">All Status</option>
+                    <option value="CREATED">Created</option>
+                    <option value="PAID">Paid</option>
+                    <option value="SHIPPED">Shipped</option>
+                    <option value="DELIVERED">Delivered</option>
+                    <option value="SETTLED">Settled</option>
+                    <option value="DELIVERED_COD_PENDING">COD Pending</option>
+                    <option value="CANCELLED">Cancelled</option>
+                </select>
+                <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} className="border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-white shadow-sm cursor-pointer outline-none">
+                    <option value="ALL">All Payment</option>
+                    <option value="PREPAID">Prepaid</option>
+                    <option value="COD">COD</option>
+                </select>
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1">{order.created_at}</div>
-                            </div>
- 
-                            {/* HIỂN THỊ TRẠNG THÁI BLOCKCHAIN */}
-                            <div className="flex flex-col gap-1 items-end">
-                                {order.status === 'Success' && order.decryptedData ? (
-                                    <>
-                                        {getBlockchainStatusBadge(order.decryptedData.status)}
-                                        {getPaymentMethodBadge(order.decryptedData.paymentMethod)}
-                                    </>
-                                ) : (
-                                    <span className="text-[10px] text-gray-400 bg-gray-100 px-2 py-1 rounded">PENDING CHAIN</span>
-                                )}
-                            </div>
-                        </div>
 
-                        {/* Body Card */}
-                        <div className="p-5 flex-grow flex flex-col">
-                            {order.status === "Success" && order.decryptedData ? (
-                            <div className="flex flex-col h-full">
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">👤</div>
-                                        <div>
-                                            <div className="text-sm font-bold text-gray-800">{order.decryptedData.customerName}</div>
-                                            <div className="text-xs text-gray-500">Khách hàng</div>
-                                        </div>
-                                    </div>
-                                    
-                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                        <div className="flex justify-between items-center mb-2">
-                                            <div className="text-xs font-bold text-gray-500 uppercase">Sản phẩm</div>
-                                            <span className="text-[10px] bg-gray-200 px-1.5 py-0.5 rounded text-gray-600 font-bold">
-                                                {order.decryptedData.product_lines.length}
-                                            </span>
-                                        </div>
-                                        
-                                        <ul className="space-y-2 text-sm">
-                                            {/* --- LOGIC HIỂN THỊ TỐI ĐA 2 SẢN PHẨM --- */}
-                                            {order.decryptedData.product_lines.slice(0, 2).map((p: any, i: number) => (
-                                                <li key={i} className="flex justify-between items-start border-b border-dashed border-gray-200 pb-1 last:border-0 last:pb-0">
-                                                    <span className="text-gray-700 pr-2 line-clamp-1 w-2/3" title={p.product_name}>
-                                                        {p.product_name} <span className="text-gray-400 text-xs">x{p.quantity}</span>
-                                                    </span>
-                                                    <span className="font-medium whitespace-nowrap text-gray-900">
-                                                        {formatPrice(p.subtotal, order.publicData.currency_code)}
-                                                    </span>
-                                                </li>
-                                            ))}
-                                        </ul>
-
-                                        {/* --- NÚT XEM THÊM NẾU CÓ > 2 SẢN PHẨM --- */}
-                                        {order.decryptedData.product_lines.length > 2 && (
-                                            <button 
-                                                onClick={() => setSelectedOrder(order)}
-                                                className="w-full mt-2 text-xs text-blue-600 font-medium hover:underline text-center py-1 bg-blue-50 rounded hover:bg-blue-100 transition"
-                                            >
-                                                + Xem thêm {order.decryptedData.product_lines.length - 2} sản phẩm khác
-                                            </button>
+             <div className="relative" ref={sortMenuRef}>
+                <button onClick={() => setShowSortMenu(!showSortMenu)} className="flex items-center justify-center w-9 h-9 border border-gray-300 rounded-md bg-white hover:bg-gray-50 transition shadow-sm">
+                    <Icons.Sort />
+                </button>
+                {showSortMenu && (
+                    <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1">
+                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">Sort By</div>
+                        {[{ label: 'Display ID', key: 'display_id' }, { label: 'Created Date', key: 'created_at' }, { label: 'Updated Date', key: 'updated_at' }].map((item) => (
+                            <div key={item.key} onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortKey === item.key ? 'font-medium text-blue-600' : 'text-gray-700'}`}>
+                                {item.label} {sortKey === item.key && <Icons.Check />}
+                            </div>
+                        ))}
+                        <div className="h-px bg-gray-100 my-1"></div>
+                        {[{ label: 'Ascending', dir: 'asc' }, { label: 'Descending', dir: 'desc' }].map((item) => (
+                            <div key={item.dir} onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortDir === item.dir ? 'font-medium text-blue-600' : 'text-gray-700'}`}>
+                                {item.label} {sortDir === item.dir && <Icons.Check />}
+                            </div>
+                        ))}
+                    </div>
                                         )}
                                     </div>
                                 </div>
 
-                                    {/* --- PHẦN NÚT BẤM (CẬP NHẬT) --- */}
-                                    <div className="mt-auto pt-4 border-t border-dashed border-gray-200">
-                                        {((order.decryptedData.paymentMethod === 'PREPAID' && order.decryptedData.status === 'PAID') ||
-                                          (order.decryptedData.paymentMethod === 'COD' && order.decryptedData.status === 'CREATED')) ? (
-                                            
-                                            <button 
-                                                onClick={() => handleShipOrder(order.id)}
-                                                disabled={isShipping === order.id}
-                                                className={`w-full py-2 rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition shadow-sm
-                                                    ${isShipping === order.id 
-                                                        ? "bg-gray-300 text-gray-500 cursor-not-allowed" 
-                                                        : "bg-indigo-600 hover:bg-indigo-700 text-white"
-                                                    }`}
-                                            >
-                                                {isShipping === order.id ? <>Running...</> : <> Giao Vận Chuyển</>}
-                                            </button>
-
-                                        ) : (
-                                            /* Nếu không đủ điều kiện hoặc đã giao -> Chỉ hiển thị thông báo text */
-                                            <div className="flex flex-col items-center gap-2 text-center">
-                                                {['SHIPPED', 'DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(order.decryptedData.status) ? (
-                                                    <div className="flex items-center justify-center gap-1 text-green-600 font-medium text-xs bg-green-50 px-3 py-1 rounded-full border border-green-100 mb-1">
-                                                        <span></span> Đã bàn giao vận chuyển
-                                                    </div>
-                                                ) : (
-                                                    <div className="text-xs text-gray-400 italic mt-1">
-                                                        Chờ thanh toán hoặc xử lý...
-                                                    </div>
-                                                )}
+         {/* Table View */}
+         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <table className="w-full text-left border-collapse">
+                <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-6 py-3 font-medium">Order</th>
+                        <th className="px-6 py-3 font-medium">Date</th>
+                        <th className="px-6 py-3 font-medium">Customer</th>
+                        <th className="px-6 py-3 font-medium">Status</th>
+                        <th className="px-6 py-3 font-medium">Payment</th>
+                        <th className="px-6 py-3 font-medium text-right">Shipping Fee</th>
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                    {processedOrders.length === 0 && !isLoadingData ? (
+                        <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-500">No orders found.</td></tr>
+                    ) : (
+                        processedOrders.map((order) => (
+                            <tr 
+                                key={order.id} 
+                                onClick={() => setSelectedOrder(order)}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors group"
+                            >
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                                    {order.display_id}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-500">
+                                    {(order.created_at)}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-gray-700">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                                            {(order.decryptedData?.customerName || order.publicData.email).charAt(0).toUpperCase()}
                                             </div>
-                                        )}
+                                        { order.publicData.email || order.decryptedData?.customerName}
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-200">
-                                    <span className="text-xs text-gray-500">{order.error || "Đang đồng bộ Blockchain..."}</span>
-                                </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                    {order.status === "Success" && order.decryptedData ? (
+                                        getBlockchainStatusBadge(order.decryptedData.status)
+                                    ) : (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">SYNCING</span>
                             )}
-                        </div>
-
-                        {/* Footer - DOANH THU */}
-                        <div className="px-5 py-4 bg-blue-50 border-t border-blue-100 flex justify-between items-center">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-blue-800 uppercase tracking-wide">Doanh thu</span>
-                            </div>
-                            <span className="text-xl font-bold text-blue-700">
+                                </td>
+                                <td className="px-6 py-4">
+                                    {order.status === "Success" && order.decryptedData ? (
+                                        <span className="inline-block text-[10px] font-mono text-gray-500 border border-gray-200 px-2 py-0.5 rounded">
+                                            {order.decryptedData.paymentMethod}
+                                        </span>
+                                    ) : null}
+                                </td>
+                                <td className="px-6 py-4 text-sm text-right text-gray-700 font-medium">
                                 {order.decryptedData 
                                     ? formatPrice(order.decryptedData.amount_untaxed, order.publicData.currency_code) 
                                     : "-"}
-                            </span>
-                        </div>
+                                </td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+            
+            {/* Footer */}
+            <div className="px-6 py-3 border-t border-gray-200 bg-white flex items-center justify-between">
+                <span className="text-xs text-gray-500">Showing {processedOrders.length} results</span>
+                <div className="flex gap-2">
+                    <button disabled className="px-3 py-1 border border-gray-300 rounded text-xs text-gray-400 cursor-not-allowed">Prev</button>
+                    <button disabled className="px-3 py-1 border border-gray-300 rounded text-xs text-gray-400 cursor-not-allowed">Next</button>
                     </div>
-                ))}
             </div>
-          )}
+         </div>
       </div>
     </div>
   )

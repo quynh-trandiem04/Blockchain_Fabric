@@ -148,7 +148,6 @@ export default function ShipperDashboard() {
       });
   }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
 
-  // ... (Giữ nguyên các hàm Helper Badge, formatPrice, getPaymentLabel, checkUserRole) ...
   const getBlockchainStatusBadge = (status: string) => {
       const styles: Record<string, string> = {
           CREATED: "bg-gray-100 text-gray-700 border-gray-300",
@@ -159,6 +158,8 @@ export default function ShipperDashboard() {
           COD_REMITTED: "bg-indigo-100 text-indigo-700 border-indigo-300",
           SETTLED: "bg-purple-100 text-purple-700 border-purple-300",
           CANCELLED: "bg-red-100 text-red-700 border-red-300",
+          RETURN_REQUESTED: "bg-yellow-100 text-yellow-700 border-yellow-300",
+          RETURNED: "bg-pink-100 text-pink-700 border-pink-300"
       };
       
       if (!status) return <span className="text-[10px] text-gray-400">...</span>;
