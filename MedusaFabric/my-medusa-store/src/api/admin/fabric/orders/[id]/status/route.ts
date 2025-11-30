@@ -27,6 +27,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         paymentMethod: orderData.paymentMethod,
         codStatus: orderData.codStatus,
         txID: orderData.history?.[0]?.txID || "",
+        updatedAt: orderData.updatedAt
     };
 
     res.json(publicData);

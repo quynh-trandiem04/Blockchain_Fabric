@@ -67,7 +67,7 @@ const Icons = {
   )
 };
 
-type SortKey = 'display_id' | 'created_at';
+type SortKey = 'display_id' | 'created_at' | 'updated_at';
 type SortDirection = 'asc' | 'desc';
 
 const BlockchainOrderList = () => {
@@ -106,7 +106,8 @@ const BlockchainOrderList = () => {
     let isMounted = true;
     const fetchData = async () => {
       try {
-        const res = await fetch(`/admin/orders?limit=50&offset=0&fields=id,display_id,created_at,email,total,currency_code,payment_status,fulfillment_status,status`, {
+        // Thêm updated_at vào fields để lấy dữ liệu
+        const res = await fetch(`/admin/orders?limit=50&offset=0&fields=id,display_id,created_at,updated_at,email,total,currency_code,payment_status,fulfillment_status,status`, {
             method: "GET", credentials: "include"
         });
         
@@ -132,7 +133,10 @@ const BlockchainOrderList = () => {
     await Promise.all(list.map(async (o) => {
         try {
             const res = await fetch(`/admin/fabric/orders/${o.id}/status`, { credentials: "include" });
-            if (res.ok) results[o.id] = await res.json();
+            if (res.ok) {
+                const data = await res.json();
+                results[o.id] = data; 
+            }
             else results[o.id] = { status: "NOT_SYNCED", paymentMethod: "-" };
         } catch { results[o.id] = { status: "ERR", paymentMethod: "-" }; }
     }));
@@ -164,16 +168,26 @@ const BlockchainOrderList = () => {
 
       // Sort
       return filtered.sort((a, b) => {
-          let aVal: any = a[sortKey];
-          let bVal: any = b[sortKey];
+          let aVal: any;
+          let bVal: any;
 
           // Xử lý đặc biệt cho display_id (số) và date
           if (sortKey === 'display_id') {
-              aVal = parseInt(aVal, 10);
-              bVal = parseInt(bVal, 10);
+              // Sort theo ID số (bỏ dấu #)
+              aVal = parseInt(a.display_id.replace(/\D/g, ''), 10);
+              bVal = parseInt(b.display_id.replace(/\D/g, ''), 10);
+          } else if (sortKey === 'updated_at') {
+              // Lấy UpdatedAt từ Blockchain (nếu có), fallback về updated_at của Medusa
+              const chainA = chainData[a.id]?.updatedAt; 
+              const chainB = chainData[b.id]?.updatedAt;
+              
+              // Nếu có trên blockchain thì dùng, không thì dùng của Medusa
+              aVal = chainA ? new Date(chainA).getTime() : new Date(a.updated_at).getTime();
+              bVal = chainB ? new Date(chainB).getTime() : new Date(b.updated_at).getTime();
           } else {
-              aVal = new Date(aVal).getTime();
-              bVal = new Date(bVal).getTime();
+              // Default: created_at
+              aVal = new Date(a.created_at).getTime();
+              bVal = new Date(b.created_at).getTime();
           }
 
           if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
@@ -216,7 +230,7 @@ const BlockchainOrderList = () => {
             main > div > div:nth-child(2) { display: none !important; }
         `}} />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, marginTop: 8 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 }}>
             <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Orders</h1>
         </div>
 
@@ -260,6 +274,7 @@ const BlockchainOrderList = () => {
                                 width: 32, height: 32, border: '1px solid #e5e7eb', borderRadius: 6, 
                                 background: 'white', cursor: 'pointer'
                             }}
+                            title="Sort Orders"
                         >
                             <Icons.Sort />
                         </button>
@@ -272,20 +287,23 @@ const BlockchainOrderList = () => {
                                 borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                                 zIndex: 50, padding: '4px 0'
                             }}>
+                                <div style={{ padding: '4px 12px', fontSize: 10, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase' }}>Sort By</div>
                                 {[
                                     { label: 'Display ID', key: 'display_id' },
                                     { label: 'Created Date', key: 'created_at' },
+                                    { label: 'Updated Date', key: 'updated_at' },
                                 ].map((item) => (
                                     <div 
                                         key={item.key}
                                         onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }}
                                         style={{ 
-                                            padding: '8px 16px', fontSize: 13, cursor: 'pointer', 
+                                            padding: '6px 12px', fontSize: 13, cursor: 'pointer', 
                                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                            background: sortKey === item.key ? '#f9fafb' : 'transparent'
+                                            background: sortKey === item.key ? '#f3f4f6' : 'transparent',
+                                            color: sortKey === item.key ? '#111827' : '#4B5563'
                                         }}
-                                        onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                                        onMouseOut={(e) => e.currentTarget.style.background = sortKey === item.key ? '#f9fafb' : 'transparent'}
+                                        onMouseOver={(e) => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseOut={(e) => e.currentTarget.style.background = sortKey === item.key ? '#f3f4f6' : 'transparent'}
                                     >
                                         {item.label}
                                         {sortKey === item.key && <Icons.Check />}
@@ -294,6 +312,7 @@ const BlockchainOrderList = () => {
                                 
                                 <div style={{ height: 1, background: '#e5e7eb', margin: '4px 0' }}></div>
 
+                                <div style={{ padding: '4px 12px', fontSize: 10, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase' }}>Order</div>
                                 {[
                                     { label: 'Ascending', dir: 'asc' },
                                     { label: 'Descending', dir: 'desc' },
@@ -302,12 +321,13 @@ const BlockchainOrderList = () => {
                                         key={item.dir}
                                         onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }}
                                         style={{ 
-                                            padding: '8px 16px', fontSize: 13, cursor: 'pointer',
+                                            padding: '6px 12px', fontSize: 13, cursor: 'pointer',
                                             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                            background: sortDir === item.dir ? '#f9fafb' : 'transparent'
+                                            background: sortDir === item.dir ? '#f3f4f6' : 'transparent',
+                                            color: sortDir === item.dir ? '#111827' : '#4B5563'
                                         }}
-                                        onMouseOver={(e) => e.currentTarget.style.background = '#f3f4f6'}
-                                        onMouseOut={(e) => e.currentTarget.style.background = sortDir === item.dir ? '#f9fafb' : 'transparent'}
+                                        onMouseOver={(e) => e.currentTarget.style.background = '#f9fafb'}
+                                        onMouseOut={(e) => e.currentTarget.style.background = sortDir === item.dir ? '#f3f4f6' : 'transparent'}
                                     >
                                         {item.label}
                                         {sortDir === item.dir && <Icons.Check />}
@@ -318,7 +338,7 @@ const BlockchainOrderList = () => {
                 </div>
             </div>
 
-            {/* TABLE */}
+            {/* --- TABLE --- */}
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
             <thead style={{ background: '#F9FAFB', borderBottom: '1px solid #e5e7eb' }}>
                 <tr>
@@ -343,19 +363,30 @@ const BlockchainOrderList = () => {
                             <td style={{ padding: '14px 24px', color: '#111827' }}>#{o.display_id}</td>
                             <td style={{ padding: '14px 24px', color: '#6b7280' }}>{formatDate(o.created_at)}</td>
                             <td style={{ padding: '14px 24px', color: '#374151' }}>{customerName}</td>
+                            
+                            {/* STATUS */}
                             <td style={{ padding: '14px 24px' }}>
                                 <span style={{ 
                                     padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                    background: bStyle.bg, color: bStyle.color 
+                                    background: bStyle.bg, color: bStyle.color,
+                                    border: `1px solid ${bStyle.border || 'transparent'}`,
+                                    whiteSpace: 'nowrap'
                                 }}>
                                     {bStatus.replace(/_/g, ' ')}
                                 </span>
                             </td>
+
+                            {/* PAYMENT */}
                             <td style={{ padding: '14px 24px' }}>
-                                <span style={{ fontFamily: 'monospace', fontSize: 11, border: '1px solid #e5e7eb', padding: '2px 6px', borderRadius: 4, color: '#4b5563' }}>
+                                <span style={{ 
+                                    fontFamily: 'monospace', fontSize: 11, border: '1px solid #e5e7eb', 
+                                    padding: '2px 6px', borderRadius: 4, color: '#4b5563',
+                                    background: '#fff'
+                                }}>
                                     {cData.paymentMethod || '-'}
                                 </span>
                             </td>
+
                             <td style={{ padding: '14px 24px', textAlign: 'right', color: '#374151' }}>
                                 {formatMoney(o.total, o.currency_code)}
                             </td>
