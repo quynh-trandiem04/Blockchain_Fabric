@@ -81,6 +81,7 @@ export default function ShipperDashboard() {
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
   const [isDelivering, setIsDelivering] = useState<string | null>(null);
+  const [isReturning, setIsReturning] = useState<string | null>(null);
   
   // State Modal Chi tiết
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
@@ -260,6 +261,37 @@ export default function ShipperDashboard() {
           alert(" Lỗi kết nối server");
       } finally {
           setIsDelivering(null);
+      }
+  }
+
+  const handleShipReturn = async (orderId: string) => {
+      if(!confirm("Xác nhận đã lấy hàng trả từ khách thành công?")) return;
+
+      setIsReturning(orderId);
+      const token = localStorage.getItem("medusa_token");
+
+      try {
+          const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/return-ship`, {
+              method: "POST",
+              headers: { 
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+              }
+          });
+
+          const result = await res.json();
+
+          if (res.ok) {
+            //   alert("✅ Đã cập nhật trạng thái hoàn hàng!");
+              loadShipperOrders(token || ""); 
+              if (selectedOrder?.id === orderId) setSelectedOrder(null);
+          } else {
+            //   alert("❌ Lỗi: " + (result.error || "Thất bại"));
+          }
+      } catch (err) {
+        //   alert("❌ Lỗi kết nối server");
+      } finally {
+          setIsReturning(null);
       }
   }
 
@@ -491,26 +523,48 @@ export default function ShipperDashboard() {
                     </div>
 
                     {/* Nút hành động */}
-                    <div className="pt-2">
-                        {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' ? (
+                    <div className="pt-2 space-y-2">
+                        {/* 1. NÚT GIAO HÀNG (DELIVER) - Logic cũ */}
+                        {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' && (
                             <button 
                                 onClick={() => handleConfirmDelivery(selectedOrder.id)}
                                 disabled={isDelivering === selectedOrder.id}
                             className="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white rounded-lg font-bold shadow-md transition flex items-center justify-center gap-2"
                             >
-                            {isDelivering === selectedOrder.id ? "Đang xử lý..." : "XÁC NHẬN ĐÃ GIAO HÀNG"}
+                                {isDelivering === selectedOrder.id ? "Đang xử lý..." : " XÁC NHẬN ĐÃ GIAO HÀNG"}
                             </button>
-                        ) : (
-                             <div className="text-center flex justify-center">
-                             {['DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED'].includes(selectedOrder.decryptedData?.status || "") ? (
-                                     <span className="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium bg-teal-50 text-teal-700 border border-teal-100">
-                                         Successfully Delivered
+                        )}
+
+                        {/* 2. NÚT LẤY HÀNG HOÀN (SHIP RETURN) - Logic mới */}
+                        {selectedOrder.decryptedData?.status === 'RETURN_REQUESTED' && (
+                            <button 
+                                onClick={() => handleShipReturn(selectedOrder.id)}
+                                disabled={isReturning === selectedOrder.id}
+                                className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-bold shadow-md transition flex items-center justify-center gap-2"
+                            >
+                                {isReturning === selectedOrder.id ? "Đang xử lý..." : " ĐÃ LẤY HÀNG HOÀN TỪ KHÁCH"}
+                            </button>
+                        )}
+
+                        {/* 3. TRẠNG THÁI KHÁC */}
+                        {['DELIVERED', 'DELIVERED_COD_PENDING', 'COD_REMITTED', 'SETTLED', 'RETURN_IN_TRANSIT', 'RETURNED'].includes(selectedOrder.decryptedData?.status || "") && (
+                             <div className="text-center flex justify-center mt-2">
+                                 {selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' ? (
+                                     <span className="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200">
+                                        Đang chuyển hoàn về Shop
                                      </span>
-                             ) : (
-                                     <span className="text-xs text-gray-400 italic">Chờ xử lý...</span>
+                                 ) : selectedOrder.decryptedData?.status === 'RETURNED' ? (
+                                     <span className="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium bg-green-50 text-green-700 border border-green-200">
+                                        Đã hoàn tất trả hàng
+                                     </span>
+                                 ) : (
+                                     <span className="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium bg-teal-50 text-teal-700 border border-teal-100">
+                                        Giao thành công
+                                     </span>
                                  )}
                             </div>
                         )}
+                        
                     </div>
                 </div>
             </div>
