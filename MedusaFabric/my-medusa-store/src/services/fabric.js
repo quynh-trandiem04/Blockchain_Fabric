@@ -244,6 +244,15 @@ class FabricService {
         const result = await contract.submitTransaction('PayoutToSeller', orderId);
         
         return result ? result.toString() : 'PAYOUT_SUCCESS';
-    }    
-}
+    }
+
+    async requestReturn(orderId) {
+        const { contract } = await this._getContract('admin'); 
+        
+        console.log(`[FabricService] Executing RequestReturn for: ${orderId}`);
+        
+        const result = await contract.submitTransaction('RequestReturn', orderId);
+        
+        return result ? result.toString() : 'RETURN_REQUESTED_SUCCESS';
+    }}
 module.exports = FabricService;
