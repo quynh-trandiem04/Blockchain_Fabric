@@ -80,10 +80,10 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
             //   alert(" Thành công! Yêu cầu trả hàng đã được ghi nhận.");
               window.location.reload(); 
           } else {
-            //   alert(" Lỗi: " + (result.error || "Không thể trả hàng"));
+              alert(" Lỗi: " + (result.error || "Không thể trả hàng"));
           }
       } catch (err) {
-        //   alert("Lỗi kết nối đến máy chủ.");
+          alert("Lỗi kết nối đến máy chủ.");
       } finally {
           setIsReturning(false);
       }

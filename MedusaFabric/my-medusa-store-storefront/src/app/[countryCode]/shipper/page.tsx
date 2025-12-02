@@ -252,7 +252,7 @@ export default function ShipperDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-              alert(" Xác nhận giao hàng thành công!");
+            //   alert(" Xác nhận giao hàng thành công!");
               loadShipperOrders(token || ""); 
           } else {
               alert(" Lỗi: " + (result.error || "Thất bại"));
@@ -282,14 +282,14 @@ export default function ShipperDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-            //   alert("✅ Đã cập nhật trạng thái hoàn hàng!");
+            //   alert(" Đã cập nhật trạng thái hoàn hàng!");
               loadShipperOrders(token || ""); 
               if (selectedOrder?.id === orderId) setSelectedOrder(null);
           } else {
-            //   alert("❌ Lỗi: " + (result.error || "Thất bại"));
+              alert(" Lỗi: " + (result.error || "Thất bại"));
           }
       } catch (err) {
-        //   alert("❌ Lỗi kết nối server");
+          alert(" Lỗi kết nối server");
       } finally {
           setIsReturning(null);
       }
@@ -402,7 +402,15 @@ export default function ShipperDashboard() {
             loadedOrders.push(row)
           })
         )
-        setOrders(loadedOrders.sort((a, b) => b.id.localeCompare(a.id)))
+        const sortedOrders = loadedOrders.sort((a, b) => b.id.localeCompare(a.id));
+        setOrders(sortedOrders)
+        if (selectedOrder) {
+            const updatedOrder = sortedOrders.find(o => o.id === selectedOrder.id);
+            if (updatedOrder) {
+                // Cập nhật lại state modal với dữ liệu mới (Status đã đổi sang DELIVERED)
+                setSelectedOrder(updatedOrder); 
+            }
+        }
     } catch (err) { console.error(err) } finally { setIsLoadingData(false) }
   }
 

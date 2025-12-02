@@ -265,5 +265,15 @@ class FabricService {
         
         return result ? result.toString() : 'RETURN_IN_TRANSIT_SUCCESS';
     }
+
+    async confirmReturnReceived(orderId) {
+        const { contract } = await this._getContract('sellerorgmsp');
+        
+        console.log(`[FabricService] Executing ConfirmReturnReceived for: ${orderId}`);
+        
+        const result = await contract.submitTransaction('ConfirmReturnReceived', orderId);
+        
+        return result ? result.toString() : 'RETURN_RECEIVED_SUCCESS';
+    }
 }
 module.exports = FabricService;

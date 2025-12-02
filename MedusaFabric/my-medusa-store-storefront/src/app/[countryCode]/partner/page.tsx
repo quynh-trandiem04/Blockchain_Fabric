@@ -82,6 +82,7 @@ export default function SellerDashboard() {
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
   const [isShipping, setIsShipping] = useState<string | null>(null); 
+  const [isConfirmingReturn, setIsConfirmingReturn] = useState<string | null>(null); 
   
   // State Modal
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
@@ -248,7 +249,7 @@ export default function SellerDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-            //   alert("✅ Thành công! TxID: " + result.tx_id);
+              alert(" Thành công! ");
               loadSellerOrders(token || ""); // Load lại danh sách để cập nhật trạng thái
               // Đóng modal nếu đang mở đúng đơn hàng đó
               if (selectedOrder?.id === orderId) setSelectedOrder(null);
@@ -259,6 +260,37 @@ export default function SellerDashboard() {
           alert(" Lỗi kết nối server");
       } finally {
           setIsShipping(null);
+      }
+  }
+
+  const handleConfirmReturn = async (orderId: string) => {
+      if(!confirm("Xác nhận bạn ĐÃ NHẬN ĐƯỢC hàng trả về từ đơn vị vận chuyển?")) return;
+
+      setIsConfirmingReturn(orderId); // Bật loading
+      const token = localStorage.getItem("medusa_token");
+
+      try {
+          const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/confirm-return`, {
+              method: "POST",
+              headers: { 
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`
+              }
+          });
+
+          const result = await res.json();
+
+          if (res.ok) {
+              alert(" Đã xác nhận nhận hàng thành công!");
+              loadSellerOrders(token || ""); // Load lại danh sách
+              if (selectedOrder?.id === orderId) setSelectedOrder(null); // Đóng modal
+          } else {
+              alert(" Lỗi: " + (result.error || "Thất bại"));
+          }
+      } catch (err) {
+          alert(" Lỗi kết nối server");
+      } finally {
+          setIsConfirmingReturn(null);
       }
   }
 
@@ -500,10 +532,11 @@ export default function SellerDashboard() {
                     </div>
 
                     {/* Nút hành động trong Modal */}
-                    <div className="pt-4">
-                        {selectedOrder.status === "Success" && selectedOrder.decryptedData && (
-                            ((selectedOrder.decryptedData.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'PAID') ||
-                             (selectedOrder.decryptedData.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'CREATED')) ? (
+                    <div className="pt-4 space-y-3">
+                        {/* CASE 1: GIAO HÀNG (Logic cũ) */}
+                        {selectedOrder.status === "Success" && selectedOrder.decryptedData && 
+                         ((selectedOrder.decryptedData.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'PAID') ||
+                          (selectedOrder.decryptedData.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'CREATED')) && (
                                 <button 
                                     onClick={() => handleShipOrder(selectedOrder.id)}
                                     disabled={isShipping === selectedOrder.id}
@@ -511,9 +544,30 @@ export default function SellerDashboard() {
                                 >
                                     {isShipping === selectedOrder.id ? "Đang xử lý..." : " BÀN GIAO VẬN CHUYỂN NGAY"}
                                 </button>
-                            ) : (
-                                <div className="text-center text-gray-400 text-sm italic"></div>
-                            )
+                        )}
+
+                        {/* CASE 2: NHẬN HÀNG TRẢ (Logic MỚI) */}
+                        {selectedOrder.status === "Success" && selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
+                                <button 
+                                    onClick={() => handleConfirmReturn(selectedOrder.id)}
+                                    disabled={isConfirmingReturn === selectedOrder.id}
+                                    className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-bold shadow-lg transition flex justify-center items-center gap-2"
+                                >
+                                    {isConfirmingReturn === selectedOrder.id ? (
+                                        "Đang xử lý..."
+                                    ) : (
+                                        <>
+                                            <span></span> XÁC NHẬN ĐÃ NHẬN HÀNG TRẢ
+                                        </>
+                                    )}
+                                </button>
+                        )}
+                        
+                        {/* Hiển thị trạng thái tĩnh nếu đã hoàn tất */}
+                        {selectedOrder.decryptedData?.status === 'RETURNED' && (
+                             <div className="w-full py-3 bg-gray-100 text-gray-600 rounded-lg font-bold text-center border border-gray-200">
+                                Đơn hàng đã hoàn trả thành công
+                             </div>
                         )}
                     </div>
                 </div>
