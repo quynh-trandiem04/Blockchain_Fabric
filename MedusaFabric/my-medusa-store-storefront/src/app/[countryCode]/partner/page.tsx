@@ -249,10 +249,8 @@ export default function SellerDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-              alert(" Thành công! ");
+            //   alert(" Thành công! ");
               loadSellerOrders(token || ""); // Load lại danh sách để cập nhật trạng thái
-              // Đóng modal nếu đang mở đúng đơn hàng đó
-              if (selectedOrder?.id === orderId) setSelectedOrder(null);
           } else {
               alert(" Lỗi: " + (result.error || "Thất bại"));
           }
@@ -281,9 +279,8 @@ export default function SellerDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-              alert(" Đã xác nhận nhận hàng thành công!");
+            //   alert(" Đã xác nhận nhận hàng thành công!");
               loadSellerOrders(token || ""); // Load lại danh sách
-              if (selectedOrder?.id === orderId) setSelectedOrder(null); // Đóng modal
           } else {
               alert(" Lỗi: " + (result.error || "Thất bại"));
           }
@@ -399,7 +396,19 @@ export default function SellerDashboard() {
             loadedOrders.push(row)
           })
         )
-        setOrders(loadedOrders.sort((a, b) => b.id.localeCompare(a.id)))
+        
+        // Sắp xếp
+        const sortedOrders = loadedOrders.sort((a, b) => b.id.localeCompare(a.id));
+        setOrders(sortedOrders);
+
+        // [FIX LỖI]: Cập nhật selectedOrder từ dữ liệu mới để modal render lại trạng thái mới
+        if (selectedOrder) {
+            const updatedSelectedOrder = sortedOrders.find(o => o.id === selectedOrder.id);
+            if (updatedSelectedOrder) {
+                setSelectedOrder(updatedSelectedOrder);
+            }
+        }
+
     } catch (err) { console.error(err) } finally { setIsLoadingData(false) }
   }
 
@@ -473,7 +482,7 @@ export default function SellerDashboard() {
       {/* --- MODAL CHI TIẾT --- */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in duration-200">
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
                     <div>
                         <h2 className="text-xl font-bold text-gray-900">Chi tiết đơn hàng {selectedOrder.display_id}</h2>
