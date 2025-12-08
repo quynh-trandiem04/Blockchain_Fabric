@@ -1,21 +1,21 @@
-# ---------------------------------------------------------------------------
-# "OrdererOrgs" - Định nghĩa tổ chức quản lý các node Orderer
-# ---------------------------------------------------------------------------
+# organizations/cryptogen/crypto-config-orderer.yaml
 OrdererOrgs:
   - Name: Orderer
     Domain: example.com
     EnableNodeOUs: true
-    # ---------------------------------------------------------------------------
-    # "Specs" - Định nghĩa 3 node Orderer cho cụm Raft
-    # ---------------------------------------------------------------------------
     Specs:
       - Hostname: orderer0
         SANS:
           - localhost
+          - orderer0.example.com
+          - 127.0.0.1
       - Hostname: orderer1
         SANS:
           - localhost
+          - orderer1.example.com
+          - 127.0.0.1
       - Hostname: orderer2
         SANS:
           - localhost
-
+          - orderer2.example.com
+          - 127.0.0.1

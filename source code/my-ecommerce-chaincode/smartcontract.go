@@ -22,16 +22,28 @@ type SmartContract struct {
 func getActorOrg(ctx contractapi.TransactionContextInterface) (string, error) {
 	mspID, err := ctx.GetClientIdentity().GetMSPID()
 	if err != nil {
-		return "", fmt.Errorf("không thể lấy MSPID của người gọi: %v", err)
+		return "", fmt.Errorf("không thể lấy MSPID: %v", err)
 	}
 	return mspID, nil
 }
 
-// getOrderState lấy dữ liệu order từ sổ cái và chuyển thành struct *Order
+// getCallerCompanyID: Lấy attribute 'companyCode' từ chứng chỉ user
+func getCallerCompanyID(ctx contractapi.TransactionContextInterface) (string, error) {
+	val, found, err := ctx.GetClientIdentity().GetAttributeValue("companyCode")
+	if err != nil {
+		return "", fmt.Errorf("lỗi đọc attribute: %v", err)
+	}
+	if !found {
+		return "", nil 
+	}
+	return val, nil
+}
+
+// getOrderState: Lấy dữ liệu order từ sổ cái
 func getOrderState(ctx contractapi.TransactionContextInterface, orderID string) (*Order, error) {
 	orderJSON, err := ctx.GetStub().GetState(orderID)
 	if err != nil {
-		return nil, fmt.Errorf("lỗi khi đọc từ world state: %v", err)
+		return nil, fmt.Errorf("lỗi đọc world state: %v", err)
 	}
 	if orderJSON == nil {
 		return nil, fmt.Errorf("đơn hàng %s không tồn tại", orderID)
@@ -45,7 +57,7 @@ func getOrderState(ctx contractapi.TransactionContextInterface, orderID string) 
 	return &order, nil
 }
 
-// saveOrderState lưu lại trạng thái mới của Order vào sổ cái
+// saveOrderState: Lưu order vào sổ cái
 func saveOrderState(ctx contractapi.TransactionContextInterface, order *Order) error {
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
@@ -58,7 +70,7 @@ func saveOrderState(ctx contractapi.TransactionContextInterface, order *Order) e
 func (s *SmartContract) orderExists(ctx contractapi.TransactionContextInterface, orderID string) (bool, error) {
 	assetJSON, err := ctx.GetStub().GetState(orderID)
 	if err != nil {
-		return false, fmt.Errorf("lỗi khi đọc từ world state: %v", err)
+		return false, fmt.Errorf("lỗi đọc world state: %v", err)
 	}
 	return assetJSON != nil, nil
 }
@@ -73,7 +85,7 @@ func getTimeNow(ctx contractapi.TransactionContextInterface) (time.Time, error) 
 }
 
 // ===================================================================================
-// CÁC HÀM GIAO DỊCH (Logic nghiệp vụ)
+// CÁC HÀM GIAO DỊCH (BUSINESS LOGIC)
 // ===================================================================================
 
 // InitLedger (Tùy chọn): Thêm một số dữ liệu mẫu để test.
@@ -83,24 +95,32 @@ func (s *SmartContract) InitLedger(ctx contractapi.TransactionContextInterface) 
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 1] 
-// : Sàn TMĐT tạo một đơn hàng mới
-// Chính sách (EP): OR('ECommercePlatformOrg.member')
+// [HÀM 1] CreateOrder: Tạo đơn hàng
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
-    orderID string, paymentMethod string, sellerID string, shipperID string, 
-    sellerDataBlob string, shipperDataBlob string) error {
+	orderID string, 
+	paymentMethod string, 
+	shipperCompanyID string,
+	sellerDataBlob string, 
+	shipperDataBlob string) error {
 
-	// 1. Kiểm tra Access Control (ACL)
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return err
+	// 1. Kiểm tra đầu vào
+	if shipperCompanyID == "" {
+		return fmt.Errorf("lỗi: đơn hàng phải có ShipperCompanyID (Đơn vị vận chuyển)")
 	}
-	// if actorOrg != "ECommercePlatformOrgMSP" {
-	// 	return fmt.Errorf("lỗi: chỉ tổ chức 'ECommercePlatformOrgMSP' mới được phép tạo đơn hàng")
-	// }
 
-	// 2. Kiểm tra Pre-condition: Đơn hàng chưa tồn tại
+	// 2. Lấy định danh người gọi
+	actorOrg, err := getActorOrg(ctx)
+	if err != nil { return err }
+
+	callerCompanyID, _ := getCallerCompanyID(ctx)
+
+	// Chỉ Seller hoặc Sàn được tạo đơn
+	if actorOrg != "SellerOrgMSP"{
+		return fmt.Errorf("lỗi: tổ chức '%s' không có quyền tạo đơn", actorOrg)
+	}
+
+	// 3. Kiểm tra trùng lặp
 	exists, err := s.orderExists(ctx, orderID)
 	if err != nil {
 		return err
@@ -128,10 +148,17 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 		Status:        "CREATED",
 		PaymentMethod: paymentMethod,
 		CodStatus:     codStatus,
-		SellerID:      sellerID,
-		ShipperID:     shipperID,
-		CreatedAt:     txTime,
-		UpdatedAt:     txTime,
+		
+		// Gán thông tin chủ sở hữu
+		SellerID:        actorOrg,        
+		SellerCompanyID: callerCompanyID, 
+		
+		// Gán thông tin vận chuyển
+		ShipperID:        "ShipperOrgMSP", 
+		ShipperCompanyID: shipperCompanyID,
+
+		CreatedAt:            txTime,
+		UpdatedAt:            txTime,
 	        SellerSensitiveData:  sellerDataBlob,
         	ShipperSensitiveData: shipperDataBlob,
 		History: []HistoryEntry{
@@ -149,8 +176,7 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 2] ConfirmPayment: Sàn xác nhận thanh toán (cho đơn Prepaid)
-// Chính sách (EP): OR('ECommercePlatformOrg.member')
+// [HÀM 2] ConfirmPayment: Sàn xác nhận thanh toán
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ConfirmPayment(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -159,7 +185,7 @@ func (s *SmartContract) ConfirmPayment(ctx contractapi.TransactionContextInterfa
 		return err
 	}
 	if actorOrg != "ECommercePlatformOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ tổ chức 'ECommercePlatformOrgMSP' mới được xác nhận thanh toán")
+		return fmt.Errorf("chỉ Sàn TMĐT mới được xác nhận thanh toán")
 	}
 
 	// 2. Lấy đơn hàng
@@ -242,31 +268,36 @@ func (s *SmartContract) CancelOrder(ctx contractapi.TransactionContextInterface,
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 4] ShipOrder: Nhà Bán & Vận chuyển bàn giao hàng
-// Chính sách (EP): OR('SellerOrg.member')
+// [HÀM 4] ShipOrder: Đơn vị vận chuyển xác nhận lấy hàng
+// Chính sách: Chỉ ShipperOrg mới được gọi, và phải đúng CompanyID
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ShipOrder(ctx contractapi.TransactionContextInterface, orderID string) error {
-	// 1. Kiểm tra ACL (Logic này kiểm tra NGƯỜI GỬI, EP `AND` sẽ được Fabric kiểm tra lúc commit)
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return err
-	}
-	if actorOrg != "SellerOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'SellerOrgMSP' mới được gọi hàm này")
-	}
-
-	// 2. Lấy đơn hàng
 	order, err := getOrderState(ctx, orderID)
-	if err != nil {
-		return err
+	if err != nil { return err }
+
+	actorOrg, _ := getActorOrg(ctx)
+	
+	// 1. KIỂM TRA QUYỀN (CHỈ CHO 1 ORG LÀ SHIPPER GỌI)
+	if actorOrg != "ShipperOrgMSP" {
+		return fmt.Errorf("lỗi: chỉ tổ chức vận chuyển 'ShipperOrgMSP' mới được phép xác nhận lấy hàng")
 	}
 
-	// 3. Kiểm tra Pre-condition (Logic)
+	// 2. KIỂM TRA ĐÚNG ĐƠN VỊ VẬN CHUYỂN (Multi-tenancy)
+	callerCompany, err := getCallerCompanyID(ctx)
+	if err != nil {
+		return fmt.Errorf("lỗi xác thực danh tính công ty: %v", err)
+	}
+
+	if order.ShipperCompanyID != callerCompany {
+		return fmt.Errorf("LỖI QUYỀN: Đơn hàng thuộc về '%s', bạn thuộc đơn vị '%s'", order.ShipperCompanyID, callerCompany)
+	}
+
+	// 3. KIỂM TRA ĐIỀU KIỆN LOGIC (QUAN TRỌNG: GIỮ NGUYÊN)
 	if order.PaymentMethod == "PREPAID" && order.Status != "PAID" {
-		return fmt.Errorf("lỗi: đơn 'PREPAID' phải ở trạng thái 'PAID' mới được giao. Trạng thái hiện tại: %s", order.Status)
+		return fmt.Errorf("lỗi: đơn PREPAID phải thanh toán (PAID) mới được giao. Trạng thái hiện tại: %s", order.Status)
 	}
 	if order.PaymentMethod == "COD" && order.Status != "CREATED" {
-		return fmt.Errorf("lỗi: đơn 'COD' phải ở trạng thái 'CREATED' mới được giao. Trạng thái hiện tại: %s", order.Status)
+		return fmt.Errorf("lỗi: đơn COD phải ở trạng thái CREATED mới được giao. Trạng thái hiện tại: %s", order.Status)
 	}
 
 	// 4. Lấy thời gian
@@ -290,31 +321,29 @@ func (s *SmartContract) ShipOrder(ctx contractapi.TransactionContextInterface, o
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 5] ConfirmDelivery: Vận chuyển giao (Đơn trả trước)
-// Chính sách (EP): OR('ShipperOrg.member')
+// [HÀM 5] ConfirmDelivery: Shipper xác nhận giao thành công (Prepaid)
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ConfirmDelivery(ctx contractapi.TransactionContextInterface, orderID string) error {
-	// 1. Kiểm tra ACL
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return err
-	}
-	if actorOrg != "ShipperOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ tổ chức 'ShipperOrgMSP' mới được xác nhận giao hàng")
-	}
-
-	// 2. Lấy đơn hàng
 	order, err := getOrderState(ctx, orderID)
-	if err != nil {
-		return err
+	if err != nil { return err }
+
+	actorOrg, _ := getActorOrg(ctx)
+	callerCompany, _ := getCallerCompanyID(ctx)
+
+	// Check quyền
+	if actorOrg != "ShipperOrgMSP" {
+		return fmt.Errorf("chỉ ShipperOrg mới được xác nhận giao hàng")
+	}
+	if order.ShipperCompanyID != callerCompany {
+		return fmt.Errorf("sai đơn vị vận chuyển: đơn là '%s', bạn là '%s'", order.ShipperCompanyID, callerCompany)
 	}
 
-	// 3. Kiểm tra Pre-condition (Logic)
+	// Check Logic
 	if order.PaymentMethod != "PREPAID" {
-		return fmt.Errorf("lỗi: hàm 'ConfirmDelivery' chỉ dùng cho đơn 'PREPAID'")
+		return fmt.Errorf("hàm này chỉ cho đơn PREPAID")
 	}
 	if order.Status != "SHIPPED" {
-		return fmt.Errorf("lỗi: đơn hàng phải ở trạng thái 'SHIPPED' mới được giao. Trạng thái hiện tại: %s", order.Status)
+		return fmt.Errorf("đơn phải đang SHIPPED")
 	}
 
 	// 4. Lấy thời gian
@@ -325,7 +354,7 @@ func (s *SmartContract) ConfirmDelivery(ctx contractapi.TransactionContextInterf
 
 	// 5. Cập nhật trạng thái
 	order.Status = "DELIVERED"
-	order.DeliveryTimestamp = txTime // <-- Ghi lại mốc thời gian giao hàng
+	order.DeliveryTimestamp = txTime
 	order.UpdatedAt = txTime
 	order.History = append(order.History, HistoryEntry{
 		TxID:      ctx.GetStub().GetTxID(),
@@ -339,31 +368,29 @@ func (s *SmartContract) ConfirmDelivery(ctx contractapi.TransactionContextInterf
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 6] ConfirmCODDelivery: Vận chuyển giao & thu tiền (Đơn COD)
-// Chính sách (EP): OR('ShipperOrg.member')
+// [HÀM 6] ConfirmCODDelivery: Shipper giao & thu tiền (COD)
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ConfirmCODDelivery(ctx contractapi.TransactionContextInterface, orderID string) error {
-	// 1. Kiểm tra ACL
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return err
-	}
-	if actorOrg != "ShipperOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ tổ chức 'ShipperOrgMSP' mới được xác nhận giao hàng COD")
-	}
-
-	// 2. Lấy đơn hàng
 	order, err := getOrderState(ctx, orderID)
-	if err != nil {
-		return err
+	if err != nil { return err }
+
+	actorOrg, _ := getActorOrg(ctx)
+	callerCompany, _ := getCallerCompanyID(ctx)
+
+	// Check quyền
+	if actorOrg != "ShipperOrgMSP" {
+		return fmt.Errorf("chỉ ShipperOrg mới được gọi")
+	}
+	if order.ShipperCompanyID != callerCompany {
+		return fmt.Errorf("sai đơn vị vận chuyển")
 	}
 
-	// 3. Kiểm tra Pre-condition (Logic)
+	// Check Logic
 	if order.PaymentMethod != "COD" {
-		return fmt.Errorf("lỗi: hàm 'ConfirmCODDelivery' chỉ dùng cho đơn 'COD'")
+		return fmt.Errorf("hàm này chỉ cho đơn COD")
 	}
 	if order.Status != "SHIPPED" {
-		return fmt.Errorf("lỗi: đơn hàng phải ở trạng thái 'SHIPPED' mới được giao. Trạng thái hiện tại: %s", order.Status)
+		return fmt.Errorf("đơn phải đang SHIPPED")
 	}
 
 	// 4. Lấy thời gian
@@ -374,8 +401,8 @@ func (s *SmartContract) ConfirmCODDelivery(ctx contractapi.TransactionContextInt
 
 	// 5. Cập nhật trạng thái
 	order.Status = "DELIVERED"
-	order.CodStatus = "PENDING_REMITTANCE" // <-- Cập nhật trạng thái COD
-	order.DeliveryTimestamp = txTime       // <-- Ghi lại mốc thời gian giao hàng
+	order.CodStatus = "PENDING_REMITTANCE"
+	order.DeliveryTimestamp = txTime
 	order.UpdatedAt = txTime
 	order.History = append(order.History, HistoryEntry{
 		TxID:      ctx.GetStub().GetTxID(),
@@ -389,8 +416,7 @@ func (s *SmartContract) ConfirmCODDelivery(ctx contractapi.TransactionContextInt
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 7] RemitCOD: Vận chuyển nộp tiền COD cho Sàn
-// Chính sách (EP): OR('ECommercePlatformOrg.member')
+// [HÀM 7] RemitCOD: Sàn xác nhận đã nhận tiền COD từ Shipper
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -399,7 +425,7 @@ func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, or
 		return err
 	}
 	if actorOrg != "ECommercePlatformOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'ECommercePlatformOrgMSP' mới được gọi hàm này")
+		return fmt.Errorf("chỉ Sàn TMĐT mới xác nhận đã nhận tiền COD (Remit)")
 	}
 
 	// 2. Lấy đơn hàng
@@ -410,7 +436,7 @@ func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, or
 
 	// 3. Kiểm tra Pre-condition (Logic)
 	if order.CodStatus != "PENDING_REMITTANCE" {
-		return fmt.Errorf("lỗi: trạng thái COD phải là 'PENDING_REMITTANCE'. Trạng thái hiện tại: %s", order.CodStatus)
+		return fmt.Errorf("CodStatus phải là PENDING_REMITTANCE")
 	}
 
 	// 4. Lấy thời gian
@@ -434,8 +460,8 @@ func (s *SmartContract) RemitCOD(ctx contractapi.TransactionContextInterface, or
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 8] PayoutToSeller: Sàn thanh toán cho Nhà Bán (sau 7 ngày -> DEMO: 5 phút)
-// Chính sách (EP): OR('ECommercePlatformOrg.member')
+// [HÀM 8] PayoutToSeller: Thanh toán cho Seller
+// Logic: Giữ nguyên kiểm tra PREPAID/COD và 5 phút
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) PayoutToSeller(ctx contractapi.TransactionContextInterface, orderID string) error {
 	// 1. Kiểm tra ACL
@@ -459,7 +485,7 @@ func (s *SmartContract) PayoutToSeller(ctx contractapi.TransactionContextInterfa
 		return err
 	}
 
-	// 4. Kiểm tra Pre-condition (Logic nghiệp vụ - Trạng thái)
+	// 4. Kiểm tra Pre-condition (Logic nghiệp vụ - Trạng thái) - GIỮ NGUYÊN
 	if order.PaymentMethod == "PREPAID" && order.Status != "DELIVERED" {
 		return fmt.Errorf("chỉ có thể thanh toán cho đơn PREPAID đã 'DELIVERED'")
 	}
@@ -559,24 +585,21 @@ func (s *SmartContract) RequestReturn(ctx contractapi.TransactionContextInterfac
 // Chính sách (EP): OR('ShipperOrgMSP.member')
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ShipReturn(ctx contractapi.TransactionContextInterface, orderID string) error {
-	// 1. Kiểm tra ACL
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return err
-	}
-	if actorOrg != "ShipperOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'ShipperOrgMSP' mới được gọi hàm này")
-	}
-
-	// 2. Lấy đơn hàng
 	order, err := getOrderState(ctx, orderID)
-	if err != nil {
-		return err
+	if err != nil { return err }
+
+	actorOrg, _ := getActorOrg(ctx)
+	callerCompany, _ := getCallerCompanyID(ctx)
+
+	if actorOrg != "ShipperOrgMSP" {
+		return fmt.Errorf("chỉ Shipper mới được lấy hàng trả")
+	}
+	if order.ShipperCompanyID != callerCompany {
+		return fmt.Errorf("sai đơn vị vận chuyển: đơn của '%s', bạn là '%s'", order.ShipperCompanyID, callerCompany)
 	}
 
-	// 3. Kiểm tra Pre-condition (Logic)
 	if order.Status != "RETURN_REQUESTED" {
-		return fmt.Errorf("lỗi: chỉ đơn hàng 'RETURN_REQUESTED' mới có thể 'ShipReturn'. Trạng thái hiện tại: %s", order.Status)
+		return fmt.Errorf("trạng thái phải là RETURN_REQUESTED")
 	}
 
 	// 4. Lấy thời gian
@@ -600,28 +623,29 @@ func (s *SmartContract) ShipReturn(ctx contractapi.TransactionContextInterface, 
 }
 
 // -----------------------------------------------------------------------------------
-// [HÀM 11] ConfirmReturnReceived: Nhà Bán nhận lại hàng trả
-// Chính sách (EP): OR('SellerOrg.member')
+// [HÀM 11] ConfirmReturnReceived: Seller nhận lại hàng trả
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) ConfirmReturnReceived(ctx contractapi.TransactionContextInterface, orderID string) error {
-	// 1. Kiểm tra ACL
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return err
-	}
-	if actorOrg != "SellerOrgMSP" {
-		return fmt.Errorf("lỗi: chỉ 'SellerOrgMSP' mới được gọi hàm này")
-	}
-
-	// 2. Lấy đơn hàng
 	order, err := getOrderState(ctx, orderID)
-	if err != nil {
-		return err
+	if err != nil { return err }
+
+	actorOrg, _ := getActorOrg(ctx)
+	callerCompany, _ := getCallerCompanyID(ctx)
+
+	// Check quyền Seller
+	if actorOrg != "SellerOrgMSP" {
+		return fmt.Errorf("chỉ Seller mới được xác nhận nhận hàng")
+	}
+	if order.SellerID != actorOrg {
+		return fmt.Errorf("không phải đơn của tổ chức bạn")
+	}
+	// Check đúng Shop (Multi-vendor)
+	if order.SellerCompanyID != "" && order.SellerCompanyID != callerCompany {
+		return fmt.Errorf("đơn của Shop '%s', bạn là Shop '%s'", order.SellerCompanyID, callerCompany)
 	}
 
-	// 3. Kiểm tra Pre-condition (Logic)
 	if order.Status != "RETURN_IN_TRANSIT" {
-		return fmt.Errorf("lỗi: chỉ đơn hàng 'RETURN_IN_TRANSIT' mới có thể 'ConfirmReturnReceived'. Trạng thái hiện tại: %s", order.Status)
+		return fmt.Errorf("trạng thái phải là RETURN_IN_TRANSIT")
 	}
 
 	// 4. Lấy thời gian
@@ -653,28 +677,37 @@ func (s *SmartContract) ConfirmReturnReceived(ctx contractapi.TransactionContext
 // Chính sách (EP): Bất kỳ ai trong 3 tổ chức
 // -----------------------------------------------------------------------------------
 func (s *SmartContract) QueryOrder(ctx contractapi.TransactionContextInterface, orderID string) (*Order, error) {
-	// 1. Kiểm tra ACL (Đảm bảo người gọi thuộc 1 trong 3 tổ chức)
-	actorOrg, err := getActorOrg(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if actorOrg != "ECommercePlatformOrgMSP" && actorOrg != "SellerOrgMSP" && actorOrg != "ShipperOrgMSP" {
-		return nil, fmt.Errorf("lỗi: tổ chức của bạn (%s) không được phép truy vấn dữ liệu", actorOrg)
-	}
-
-	// 2. Lấy đơn hàng
 	order, err := getOrderState(ctx, orderID)
 	if err != nil {
 		return nil, err
 	}
 	
-	// (Lưu ý: Logic về Private Data Collections (PDC) sẽ được thêm vào đây nếu cần)
+	// Lấy thông tin người gọi
+	actorOrg, _ := getActorOrg(ctx)
+	callerCompany, _ := getCallerCompanyID(ctx)
+
+	// LOGIC PHÂN QUYỀN XEM (Visibility)
 	
+	// 1. Admin Sàn: Xem hết
+	if actorOrg == "ECommercePlatformOrgMSP" {
+		return order, nil
+	}
+
+	// 2. Seller: Chỉ xem đơn của Shop mình
+	if actorOrg == "SellerOrgMSP" {
+		if order.SellerCompanyID != "" && order.SellerCompanyID != callerCompany {
+			return nil, fmt.Errorf("KHÔNG CÓ QUYỀN: Đơn này của Shop '%s'", order.SellerCompanyID)
+		}
+		return order, nil
+	}
+
+	// 3. Shipper: Chỉ xem đơn của Hãng mình
+	if actorOrg == "ShipperOrgMSP" {
+		if order.ShipperCompanyID != "" && order.ShipperCompanyID != callerCompany {
+			return nil, fmt.Errorf("KHÔNG CÓ QUYỀN: Đơn này của Hãng '%s'", order.ShipperCompanyID)
+		}
 	return order, nil
 }
 
-// (Bạn có thể thêm các hàm Rich Query (truy vấn phức tạp) cho CouchDB ở đây)
-// Ví dụ: func (s *SmartContract) QueryOrdersBySeller(ctx contractapi.TransactionContextInterface, sellerID string) ([]*Order, error) { ... }
-
-
-
+	return nil, fmt.Errorf("tổ chức '%s' không có quyền truy cập", actorOrg)
+}

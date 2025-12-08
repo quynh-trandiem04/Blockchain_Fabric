@@ -36,6 +36,10 @@ export default function ProductActions({
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  console.log("=== DEBUG FRONTEND PRODUCT DATA ===");
+  console.log("Product Options:", product.options);
+  console.log("Product Variants:", product.variants);
+
   const [options, setOptions] = useState<Record<string, string | undefined>>({})
   const [isAdding, setIsAdding] = useState(false)
   const countryCode = useParams().countryCode as string
