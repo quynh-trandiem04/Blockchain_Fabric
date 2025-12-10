@@ -1,3 +1,5 @@
+// my-medusa-store\src\modules\marketplace\models\seller.ts
+
 import { model } from "@medusajs/framework/utils"
 
 export const Seller = model.define("seller", {
