@@ -1,5 +1,7 @@
+// my-medusa-store-storefront\src\lib\constants.tsx
+
 import React from "react"
-import { CreditCard } from "@medusajs/icons"
+import { CreditCard, Cash } from "@medusajs/icons"
 
 import Ideal from "@modules/common/icons/ideal"
 import Bancontact from "@modules/common/icons/bancontact"
@@ -34,21 +36,31 @@ export const paymentInfoMap: Record<
     title: "Manual Payment",
     icon: <CreditCard />,
   },
-  // Add more payment providers here
+  // [3] CẤU HÌNH SHIP COD (ID MỚI)
+  // Lưu ý: Trong Admin Medusa, bạn cần đảm bảo Provider này có ID là 'manual'
+  pp_cod: {
+    title: "Ship COD (Cash on Delivery)",
+    icon: <Cash />,
+  },
+  // Fallback cho manual nếu cần
+  manual: {
+    title: "Ship COD",
+    icon: <Cash />,
+  }
 }
 
-// This only checks if it is native stripe or medusa payments for card payments, it ignores the other stripe-based providers
 export const isStripeLike = (providerId?: string) => {
-  return (
-    providerId?.startsWith("pp_stripe_") || providerId?.startsWith("pp_medusa-")
-  )
+  return providerId?.startsWith("pp_stripe_") || providerId?.startsWith("pp_medusa-")
 }
 
 export const isPaypal = (providerId?: string) => {
   return providerId?.startsWith("pp_paypal")
 }
 export const isManual = (providerId?: string) => {
-  return providerId?.startsWith("pp_system_default")
+  return (
+    providerId?.startsWith("pp_system_default") || 
+    providerId?.startsWith("pp_cod")
+  )
 }
 
 // Add currencies that don't need to be divided by 100

@@ -1,7 +1,6 @@
-// medusa-config.ts
+// my-medusa-store\medusa-config.ts
 
 import { loadEnv, defineConfig } from '@medusajs/framework/utils'
-const path = require("path"); // Bắt buộc có dòng này
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
 
@@ -19,10 +18,28 @@ module.exports = defineConfig({
   },
   modules: [
     {
-      // Dùng path.resolve để lấy đường dẫn tuyệt đối chuẩn xác
-      // __dirname trỏ đến thư mục gốc của dự án (nơi chứa medusa-config.ts)
-      resolve: path.resolve(__dirname, "src/modules/marketplace"),
+      resolve: "./src/modules/marketplace",
       key: "marketplace", 
+    },
+    // 👇 CẤU HÌNH PAYMENT ĐƠN GIẢN (Chỉ dùng provider có sẵn)
+    {
+      resolve: "@medusajs/payment",
+      options: {
+      providers: [
+        {
+            // Trỏ vào module local chứa cả 2 provider
+            resolve: "./src/modules/simple-payment",
+          id: "pp_system_default",
+            options: { name: "Manual Payment" }
+          },
+          {
+            // Vẫn trỏ vào cùng module đó, nhưng dùng ID khác
+            resolve: "./src/modules/simple-payment",
+            id: "pp_cod", 
+            options: { name: "Ship COD" }
+          }
+      ],
+      },
     },
   ]
 })
