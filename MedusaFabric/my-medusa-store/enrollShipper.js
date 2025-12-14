@@ -1,58 +1,64 @@
 // enrollShipper.js
 'use strict';
 
+const FabricCAServices = require('fabric-ca-client');
 const { Wallets } = require('fabric-network');
 const fs = require('fs');
 const path = require('path');
+const yaml = require('js-yaml');
 
-// === CẤU HÌNH ===
-const CRYPTO_PATH = path.resolve(__dirname, 'organizations'); 
+// Cấu hình
 const IDENTITY_LABEL = 'shipper_admin';
-const MSP_ID = 'ShipperOrgMSP';
-const ORG_DOMAIN = 'shipper.com';
-const ADMIN_USER = 'Admin@shipper.com';
+const MSP_ID = 'ShipperOrgMSP'; // Phải khớp với configtx.yaml
+const FABRIC_HOST = process.env.FABRIC_HOST || '192.168.40.11'; 
 
 async function main() {
     try {
+        // 1. Load Connection Profile để lấy thông tin CA chính xác
+        const ccpPath = path.resolve(__dirname, 'connection-profile.yaml');
+        const yamlContent = fs.readFileSync(ccpPath, 'utf8');
+        let ccp;
+        try {
+            const docs = yaml.loadAll(yamlContent);
+            ccp = docs.find(doc => doc && doc.organizations);
+        } catch (e) {
+            ccp = yaml.load(yamlContent);
+        }
+
+        const caInfo = ccp.certificateAuthorities['ca.shipper.com'];
+        const caTLSCACerts = caInfo.tlsCACerts.pem;
+        const caURL = caInfo.url.replace(/:\/\/[^:]+:/, `://${FABRIC_HOST}:`);
+
+        // 2. Kết nối CA
+        const ca = new FabricCAServices(caURL, { trustedRoots: caTLSCACerts, verify: false }, null);
+
+        // 3. Setup Wallet
         const walletPath = path.join(process.cwd(), 'wallet');
         const wallet = await Wallets.newFileSystemWallet(walletPath);
         console.log(`📂 Wallet path: ${walletPath}`);
 
-        const identity = await wallet.get(IDENTITY_LABEL);
-        if (identity) {
-            console.log(`✅ Danh tính "${IDENTITY_LABEL}" đã tồn tại.`);
-            return;
-        }
+        // 4. Enroll Admin (admin / adminpw là mặc định của Fabric CA)
+        console.log('⏳ Enrolling admin...');
+        const enrollment = await ca.enroll({ 
+            enrollmentID: 'admin', 
+            enrollmentSecret: 'adminpw' 
+        });
 
-        const certPath = path.join(CRYPTO_PATH, 'peerOrganizations', ORG_DOMAIN, 'users', ADMIN_USER, 'msp', 'signcerts', `${ADMIN_USER}-cert.pem`);
-        const keyDir = path.join(CRYPTO_PATH, 'peerOrganizations', ORG_DOMAIN, 'users', ADMIN_USER, 'msp', 'keystore');
-
-        if (!fs.existsSync(certPath)) {
-            throw new Error(`❌ Không tìm thấy Cert tại: ${certPath}`);
-        }
-
-        const keyFiles = fs.readdirSync(keyDir);
-        const keyFile = keyFiles.find(f => f.endsWith('_sk') || f.length > 10);
-        if (!keyFile) throw new Error(`❌ Không tìm thấy Private Key trong: ${keyDir}`);
-        
-        const keyPath = path.join(keyDir, keyFile);
-        const certificate = fs.readFileSync(certPath, 'utf8');
-        const privateKey = fs.readFileSync(keyPath, 'utf8');
-
+        // 5. Lưu vào Wallet
         const x509Identity = {
             credentials: {
-                certificate: certificate,
-                privateKey: privateKey,
+                certificate: enrollment.certificate,
+                privateKey: enrollment.key.toBytes(),
             },
             mspId: MSP_ID,
             type: 'X.509',
         };
 
         await wallet.put(IDENTITY_LABEL, x509Identity);
-        console.log(`🎉 Thành công! Đã thêm "${IDENTITY_LABEL}" vào wallet.`);
+        console.log(`✅ Successfully enrolled admin user "${IDENTITY_LABEL}" and imported it into the wallet`);
 
     } catch (error) {
-        console.error(`❌ Lỗi enroll Shipper: ${error}`);
+        console.error(`❌ Failed to enroll admin user "${IDENTITY_LABEL}": ${error}`);
         process.exit(1);
     }
 }

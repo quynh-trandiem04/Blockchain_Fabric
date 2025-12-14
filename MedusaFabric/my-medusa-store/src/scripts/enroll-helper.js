@@ -7,7 +7,7 @@ const path = require('path');
 const yaml = require('js-yaml');
 
 // Cho phép cấu hình IP của máy chạy Blockchain
-const FABRIC_HOST = process.env.FABRIC_HOST || '192.168.40.11'; // IP máy Ubuntu của bạn
+const FABRIC_HOST = process.env.FABRIC_HOST || '192.168.40.11'; 
 
 async function enrollSellerIdentity(enrollmentID, companyCodeAttr) {
     try {
@@ -15,82 +15,82 @@ async function enrollSellerIdentity(enrollmentID, companyCodeAttr) {
         if (!fs.existsSync(ccpPath)) {
             throw new Error(`Cannot find connection profile at: ${ccpPath}`);
         }
-        const ccp = yaml.load(fs.readFileSync(ccpPath, 'utf8'));
 
-        // Lấy thông tin config gốc
-        const caInfo = ccp.certificateAuthorities['ca.seller.com'];
-        const caTLSCACerts = caInfo.tlsCACerts.pem;   
+        // --- Xử lý file YAML ---
+        const yamlContent = fs.readFileSync(ccpPath, 'utf8');
+        let ccp;
+        try {
+            const docs = yaml.loadAll(yamlContent);
+            ccp = docs.find(doc => doc && doc.organizations);
+        } catch (e) {
+            ccp = yaml.load(yamlContent);
+        }
 
-        // 1. Thay thế Hostname
+        if (!ccp) throw new Error("Invalid Connection Profile.");
+
+        const caName = 'ca.seller.com'; 
+        const caInfo = ccp.certificateAuthorities[caName];
+        
+        if (!caInfo) throw new Error(`CA '${caName}' not found.`);
+
+        let caTLSCACerts = caInfo.tlsCACerts.pem;
+        if (!caTLSCACerts && caInfo.tlsCACerts.path) {
+             const certPath = path.resolve(process.cwd(), caInfo.tlsCACerts.path);
+             caTLSCACerts = fs.readFileSync(certPath, 'utf8');
+        }
+
         let caURL = caInfo.url.replace(/:\/\/[^:]+:/, `://${FABRIC_HOST}:`);
         console.log(`🔌 Connecting to CA at: ${caURL}`);
         
         const tlsOptions = {
             trustedRoots: caTLSCACerts,
             verify: false,
-            checkServerIdentity: () => { return undefined; }
         };
 
-        // 2. [FIX LỖI TẠI ĐÂY]: Thay caInfo.caName bằng tên chuẩn 'ca-org2'
-        // Server Docker được cấu hình là 'ca-org2', không phải 'ca.seller.com'
-        const CA_NAME_CORRECT = 'ca-org2'; 
-
-        const ca = new FabricCAServices(caURL, tlsOptions, CA_NAME_CORRECT);
+        const CA_DOCKER_NAME = 'ca-org2'; 
+        const ca = new FabricCAServices(caURL, tlsOptions, CA_DOCKER_NAME);
 
         const walletPath = path.join(process.cwd(), 'wallet');
         const wallet = await Wallets.newFileSystemWallet(walletPath);
 
-        // Check Admin
+        // --- 1. Lấy quyền Admin ---
         const adminIdentity = await wallet.get('seller_admin');
         if (!adminIdentity) {
-            console.log('⚠️ Admin "seller_admin" missing. Auto-enrolling...');
-            try {
-                const enrollment = await ca.enroll({ 
-                    enrollmentID: 'admin', 
-                    enrollmentSecret: 'adminpw' 
-                });
-                const x509Identity = {
-                    credentials: {
-                        certificate: enrollment.certificate,
-                        privateKey: enrollment.key.toBytes(),
-                    },
-                    mspId: 'SellerOrgMSP',
-                    type: 'X.509',
-                };
-                await wallet.put('seller_admin', x509Identity);
-                console.log('✅ Admin "seller_admin" enrolled.');
-            } catch (err) {
-                throw new Error(`❌ Failed to auto-enroll admin: ${err.message}`);
-            }
+            throw new Error('⚠️ Admin "seller_admin" not found. Please run "node enrollSeller.js" first!');
         }
 
-        const finalAdminIdentity = await wallet.get('seller_admin');
-        const provider = wallet.getProviderRegistry().getProvider(finalAdminIdentity.type);
-        const adminUser = await provider.getUserContext(finalAdminIdentity, 'seller_admin');
+        const provider = wallet.getProviderRegistry().getProvider(adminIdentity.type);
+        const adminUser = await provider.getUserContext(adminIdentity, 'seller_admin');
 
-        // Đăng ký User
-        let secret;
+        // --- 2. [FIX MỚI] Kiểm tra và Xóa User cũ nếu bị kẹt (Zombie User) ---
+        // IdentityService dùng để quản lý (CRUD) các identity trên CA
+        const identityService = ca.newIdentityService();
+        
         try {
-            secret = await ca.register({
-                affiliation: '',
-                enrollmentID: enrollmentID,
-                role: 'client',
-                attrs: [{ name: 'companyCode', value: companyCodeAttr, ecert: true }]
-            }, adminUser);
-            console.log(`✨ Registered user "${enrollmentID}"`);
-        } catch (regError) {
-            if (regError.toString().includes('already registered')) {
-                console.warn(`⚠️ User "${enrollmentID}" đã tồn tại trên CA.`);
-                // Nếu đã tồn tại mà chưa có wallet, ta buộc phải báo lỗi vì không lấy lại được secret
-                // Trừ khi bạn đã lưu secret ở đâu đó, hoặc admin cũ đã bị xóa.
-                // Để test tiếp, hãy dùng tên Shop khác.
-                throw new Error(`User "${enrollmentID}" đã tồn tại. Hãy tạo Shop với tên khác!`);
-            } else {
-                throw regError;
-            }
+            // Thử lấy thông tin user xem có tồn tại không
+            await identityService.getOne(enrollmentID, adminUser);
+            console.log(`⚠️ User "${enrollmentID}" đã tồn tại trên CA. Đang xóa để đăng ký lại...`);
+            
+            // Xóa user cũ
+            await identityService.delete(enrollmentID, adminUser);
+            console.log(`🗑️ Đã xóa user "${enrollmentID}" khỏi CA.`);
+        } catch (error) {
+            // Nếu lỗi là "Identity not found" thì tốt, ta bỏ qua và tạo mới
+            // Nếu lỗi khác thì in ra để debug (nhưng thường không chặn luồng chính)
         }
 
-        // Enroll
+        // --- 3. Đăng ký User mới (Shop) ---
+        console.log(`✨ Registering user "${enrollmentID}"...`);
+        const secret = await ca.register({
+            affiliation: '',
+            enrollmentID: enrollmentID,
+            role: 'client',
+            attrs: [{ name: 'companyCode', value: companyCodeAttr, ecert: true }]
+        }, adminUser);
+        
+        console.log(`🔑 Secret generated for "${enrollmentID}"`);
+
+        // --- 4. Enroll User mới ---
         const enrollment = await ca.enroll({
             enrollmentID: enrollmentID,
             enrollmentSecret: secret
@@ -101,12 +101,12 @@ async function enrollSellerIdentity(enrollmentID, companyCodeAttr) {
                 certificate: enrollment.certificate,
                 privateKey: enrollment.key.toBytes(),
             },
-            mspId: 'SellerOrgMSP',
+            mspId: 'SellerOrgMSP', 
             type: 'X.509',
         };
 
         await wallet.put(enrollmentID, x509Identity);
-        console.log(`✅ Wallet created for "${enrollmentID}"`);
+        console.log(`✅ Wallet created successfully for "${enrollmentID}"`);
 
     } catch (error) {
         console.error(`❌ Enroll Failed: ${error.message}`);

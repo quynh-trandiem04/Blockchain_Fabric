@@ -1,0 +1,427 @@
+// src/services/fabric.ts
+// @ts-nocheck
+
+const { Gateway, Wallets } = require('fabric-network');
+const path = require('path');
+const fs = require('fs');
+const crypto = require('crypto');
+const yaml = require('js-yaml');
+
+// === CẤU HÌNH ===
+const KEY_PATH = path.join(process.cwd(), 'keys');
+const CHANNEL_NAME = 'orderchannel';
+const CC_NAME = 'ecommerce';
+const VM_IP = '192.168.40.11'; 
+
+// [QUAN TRỌNG] Thêm dòng này để fix lỗi CCP_PATH is not defined
+const CCP_PATH = path.resolve(process.cwd(), 'connection-profile.yaml'); 
+
+// Load Key Mã Hóa
+let SELLER_PUBLIC_KEY = "";
+let SHIPPER_PUBLIC_KEY = "";
+try {
+    SELLER_PUBLIC_KEY = fs.readFileSync(path.join(KEY_PATH, 'seller_public_key.pem'), 'utf8');
+    SHIPPER_PUBLIC_KEY = fs.readFileSync(path.join(KEY_PATH, 'shipper_public_key.pem'), 'utf8');
+} catch (e) {
+    console.warn("⚠️ Warning: Chưa load được RSA Keys. Hãy kiểm tra thư mục 'keys'.");
+}
+
+// --- CERTIFICATES (COPY MỚI NHẤT TỪ UBUNTU) ---
+// (Giữ nguyên các biến PEM của bạn ở đây...)
+const ORDERER_PEM = `-----BEGIN CERTIFICATE-----
+MIICQzCCAeqgAwIBAgIRAPg+L67lbDgvZPE54LyOA6kwCgYIKoZIzj0EAwIwbDEL
+MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+cmFuY2lzY28xFDASBgNVBAoTC2V4YW1wbGUuY29tMRowGAYDVQQDExF0bHNjYS5l
+eGFtcGxlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+bmNpc2NvMRQwEgYDVQQKEwtleGFtcGxlLmNvbTEaMBgGA1UEAxMRdGxzY2EuZXhh
+bXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR85rl5dztEhhOZ59SE
+jNpURpsm1iJQ6dvf1NrOhTocyEpqOpkRqEsdO+e0D6jKbWDPP77Mzb0nYyO5GLoQ
+91/7o20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJOd4fYI4WDoMTzc6LlP
+zzYqp031Vtp9DctReU1qUgNCMAoGCCqGSM49BAMCA0cAMEQCIGdZOeHJikWVCits
+3AxoOmPlboPjlmqjheWrMtaZlYMCAiAEfKEg5bra9xRsVdQr4WGvO3RagVdGyhPF
+Ak/F5AfvYg==
+-----END CERTIFICATE-----`;
+
+const SELLER_PEM = `-----BEGIN CERTIFICATE-----
+MIICPjCCAeWgAwIBAgIQEOKc7ETskCNmtC+8apoR5DAKBggqhkjOPQQDAjBqMQsw
+CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+YW5jaXNjbzETMBEGA1UEChMKc2VsbGVyLmNvbTEZMBcGA1UEAxMQdGxzY2Euc2Vs
+bGVyLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGoxCzAJBgNV
+BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp
+c2NvMRMwEQYDVQQKEwpzZWxsZXIuY29tMRkwFwYDVQQDExB0bHNjYS5zZWxsZXIu
+Y29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEoLPWtIo6j5Z/b4LYafsUA1UT
+HEE+5tFHbMSJU3S3blscWG3v43v4gN/+ADZERNxzXf1oARx4thO6nrn9KV3PT6Nt
+MGswDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcD
+ATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdDgQiBCCfPVgR330zBmUlLkRiO3dI+2gL
+GhnpTfSLb30a9bpbljAKBggqhkjOPQQDAgNHADBEAiAOZ/pFqUL/wQ9bh1gBN0tR
+/w2qM7Wx7xWebE0aQX8luwIgLexCPu5Gofh32iApmWvqw24oN+MMWuVJGRWroaHt
+4mk=
+-----END CERTIFICATE-----`;
+
+const ECOMMERCE_PEM = `-----BEGIN CERTIFICATE-----
+MIICTDCCAfGgAwIBAgIQNTijvW/8tzXgCtpfot3A+zAKBggqhkjOPQQDAjBwMQsw
+CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+YW5jaXNjbzEWMBQGA1UEChMNZWNvbW1lcmNlLmNvbTEcMBoGA1UEAxMTdGxzY2Eu
+ZWNvbW1lcmNlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMHAx
+CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4g
+RnJhbmNpc2NvMRYwFAYDVQQKEw1lY29tbWVyY2UuY29tMRwwGgYDVQQDExN0bHNj
+YS5lY29tbWVyY2UuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEemvF4IoP
+AoS0HmjciW8xMJxShHehKjZ7GlHewpcLiSX1RlqMbiz+WJRigqe0aB+JRA0LKaNG
+D94khgpiOwCMcqNtMGswDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUF
+BwMCBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdDgQiBCDO3GoFjWfh
+kKHLaCfq5WCkDgaLsmQ/BvHGitsmrf5nnTAKBggqhkjOPQQDAgNJADBGAiEA4fzu
+4F+LWO6twh64CbeqkjPPwlYLNvI+XW/pOp5K6kgCIQDc4MLuuOWxYQim+Xa2ER6p
+HJ7iopSuXIsCCFx2y0uasA==
+-----END CERTIFICATE-----`;
+
+const SHIPPER_PEM = `-----BEGIN CERTIFICATE-----
+MIICRTCCAeqgAwIBAgIRAIrgMELwYH2gU/9i6paxGXEwCgYIKoZIzj0EAwIwbDEL
+MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+cmFuY2lzY28xFDASBgNVBAoTC3NoaXBwZXIuY29tMRowGAYDVQQDExF0bHNjYS5z
+aGlwcGVyLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+bmNpc2NvMRQwEgYDVQQKEwtzaGlwcGVyLmNvbTEaMBgGA1UEAxMRdGxzY2Euc2hp
+cHBlci5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR6+MHcvvKav3Q0VHZs
+QcKu6omEP8AfvS7PC9um/q3JiPjGsP7aiGo5b9dMj/Ic8fDMt8Uo30PT+c0IZPIp
+vbAqo20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJf3xZ1W+ftkl8urCAdP
+8rBYbMDAcJ/O1kExaeliCVD4MAoGCCqGSM49BAMCA0kAMEYCIQDU8LlgZrH4EZUo
+7VOyjADkPLmjvSJun43afyWiH0/XRwIhAKnOBd2eWms6vbL7I8TXKihVinHnXBwH
+aCTV/M/GlT8I
+-----END CERTIFICATE-----`; 
+
+// === Helper Mã Hóa ===
+const ALGORITHM = 'aes-256-gcm';
+const IV_LENGTH = 16;
+const KEY_LENGTH = 32;
+
+function hybridEncrypt(dataString, rsaPublicKey) {
+    if (!rsaPublicKey) return ""; 
+    const symmetricKey = crypto.randomBytes(KEY_LENGTH);
+    const iv = crypto.randomBytes(IV_LENGTH);
+    const cipher = crypto.createCipheriv(ALGORITHM, symmetricKey, iv);
+    let encryptedData = cipher.update(dataString, 'utf8', 'base64');
+    encryptedData += cipher.final('base64');
+    const authTag = cipher.getAuthTag();
+    const encryptedKey = crypto.publicEncrypt({ 
+        key: rsaPublicKey, 
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, 
+        oaepHash: 'sha256' 
+    }, symmetricKey);
+    return JSON.stringify({ 
+        iv: iv.toString('base64'), 
+        authTag: authTag.toString('base64'), 
+        encryptedKey: encryptedKey.toString('base64'), 
+        encryptedData: encryptedData 
+    });
+}
+
+function hybridDecrypt(blobString, rsaPrivateKey) {
+    if (!blobString || !rsaPrivateKey) return null;
+    try {
+        const { iv, authTag, encryptedKey, encryptedData } = JSON.parse(blobString);
+        const ivBuffer = Buffer.from(iv, 'base64');
+        const authTagBuffer = Buffer.from(authTag, 'base64');
+        const decryptedSymmetricKey = crypto.privateDecrypt({ 
+            key: rsaPrivateKey, 
+            padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, 
+            oaepHash: 'sha256' 
+        }, Buffer.from(encryptedKey, 'base64'));
+        const decipher = crypto.createDecipheriv(ALGORITHM, decryptedSymmetricKey, ivBuffer);
+        decipher.setAuthTag(authTagBuffer);
+        let decryptedData = decipher.update(encryptedData, 'base64', 'utf8');
+        decryptedData += decipher.final('utf8');
+        return JSON.parse(decryptedData);
+    } catch (e) {
+        console.error("Decrypt Error:", e.message);
+        return null;
+    }
+}
+
+class FabricService {
+    constructor(container) {
+        this.container = container;
+        this.gateways = {}; 
+        this.wallet = null; // Khởi tạo biến wallet
+    }
+
+    async _getContract(role = 'admin') {
+        const userId = 'seller_admin'; 
+        // const mspId = 'SellerOrgMSP';
+
+        // // 1. Reuse gateway nếu đã kết nối
+        // if (this.gateways[userId]) {
+        //     try {
+        //     const network = await this.gateways[userId].getNetwork(CHANNEL_NAME);
+        //     return { contract: network.getContract(CC_NAME), gateway: this.gateways[userId] };
+        //     } catch (e) { this.gateways[userId] = null; }
+        // }
+
+        // 2. Load Config từ YAML
+        if (!fs.existsSync(CCP_PATH)) {
+            throw new Error(`Connection Profile not found at ${CCP_PATH}`);
+        }
+        const yamlDocs = yaml.loadAll(fs.readFileSync(CCP_PATH, 'utf8'));
+        const ccp = yamlDocs[0]; 
+
+        // 3. Khởi tạo Wallet (Lưu vào biến class this.wallet)
+        if (!this.wallet) {
+            const walletPath = path.join(process.cwd(), 'wallet');
+            this.wallet = await Wallets.newFileSystemWallet(walletPath);
+        }
+
+        // Kiểm tra Identity
+        const identity = await this.wallet.get(userId);
+        if (!identity) {
+            throw new Error(`Identity '${userId}' not found in wallet.`);
+        }
+
+        // 4. Kết nối Gateway
+        const gateway = new Gateway();
+        await gateway.connect(ccp, {
+            wallet: this.wallet, // <--- QUAN TRỌNG: Phải dùng this.wallet
+            identity: userId,
+            discovery: { enabled: false, asLocalhost: false } 
+        });
+
+        console.log(`✅ Gateway connected: ${userId} (YAML MODE)`);
+        // this.gateways[userId] = gateway;
+        const network = await gateway.getNetwork(CHANNEL_NAME);
+        return { contract: network.getContract(CC_NAME), gateway };
+    }
+
+    // --- Create Order ---
+    async createOrder(data, sellerCompanyId) {
+        const { contract } = await this._getContract('seller'); 
+
+        const sellerPayload = JSON.stringify({
+            customerName: data.customerName,
+           items: data.product_lines,
+            amount_untaxed: data.amount_untaxed,
+            amount_total: data.amount_total
+        });
+        const shipperPayload = JSON.stringify({
+            customerName: data.customerName,
+            shipping_address: data.shipping_address,
+            phone: data.shipping_phone,
+            cod_amount: data.cod_amount || 0
+        });
+        
+        // Mã hóa
+        const encryptedSellerBlob = hybridEncrypt(sellerPayload, data._sellerPublicKey || SELLER_PUBLIC_KEY);
+        const encryptedShipperBlob = hybridEncrypt(shipperPayload, SHIPPER_PUBLIC_KEY);
+
+       console.log(`[Fabric] Creating Order: ${data.orderID}`);
+        
+        try {
+            const transaction = contract.createTransaction('CreateOrder');
+        await transaction.submit(
+            data.orderID,
+            data.paymentMethod, 
+            data.shipperCompanyID, 
+            encryptedSellerBlob,
+            encryptedShipperBlob,
+            sellerCompanyId
+        );
+           console.log(`[Fabric] ✅ Success: ${data.orderID}`);
+        return transaction.getTransactionId();
+        } catch (error) {
+           console.error(`[Fabric] Submit Error: ${error.message}`);
+           if (error.responses) {
+                error.responses.forEach(r => console.error(`   Peer: ${r.peer.name} | Status: ${r.status} | Msg: ${r.message}`));
+           }
+           throw error; 
+        }
+    }
+
+    // =========================================================================
+    // 2. QUERY & DECRYPT (Truy vấn & Giải mã)
+    // =========================================================================
+    async queryOrder(orderId, role = 'admin', companyID = '') { 
+        const { contract } = await this._getContract(role);
+
+        if (companyID) {
+            // Nếu có Company ID, gọi hàm Chaincode chung (QueryOrderForOrg)
+            let mspId = '';
+            if (role === 'seller') {
+                mspId = 'SellerOrgMSP';
+            } else if (role === 'shipper') {
+                mspId = 'ShipperOrgMSP';
+            } else {
+                throw new Error(`Invalid role '${role}' for company query.`);
+            }
+
+            console.log(`[FabricService] Executing QueryOrderForOrg: ${orderId}, ${mspId}, ${companyID}`);
+            const result = await contract.evaluateTransaction('QueryOrderForOrg', orderId, mspId, companyID); 
+            return JSON.parse(result.toString());
+        }
+        
+        const result = await contract.evaluateTransaction('QueryOrder', orderId);
+        return JSON.parse(result.toString());
+    }
+
+    // --- Cập nhật hàm Decrypt ---
+    async decryptSellerData(orderId, privateKeyOverride = null, sellerCompanyID = '') { // Thêm sellerCompanyID
+        try {
+            // 1. Lấy dữ liệu thô từ Blockchain
+            console.log(`[FabricService] Querying Fabric for Order: ${orderId}`);
+            const orderData = await this.queryOrder(orderId, 'seller', sellerCompanyID); // <-- TRUYỀN COMPANY ID
+            
+            if (!orderData || !orderData.seller_sensitive_data) {
+                console.warn(`[FabricService] Order data or sensitive data not found for ${orderId}.`);
+                return { error: "No sensitive data found." };
+            }
+
+            // 2. Xác định Private Key và giải mã
+            const decryptionKey = privateKeyOverride || this.config.SELLER_PRIVATE;
+            
+            // hybridDecrypt đã có try/catch nội bộ, nhưng chúng ta log rõ hơn
+            const decrypted = hybridDecrypt(orderData.seller_sensitive_data, decryptionKey);
+
+            if (!decrypted) {
+                console.error(`[FabricService] ❌ DECRYPTION FAILED for ${orderId}. Key/Blob mismatch.`);
+                return { error: "Decryption failed (Key mismatch or corrupt data)." };
+            }
+            
+            return { ...orderData, decrypted_seller_data: decrypted };
+        } catch (e) {
+            console.error(`[FabricService] ❌ Runtime Error in Decrypt: ${e.message}`);
+            throw new Error(`Fabric Query/Process Error: ${e.message}`); 
+        }
+    }
+    // =========================================================================
+    // 3. WORKFLOW ACTIONS (Chuyển trạng thái)
+    // =========================================================================
+
+    // Sàn xác nhận thanh toán (Cho đơn PREPAID)
+    async confirmPayment(orderId) {
+        const { contract } = await this._getContract('admin');
+        console.log(`[Fabric] Admin confirming payment: ${orderId}`);
+        await contract.submitTransaction('ConfirmPayment', orderId);
+        return { success: true };
+    }
+
+    // Shipper lấy hàng (Dùng chung cho cả COD và Prepaid)
+    async shipOrder(orderId) {
+        const { contract } = await this._getContract('shipper');
+        console.log(`[Fabric] Shipper shipping order: ${orderId}`);
+        await contract.submitTransaction('ShipOrder', orderId);
+        return { success: true };
+    }
+
+    // Shipper giao thành công & thu tiền (Cho COD)
+    async confirmCODDelivery(orderId) {
+        const { contract } = await this._getContract('shipper');
+        console.log(`[Fabric] Shipper confirmed COD delivery: ${orderId}`);
+        await contract.submitTransaction('ConfirmCODDelivery', orderId);
+        return { success: true };
+    }
+
+    // Shipper giao thành công (Cho Prepaid)
+    async confirmDelivery(orderId) {
+        const { contract } = await this._getContract('shipper');
+        console.log(`[Fabric] Shipper confirmed delivery: ${orderId}`);
+        await contract.submitTransaction('ConfirmDelivery', orderId);
+        return { success: true };
+    }
+
+    // Sàn nhận tiền COD từ Shipper (Remit)
+    async remitCOD(orderId) {
+        const { contract } = await this._getContract('admin');
+        console.log(`[Fabric] Admin confirming COD remittance: ${orderId}`);
+        await contract.submitTransaction('RemitCOD', orderId);
+        return { success: true };
+    }
+
+    // Thanh toán cho Seller (Payout)
+    async payoutToSeller(orderId) {
+        const { contract } = await this._getContract('admin');
+        console.log(`[Fabric] Admin executing payout: ${orderId}`);
+        await contract.submitTransaction('PayoutToSeller', orderId);
+        return { success: true };
+    }
+
+    // =========================================================================
+    // 4. RETURN FLOW (Trả hàng)
+    // =========================================================================
+    
+    // Khách yêu cầu trả hàng (Sàn duyệt)
+    async requestReturn(orderId) {
+        const { contract } = await this._getContract('admin');
+        await contract.submitTransaction('RequestReturn', orderId);
+        return { success: true };
+    }
+
+    // Shipper lấy hàng trả
+    async shipReturn(orderId) {
+        const { contract } = await this._getContract('shipper');
+        await contract.submitTransaction('ShipReturn', orderId);
+        return { success: true };
+    }
+
+    // Seller nhận lại hàng
+    async confirmReturnReceived(orderId) {
+        const { contract } = await this._getContract('seller');
+        await contract.submitTransaction('ConfirmReturnReceived', orderId);
+        return { success: true };
+    }
+
+    // =========================================================================
+    // 5. LISTING (Liệt kê đơn hàng từ Blockchain bằng Rich Query)
+    // =========================================================================
+
+    async listSellerOrders(sellerCompanyID) {
+        const { contract } = await this._getContract('seller'); 
+
+        // Query CouchDB bằng Rich Query (JSON Query)
+        const queryString = {
+            selector: {
+                docType: 'Order',
+                sellerCompanyID: sellerCompanyID
+            }
+        };
+        
+        // Convert query object sang string
+        const queryJSON = JSON.stringify(queryString);
+
+        console.log(`[Fabric List] Executing Rich Query: ${queryJSON}`);
+
+        // Gọi hàm Ad-hoc Query (Querying the world state)
+        // Giả định bạn có hàm QueryByString trong Chaincode Go
+        let resultBuffer;
+        try {
+            resultBuffer = await contract.evaluateTransaction('QueryOrdersByString', queryJSON);
+        } catch (e) {
+            console.error(`[Fabric List] Query Error (Chaincode):`, e.message);
+            throw new Error("QueryByString failed. Check Chaincode implementation.");
+        }
+        
+        // Xử lý kết quả trả về từ Chaincode (thường là mảng JSON của các record)
+        const rawResults = JSON.parse(resultBuffer.toString());
+
+        // Format lại kết quả cho Frontend
+        const sellerOrders = rawResults.map(record => ({
+            id: record.Key,
+            display_id: record.Key.split('_')[0],
+                created_at: record.Record.createdAt,
+                
+            // TRẢ VỀ PUBLIC DATA (Giả định Chaincode có trả về các trường này)
+                publicData: {
+                email: record.Record.customerEmail || "Guest", // THÊM TRƯỜNG NÀY
+                currency_code: record.Record.currencyCode || 'USD', 
+                total: record.Record.totalAmount || 0, 
+                medusa_status: "synced", 
+                medusa_payment: record.Record.paymentMethod || "COD", 
+            },
+            
+            status: "Pending", 
+            decryptedData: null
+        }));
+
+        return sellerOrders;
+    }
+}
+
+module.exports = FabricService;

@@ -1,134 +1,250 @@
----
 name: "ecommerce-network-profile"
 version: "1.0.0"
 
 client:
-  organization: ECommercePlatformOrgMSP
-  credentialStore:
-    path: /tmp/hfc-kvs
-    cryptoStore:
-      path: /tmp/hfc-cvs
-    wallet: wallet
+  organization: SellerOrgMSP
+  connection:
+    timeout:
+      peer:
+        endorser: '300'
+
+channels:
+  orderchannel:
+    orderers:
+      - orderer0.example.com
+      - orderer1.example.com
+      - orderer2.example.com
+    peers:
+      peer0.seller.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.ecommerce.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+      peer0.shipper.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
 
 organizations:
-  ECommercePlatformOrgMSP:
-    mspid: ECommercePlatformOrgMSP
-    admin:
-      msp_path: ./organizations/peerOrganizations/ecommerce.com/users/Admin@ecommerce.com/msp
-      private_key: ./organizations/peerOrganizations/ecommerce.com/users/Admin@ecommerce.com/msp/keystore/
-    peers:
-      - peer0.ecommerce.com
-      - peer1.ecommerce.com
-    certificateAuthorities:
-      - ca.ecommerce.com
-
   SellerOrgMSP:
     mspid: SellerOrgMSP
-    admin:
-      msp_path: ./organizations/peerOrganizations/seller.com/users/Admin@seller.com/msp
-      private_key: ./organizations/peerOrganizations/seller.com/users/Admin@seller.com/msp/keystore/
     peers:
       - peer0.seller.com
-      - peer1.seller.com
-    certificateAuthorities:
-      - ca.seller.com
-
+  ECommercePlatformOrgMSP:
+    mspid: ECommercePlatformOrgMSP
+    peers:
+      - peer0.ecommerce.com
   ShipperOrgMSP:
     mspid: ShipperOrgMSP
-    admin:
-      msp_path: ./organizations/peerOrganizations/shipper.com/users/Admin@shipper.com/msp
-      private_key: ./organizations/peerOrganizations/shipper.com/users/Admin@shipper.com/msp/keystore/
     peers:
       - peer0.shipper.com
-      - peer1.shipper.com
-    certificateAuthorities:
-      - ca.shipper.com
 
 orderers:
   orderer0.example.com:
-    url: grpcs://orderer0.example.com:7050
+    url: grpcs://192.168.40.11:7050
     grpcOptions:
       ssl-target-name-override: orderer0.example.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
-      path: ./organizations/ordererOrganizations/example.com/orderers/orderer0.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICQzCCAeqgAwIBAgIRAPg+L67lbDgvZPE54LyOA6kwCgYIKoZIzj0EAwIwbDEL
+        MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+        cmFuY2lzY28xFDASBgNVBAoTC2V4YW1wbGUuY29tMRowGAYDVQQDExF0bHNjYS5l
+        eGFtcGxlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+        BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+        bmNpc2NvMRQwEgYDVQQKEwtleGFtcGxlLmNvbTEaMBgGA1UEAxMRdGxzY2EuZXhh
+        bXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR85rl5dztEhhOZ59SE
+        jNpURpsm1iJQ6dvf1NrOhTocyEpqOpkRqEsdO+e0D6jKbWDPP77Mzb0nYyO5GLoQ
+        91/7o20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+        AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJOd4fYI4WDoMTzc6LlP
+        zzYqp031Vtp9DctReU1qUgNCMAoGCCqGSM49BAMCA0cAMEQCIGdZOeHJikWVCits
+        3AxoOmPlboPjlmqjheWrMtaZlYMCAiAEfKEg5bra9xRsVdQr4WGvO3RagVdGyhPF
+        Ak/F5AfvYg==
+        -----END CERTIFICATE-----
+
   orderer1.example.com:
-    url: grpcs://orderer1.example.com:8050
+    url: grpcs://192.168.40.11:8050
     grpcOptions:
       ssl-target-name-override: orderer1.example.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
-      path: ./organizations/ordererOrganizations/example.com/orderers/orderer1.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICQzCCAeqgAwIBAgIRAPg+L67lbDgvZPE54LyOA6kwCgYIKoZIzj0EAwIwbDEL
+        MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+        cmFuY2lzY28xFDASBgNVBAoTC2V4YW1wbGUuY29tMRowGAYDVQQDExF0bHNjYS5l
+        eGFtcGxlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+        BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+        bmNpc2NvMRQwEgYDVQQKEwtleGFtcGxlLmNvbTEaMBgGA1UEAxMRdGxzY2EuZXhh
+        bXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR85rl5dztEhhOZ59SE
+        jNpURpsm1iJQ6dvf1NrOhTocyEpqOpkRqEsdO+e0D6jKbWDPP77Mzb0nYyO5GLoQ
+        91/7o20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+        AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJOd4fYI4WDoMTzc6LlP
+        zzYqp031Vtp9DctReU1qUgNCMAoGCCqGSM49BAMCA0cAMEQCIGdZOeHJikWVCits
+        3AxoOmPlboPjlmqjheWrMtaZlYMCAiAEfKEg5bra9xRsVdQr4WGvO3RagVdGyhPF
+        Ak/F5AfvYg==
+        -----END CERTIFICATE-----
+
   orderer2.example.com:
-    url: grpcs://orderer2.example.com:9050
+    url: grpcs://192.168.40.11:9050
     grpcOptions:
       ssl-target-name-override: orderer2.example.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
-      path: ./organizations/ordererOrganizations/example.com/orderers/orderer2.example.com/msp/tlscacerts/tlsca.example.com-cert.pem
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICQzCCAeqgAwIBAgIRAPg+L67lbDgvZPE54LyOA6kwCgYIKoZIzj0EAwMwbDEL
+        MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+        cmFuY2lzY28xFDASBgNVBAoTC2V4YW1wbGUuY29tMRowGAYDVQQDExF0bHNjYS5l
+        eGFtcGxlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+        BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+        bmNpc2NvMRQwEgYDVQQKEwtleGFtcGxlLmNvbTEaMBgGA1UEAxMRdGxzY2EuZXhh
+        bXBsZS5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR85rl5dztEhhOZ59SE
+        jNpURpsm1iJQ6dvf1NrOhTocyEpqOpkRqEsdO+e0D6jKbWDPP77Mzb0nYyO5GLoQ
+        91/7o20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+        AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJOd4fYI4WDoMTzc6LlP
+        zzYqp031Vtp9DctReU1qUgNCMAoGCCqGSM49BAMCA0cAMEQCIGdZOeHJikWVCits
+        3AxoOmPlboPjlmqjheWrMtaZlYMCAiAEfKEg5bra9xRsVdQr4WGvO3RagVdGyhPF
+        Ak/F5AfvYg==
+        -----END CERTIFICATE-----
 
 peers:
-  # Org ECommerce
-  peer0.ecommerce.com:
-    url: grpcs://peer0.ecommerce.com:7051
-    grpcOptions:
-      ssl-target-name-override: peer0.ecommerce.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
-    tlsCACerts:
-      path: ./organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com/tls/ca.crt
-  peer1.ecommerce.com:
-    url: grpcs://peer1.ecommerce.com:7061
-    grpcOptions:
-      ssl-target-name-override: peer1.ecommerce.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
-    tlsCACerts:
-      path: ./organizations/peerOrganizations/ecommerce.com/peers/peer1.ecommerce.com/tls/ca.crt
-      
-  # Org Seller
   peer0.seller.com:
-    url: grpcs://peer0.seller.com:9051
+    url: grpcs://192.168.40.11:9051
     grpcOptions:
       ssl-target-name-override: peer0.seller.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
-      path: ./organizations/peerOrganizations/seller.com/peers/peer0.seller.com/tls/ca.crt
-  peer1.seller.com:
-    url: grpcs://peer1.seller.com:9061
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICPjCCAeWgAwIBAgIQEOKc7ETskCNmtC+8apoR5DAKBggqhkjOPQQDAjBqMQsw
+        CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+        YW5jaXNjbzETMBEGA1UEChMKc2VsbGVyLmNvbTEZMBcGA1UEAxMQdGxzY2Euc2Vs
+        bGVyLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGoxCzAJBgNV
+        BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp
+        c2NvMRMwEQYDVQQKEwpzZWxsZXIuY29tMRkwFwYDVQQDExB0bHNjYS5zZWxsZXIu
+        Y29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEoLPWtIo6j5Z/b4LYafsUA1UT
+        HEE+5tFHbMSJU3S3blscWG3v43v4gN/+ADZERNxzXf1oARx4thO6nrn9KV3PT6Nt
+        MGswDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcD
+        ATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdDgQiBCCfPVgR330zBmUlLkRiO3dI+2gL
+        GhnpTfSLb30a9bpbljAKBggqhkjOPQQDAgNHADBEAiAOZ/pFqUL/wQ9bh1gBN0tR
+        /w2qM7Wx7xWebE0aQX8luwIgLexCPu5Gofh32iApmWvqw24oN+MMWuVJGRWroaHt
+        4mk=
+        -----END CERTIFICATE-----
+  peer0.ecommerce.com:
+    url: grpcs://192.168.40.11:7051
     grpcOptions:
-      ssl-target-name-override: peer1.seller.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
+      ssl-target-name-override: peer0.ecommerce.com
     tlsCACerts:
-      path: ./organizations/peerOrganizations/seller.com/peers/peer1.seller.com/tls/ca.crt
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICTDCCAfGgAwIBAgIQNTijvW/8tzXgCtpfot3A+zAKBggqhkjOPQQDAjBwMQsw
+        CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+        YW5jaXNjbzEWMBQGA1UEChMNZWNvbW1lcmNlLmNvbTEcMBoGA1UEAxMTdGxzY2Eu
+        ZWNvbW1lcmNlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMHAx
+        CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4g
+        RnJhbmNpc2NvMRYwFAYDVQQKEw1lY29tbWVyY2UuY29tMRwwGgYDVQQDExN0bHNj
+        YS5lY29tbWVyY2UuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEemvF4IoP
+        AoS0HmjciW8xMJxShHehKjZ7GlHewpcLiSX1RlqMbiz+WJRigqe0aB+JRA0LKaNG
+        D94khgpiOwCMcqNtMGswDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUF
+        BwMCBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdDgQiBCDO3GoFjWfh
+        kKHLaCfq5WCkDgaLsmQ/BvHGitsmrf5nnTAKBggqhkjOPQQDAgNJADBGAiEA4fzu
+        4F+LWO6twh64CbeqkjPPwlYLNvI+XW/pOp5K6kgCIQDc4MLuuOWxYQim+Xa2ER6p
+        HJ7iopSuXIsCCFx2y0uasA==
+        -----END CERTIFICATE-----
 
-  # Org Shipper
   peer0.shipper.com:
-    url: grpcs://peer0.shipper.com:11051
+    url: grpcs://192.168.40.11:11051
     grpcOptions:
       ssl-target-name-override: peer0.shipper.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
     tlsCACerts:
-      path: ./organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com/tls/ca.crt
-  peer1.shipper.com:
-    url: grpcs://peer1.shipper.com:11061
-    grpcOptions:
-      ssl-target-name-override: peer1.shipper.com
-      request-timeout: 10000  # <--- THÊM TIMEOUT
-    tlsCACerts:
-      path: ./organizations/peerOrganizations/shipper.com/peers/peer1.shipper.com/tls/ca.crt
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICRTCCAeqgAwIBAgIRAIrgMELwYH2gU/9i6paxGXEwCgYIKoZIzj0EAwIwbDEL
+        MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+        cmFuY2lzY28xFDASBgNVBAoTC3NoaXBwZXIuY29tMRowGAYDVQQDExF0bHNjYS5z
+        aGlwcGVyLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+        BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+        bmNpc2NvMRQwEgYDVQQKEwtzaGlwcGVyLmNvbTEaMBgGA1UEAxMRdGxzY2Euc2hp
+        cHBlci5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR6+MHcvvKav3Q0VHZs
+        QcKu6omEP8AfvS7PC9um/q3JiPjGsP7aiGo5b9dMj/Ic8fDMt8Uo30PT+c0IZPIp
+        vbAqo20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+        AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJf3xZ1W+ftkl8urCAdP
+        8rBYbMDAcJ/O1kExaeliCVD4MAoGCCqGSM49BAMCA0kAMEYCIQDU8LlgZrH4EZUo
+        7VOyjADkPLmjvSJun43afyWiH0/XRwIhAKnOBd2eWms6vbL7I8TXKihVinHnXBwH
+        aCTV/M/GlT8I
+        -----END CERTIFICATE-----
 
+# ====================================================================
+# KHỐI certificateAuthorities (ĐÃ BỔ SUNG)
+# ====================================================================
 certificateAuthorities:
-  ca.ecommerce.com:
-    url: https://ca.ecommerce.com:7054
+  
+  # CA SELLER
+  ca.seller.com: 
+    url: https://192.168.40.11:8054 
+    caName: ca-seller 
     tlsCACerts:
-      path: ./organizations/peerOrganizations/ecommerce.com/ca/ca.ecommerce.com-cert.pem
-    caName: ca.ecommerce.com
-  ca.seller.com:
-    url: https://ca.seller.com:8054
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICPjCCAeWgAwIBAgIQEOKc7ETskCNmtC+8apoR5DAKBggqhkjOPQQDAjBqMQsw
+        CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+        YW5jaXNjbzETMBEGA1UEChMKc2VsbGVyLmNvbTEZMBcGA1UEAxMQdGxzY2Euc2Vs
+        bGVyLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGoxCzAJBgNV
+        BAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJhbmNp
+        c2NvMRMwEQYDVQQKEwpzZWxsZXIuY29tMRkwFwYDVQQDExB0bHNjYS5zZWxsZXIu
+        Y29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEoLPWtIo6j5Z/b4LYafsUA1UT
+        HEE+5tFHbMSJU3S3blscWG3v43v4gN/+ADZERNxzXf1oARx4thO6nrn9KV3PT6Nt
+        MGswDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUFBwMCBggrBgEFBQcD
+        ATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdDgQiBCCfPVgR330zBmUlLkRiO3dI+2gL
+        GhnpTfSLb30a9bpbljAKBggqhkjOPQQDAgNHADBEAiAOZ/pFqUL/wQ9bh1gBN0tR
+        /w2qM7Wx7xWebE0aQX8luwIgLexCPu5Gofh32iApmWvqw24oN+MMWuVJGRWroaHt
+        4mk=
+        -----END CERTIFICATE-----
+
+  # CA ECOMMERCE
+  ca.ecommerce.com: 
+    url: https://192.168.40.11:7054 
+    caName: ca-ecommerce
     tlsCACerts:
-      path: ./organizations/peerOrganizations/seller.com/ca/ca.seller.com-cert.pem
-    caName: ca.seller.com
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICTDCCAfGgAwIBAgIQNTijvW/8tzXgCtpfot3A+zAKBggqhkjOPQQDAjBwMQsw
+        CQYDVQQGEwJVUzETMBEGA1UECBMKQ2FsaWZvcm5pYTEWMBQGA1UEBxMNU2FuIEZy
+        YW5jaXNjbzEWMBQGA1UEChMNZWNvbW1lcmNlLmNvbTEcMBoGA1UEAxMTdGxzY2Eu
+        ZWNvbW1lcmNlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMHAx
+        CzAJBgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4g
+        RnJhbmNpc2NvMRYwFAYDVQQKEw1lY29tbWVyY2UuY29tMRwwGgYDVQQDExN0bHNj
+        YS5lY29tbWVyY2UuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEemvF4IoP
+        AoS0HmjciW8xMJxShHehKjZ7GlHewpcLiSX1RlqMbiz+WJRigqe0aB+JRA0LKaNG
+        D94khgpiOwCMcqNtMGswDgYDVR0PAQH/BAQDAgGmMB0GA1UdJQQWMBQGCCsGAQUF
+        BwMCBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdDgQiBCDO3GoFjWfh
+        kKHLaCfq5WCkDgaLsmQ/BvHGitsmrf5nnTAKBggqhkjOPQQDAgNJADBGAiEA4fzu
+        4F+LWO6twh64CbeqkjPPwlYLNvI+XW/pOp5K6kgCIQDc4MLuuOWxYQim+Xa2ER6p
+        HJ7iopSuXIsCCFx2y0uasA==
+        -----END CERTIFICATE-----
+
+  # CA SHIPPER
   ca.shipper.com:
-    url: https://ca.shipper.com:9054
+    url: https://192.168.40.11:9054 
+    caName: ca-shipper
     tlsCACerts:
-      path: ./organizations/peerOrganizations/shipper.com/ca/ca.shipper.com-cert.pem
-    caName: ca.shipper.com
+      pem: |
+        -----BEGIN CERTIFICATE-----
+        MIICRTCCAeqgAwIBAgIRAIrgMELwYH2gU/9i6paxGXEwCgYIKoZIzj0EAwIwbDEL
+        MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
+        cmFuY2lzY28xFDASBgNVBAoTC3NoaXBwZXIuY29tMRowGAYDVQQDExF0bHNjYS5z
+        aGlwcGVyLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
+        BgNVBAYTAlVTMRMwEQYDVQQIEwpDYWxpZm9ybmlhMRYwFAYDVQQHEw1TYW4gRnJh
+        bmNpc2NvMRQwEgYDVQQKEwtzaGlwcGVyLmNvbTEaMBgGA1UEAxMRdGxzY2Euc2hp
+        cHBlci5jb20wWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAAR6+MHcvvKav3Q0VHZs
+        QcKu6omEP8AfvS7PC9um/q3JiPjGsP7aiGo5b9dMj/Ic8fDMt8Uo30PT+c0IZPIp
+        vbAqo20wazAOBgNVHQ8BAf8EBAMCAaYwHQYDVR0lBBYwFAYIKwYBBQUHAwIGCCsG
+        AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJf3xZ1W+ftkl8urCAdP
+        8rBYbMDAcJ/O1kExaeliCVD4MAoGCCqGSM49BAMCA0kAMEYCIQDU8LlgZrH4EZUo
+        7VOyjADkPLmjvSJun43afyWiH0/XRwIhAKnOBd2eWms6vbL7I8TXKihVinHnXBwH
+        aCTV/M/GlT8I
+        -----END CERTIFICATE-----

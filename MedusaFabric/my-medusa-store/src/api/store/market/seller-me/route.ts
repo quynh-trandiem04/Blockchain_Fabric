@@ -5,7 +5,7 @@ import { Modules } from "@medusajs/utils";
 import jwt from "jsonwebtoken";
 import { Client } from "pg"; 
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const container = req.scope;
@@ -39,17 +39,17 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     
     // Query cả 2 bảng link có thể có để chắc chắn tìm thấy
     const linkRes = await dbClient.query(
-        `SELECT user_id FROM link_user_auth_identity WHERE auth_identity_id = $1
-         UNION ALL
-         SELECT user_id FROM user_user_auth_auth_identity WHERE auth_identity_id = $1`,
+        `SELECT user_id FROM user_user_auth_auth_identity WHERE auth_identity_id = $1`,
         [authId]
     );
 
     if (linkRes.rows.length === 0) {
         console.error(`❌ No Link found for AuthID: ${authId}`);
-        // Nếu không tìm thấy link, thử fallback: Tìm user có email trùng với entity_id (nếu có trong token)
-        // Nhưng ở đây ta return lỗi luôn để debug cho sạch.
-        return res.status(404).json({ message: "User not linked to this Account (Link Table Empty)" });
+        // Fallback: In ra danh sách bảng để debug nếu tên bảng vẫn sai
+        const tables = await dbClient.query(`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'link_%'`);
+        console.log("Existing Link Tables:", tables.rows.map(r => r.tablename));
+        
+        return res.status(404).json({ message: "User not linked to this Account" });
     }
 
     const userId = linkRes.rows[0].user_id;
@@ -63,7 +63,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     if (!user) {
         return res.status(404).json({ message: "User profile not found in DB" });
     }
-
+    console.log("User: ", user)
     res.json({ user });
 
   } catch (error: any) {

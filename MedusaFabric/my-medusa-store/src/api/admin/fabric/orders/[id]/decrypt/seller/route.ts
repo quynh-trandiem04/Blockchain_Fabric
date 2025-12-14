@@ -4,8 +4,8 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import jwt from "jsonwebtoken";
 import { Modules } from "@medusajs/utils";
 
-const FabricService = require("../../../../../../../services/fabric");
-const fabricService = new FabricService();
+// const FabricService = require("../../../../../../../services/fabric");
+// const fabricService = new FabricService();
 
 // Giữ nguyên cấu hình Role và Secret...
 const SELLER_ALLOWED_ROLES = ['sellerorgmsp', 'ecommerceplatformorgmsp'];
@@ -21,6 +21,8 @@ const getFabricRole = (userData: any): string => {
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const orderId = req.params.id;
   let actorId: string | undefined;
+
+  const fabricService = req.scope.resolve("fabricService") as any;
 
   // 1. KIỂM TRA SESSION (Nếu có)
   const authContext = (req as any).auth;
@@ -55,7 +57,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         console.error("ERROR:", error);
         return res.status(500).json({ error: error.message });
       }
-      return; // Kết thúc hàm tại đây
+        return; 
   }
 
   // --- NẾU CÓ ACTOR ID (Trường hợp Postman/Storefront có Token) ---
@@ -68,15 +70,17 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
       if (!user) return res.status(401).json({ error: "UNAUTHORIZED: User không tồn tại." });
 
-      const callingRole = getFabricRole(user);
+        // Lấy Private Key của user đang đăng nhập (đã lưu trong fix-seller-keys.js)
+        const sellerPrivateKey = user.metadata?.rsa_private_key; 
       
-      if (!SELLER_ALLOWED_ROLES.includes(callingRole)) {
+        if (!sellerPrivateKey) {
           return res.status(403).json({ 
-              error: `FORBIDDEN: Tài khoản ${user.email} không có quyền.` 
+                 error: "FORBIDDEN: Không tìm thấy Private Key RSA để giải mã dữ liệu nhạy cảm." 
           });
       }
 
-      const data = await fabricService.decryptSellerData(orderId);
+        // Giải mã dữ liệu với Private Key của user
+        const data = await fabricService.decryptSellerData(orderId, sellerPrivateKey);
       res.json(data);
 
   } catch (error: any) {

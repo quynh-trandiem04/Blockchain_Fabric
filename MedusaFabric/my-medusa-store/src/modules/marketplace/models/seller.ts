@@ -16,4 +16,6 @@ export const Seller = model.define("seller", {
   
   // Mapping với User ID của Medusa
   admin_user_id: model.text().nullable(), 
+  
+  metadata: model.json().nullable(), 
 })

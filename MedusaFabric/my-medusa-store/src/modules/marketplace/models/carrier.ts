@@ -11,4 +11,5 @@ export const Carrier = model.define("carrier", {
   
   // API Url hoặc config riêng nếu cần tích hợp API thật
   api_url: model.text().nullable(),
+  metadata: model.json().nullable()
 })

@@ -15,12 +15,15 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { cart_id } = req.body as { cart_id: string };
   const container = req.scope;
 
+  // Resolve các service cần thiết
   const cartService = container.resolve("cartService") as any;
   const orderService = container.resolve("orderService") as any;
+  // Thêm marketplaceService để lấy thông tin Key của Seller
+  const marketplaceService = container.resolve("marketplace") as any;
   const fabricService = new FabricService(container);
 
   try {
-    // Lấy Cart
+    // 1. Lấy Cart
     const cart = await cartService.retrieve(cart_id, {
       relations: ["items", "items.variant", "items.variant.product", "shipping_address", "billing_address", "region", "payment_sessions"]
     });
@@ -28,21 +31,18 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     if (!cart) return res.status(404).json({ message: "Cart not found" });
 
     // Lấy thông tin Shipper code
-    const selectedShipperCode = (cart.metadata?.shipper_code as string) || "GHN"; 
+    const selectedShipperCode = (cart.metadata?.shipper_code as string); 
 
-    // --- LOGIC MỚI: TÍNH TOÁN TỔNG GIÁ TRỊ HÀNG ĐỂ CHIA SHIP ---
-    // Tổng tiền hàng chưa thuế của cả giỏ (dùng để tính tỷ lệ)
-    const totalCartItemsAmount = cart.items.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
-    // Tổng phí ship của cả giỏ
+    // --- LOGIC CHIA SHIP & GROUP ĐƠN HÀNG ---
+    const totalCartItemsAmount = cart.items.reduce((sum: number, item: any) => sum + (item.unit_price * item.quantity), 0);
     const totalCartShipping = cart.shipping_total || 0;
 
-    // Group items theo Seller
+    // Group items theo Seller (dựa vào metadata của Product)
     const sellerGroups: Record<string, any[]> = {};
 
     for (const item of cart.items) {
-      // Ép kiểu any cho product để truy cập metadata không bị lỗi TS
       const product = item.variant.product as any; 
-      const sellerCompanyID = product.metadata?.seller_company_id || "Shop_A"; 
+      const sellerCompanyID = product.metadata?.seller_company_id; 
       
       if (!sellerGroups[sellerCompanyID]) {
         sellerGroups[sellerCompanyID] = [];
@@ -50,10 +50,9 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
       sellerGroups[sellerCompanyID].push(item);
     }
 
-    // Hoàn tất đơn hàng trong Medusa
+    // 2. Hoàn tất đơn hàng trong Medusa (Master Order)
     let masterOrder;
     try {
-        // Kiểm tra trạng thái thanh toán trước khi authorize
         if (cart.payment_session && cart.payment_session.status !== "authorized") {
              await cartService.authorizePayment(cart.id);
         }
@@ -62,46 +61,57 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         return res.status(400).json({ error: "Payment Failed or Order Exists" });
     }
 
-    // 3. Fix lỗi mảng: Khai báo kiểu cụ thể
+    // 3. Tách đơn & Gửi lên Blockchain
     const blockchainResults: BlockchainResult[] = [];
     let subIndex = 1;
 
-    // Duyệt qua từng Seller để tạo đơn con
+    // Duyệt qua từng Seller
     for (const [sellerID, items] of Object.entries(sellerGroups)) {
-        // A. Tính tổng tiền hàng cho đơn con này
+        
+        // --- [MỚI] LẤY PUBLIC KEY RIÊNG CỦA SELLER ---
+        // sellerID ở đây chính là company_code (ví dụ: Shop_123)
+        let sellerPublicKey = null;
+        try {
+            const sellers = await marketplaceService.listSellers({ company_code: sellerID });
+            if (sellers.length > 0) {
+                // Lấy Public Key từ metadata của Seller đã được tạo lúc Approve
+                sellerPublicKey = sellers[0].metadata?.rsa_public_key || null;
+            }
+        } catch (err) {
+            console.warn(`⚠️ Could not fetch public key for seller ${sellerID}, using default fallback.`);
+        }
+
+        // --- TÍNH TOÁN TIỀN ---
         const subItemsTotal = items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
         
-        // B. [LOGIC CHIA SHIP]: Tính phí ship theo tỷ lệ giá trị
-        // Công thức: (Tiền hàng đơn con / Tổng tiền hàng giỏ) * Tổng phí ship
+        // Chia phí ship theo tỷ lệ giá trị
         let subShippingFee = 0;
         if (totalCartItemsAmount > 0) {
             subShippingFee = Math.round((subItemsTotal / totalCartItemsAmount) * totalCartShipping);
         } else {
-            // Trường hợp hàng 0 đồng (ít gặp), chia đều hoặc dồn hết vào đơn 1
             subShippingFee = Math.round(totalCartShipping / Object.keys(sellerGroups).length);
         }
 
-        // C. Tổng cộng đơn con = Tiền hàng + Tiền ship đã chia
         const subOrderTotal = subItemsTotal + subShippingFee;
-        
         const splitOrderID = `${masterOrder.id}_${subIndex}`; 
         
-        const isCOD = masterOrder.payments.some(p => p.provider_id === 'manual' || p.provider_id === 'cod');
+        const isCOD = masterOrder.payments.some((p: any) => p.provider_id === 'manual' || p.provider_id === 'cod' || p.provider_id === 'pp_cod');
         const paymentMethod = isCOD ? "COD" : "PREPAID";
-        
-        // Nếu là COD thì thu đúng số tiền tổng của đơn con này (Hàng + Ship đã chia)
         const codAmount = isCOD ? subOrderTotal : 0; 
 
+        // --- TẠO PAYLOAD ---
         const payload = {
             orderID: splitOrderID,
             paymentMethod: paymentMethod,
             sellerCompanyID: sellerID,       
             shipperCompanyID: selectedShipperCode, 
             
+            // Thông tin khách hàng & giao hàng
             customerName: `${cart.shipping_address?.first_name} ${cart.shipping_address?.last_name}`,
             shipping_address: `${cart.shipping_address?.address_1}, ${cart.shipping_address?.city}`,
             shipping_phone: cart.shipping_address?.phone || "",
             
+            // Chi tiết sản phẩm
             product_lines: items.map(i => ({
                 product_name: i.title,
                 quantity: i.quantity,
@@ -109,14 +119,19 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
                 subtotal: i.unit_price * i.quantity
             })),
 
+            // Tài chính
             amount_untaxed: subItemsTotal,
-            amount_total: subOrderTotal, // Tổng tiền cuối cùng của đơn con
-            shipping_total: subShippingFee, // Phí ship hiển thị cho đơn con này
-            cod_amount: codAmount
+            amount_total: subOrderTotal, 
+            shipping_total: subShippingFee, 
+            cod_amount: codAmount,
+
+            // --- [QUAN TRỌNG] TRUYỀN KEY RIÊNG ---
+            _sellerPublicKey: sellerPublicKey 
         };
 
-        console.log(`🚀 Blockchain: ${splitOrderID} | ShipFee: ${subShippingFee} | Total: ${subOrderTotal}`);
+        console.log(`🚀 Blockchain: ${splitOrderID} | Seller: ${sellerID} | Encrypt with Custom Key: ${!!sellerPublicKey}`);
         
+        // Gọi Service (Service sẽ tự động dùng _sellerPublicKey nếu có)
         const txId = await fabricService.createOrder(payload);
         
         blockchainResults.push({
@@ -128,7 +143,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         subIndex++;
     }
 
-    // Update Master Order
+    // 4. Update Metadata cho Master Order để Admin tiện tra cứu
     await orderService.update(masterOrder.id, {
         metadata: {
             blockchain_data: blockchainResults,

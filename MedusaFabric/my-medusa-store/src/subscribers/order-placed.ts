@@ -1,10 +1,11 @@
-// my-medusa-store/src/subscribers/order-placed.ts
+// src/subscribers/order-placed.ts
 
 import { 
   type SubscriberConfig, 
   type SubscriberArgs,
 } from "@medusajs/framework";
 
+// Import Fabric Service (đảm bảo đường dẫn đúng)
 const FabricService = require("../services/fabric");
 
 export default async function orderPlacedHandler({
@@ -14,26 +15,23 @@ export default async function orderPlacedHandler({
   
   const fabricService = new FabricService(container); 
   const remoteQuery = container.resolve("remoteQuery");
+  const marketplaceService = container.resolve("marketplace") as any;
 
   try {
-      console.log(`[Subscriber] Xử lý đơn hàng: ${data.id}`);
+      console.log(`[Subscriber] 📦 Bắt đầu xử lý đơn hàng Medusa: ${data.id}`);
 
-      // 1. QUERY GRAPH
+      // 1. QUERY GRAPH ĐẦY ĐỦ
       const query = {
           entryPoint: "order",
           fields: [
               "*", 
               "shipping_address.*",
-              
               "items.*",
               "items.variant.title",
-              "items.variant.options.value",
-              "items.variant.options.option.title",
-              
-              // --- QUAN TRỌNG: Lấy toàn bộ trường của shipping_methods ---
+              "items.variant.product.metadata", // Cần metadata để lấy seller_id
               "shipping_methods.*", 
-              // Lấy thêm tax_lines để chắc chắn (nếu giá ship bao gồm thuế)
-              "shipping_methods.tax_lines.*" 
+              "payment_collections.*",
+              "payment_collections.payment_sessions.*"
           ],
           variables: { id: data.id }
       };
@@ -42,103 +40,117 @@ export default async function orderPlacedHandler({
       const order = result[0];
 
       if (!order) {
-          console.error(`[Subscriber] Lỗi: Không tìm thấy đơn hàng ${data.id}`);
+          console.error(`[Subscriber] ❌ Không tìm thấy đơn hàng ${data.id}`);
           return;
       }
 
-      // 2. TÍNH TIỀN HÀNG (Logic cũ đã đúng)
-      const items = order.items || [];
-      const processedLines = items.map((item: any) => {
-          let variantInfo = item.variant?.title || "";
-          if (item.variant?.options) {
-             const optionsStr = item.variant.options
-                .map((opt: any) => `${opt.option?.title}: ${opt.value}`)
-                .join(", ");
-             if (!variantInfo || variantInfo === item.title) {
-                 variantInfo = optionsStr;
-             }
+      // 2. GOM NHÓM ITEMS THEO SELLER
+      // Structure: { "Shop_A": [item1, item2], "Shop_B": [item3] }
+      const sellerGroups: Record<string, any[]> = {};
+      let totalOrderValue = 0;
+
+      for (const item of order.items) {
+          const sellerCompanyID = item.variant?.product?.metadata?.seller_company_id || "Unknown_Seller";
+          if (!sellerGroups[sellerCompanyID]) {
+              sellerGroups[sellerCompanyID] = [];
           }
-          const displayName = variantInfo ? `${item.title} (${variantInfo})` : item.title;
-          const qty = item.quantity ?? 1; 
-          const price = item.unit_price ?? 0;
-          const realSubtotal = price * qty;
-
-          return { 
-              product_name: displayName,
-              quantity: qty,
-              unit_price: price,
-              subtotal: realSubtotal
-          };
-      });
-
-      const calculatedProductTotal = processedLines.reduce((sum: number, line: any) => sum + line.subtotal, 0);
-      
-      // =================================================================
-      // 3. TÍNH PHÍ SHIP (FIX LỖI 0 ĐỒNG)
-      // =================================================================
-      
-      let finalShippingTotal = 0;
-
-      // Cách 1: Thử lấy từ order root
-      if (order.shipping_total && order.shipping_total > 0) {
-          finalShippingTotal = order.shipping_total;
-      } 
-      // Cách 2: Nếu root = 0, tự cộng từ shipping_methods
-      else if (order.shipping_methods && order.shipping_methods.length > 0) {
-        //   console.log("[Subscriber] Shipping Total gốc là 0, đang tính lại thủ công...");
-          
-          finalShippingTotal = order.shipping_methods.reduce((sum: number, method: any) => {
-              // Medusa v2 có thể lưu giá ở 'price', 'amount' hoặc 'total'
-              // Ta kiểm tra tất cả, ưu tiên 'amount' hoặc 'price'
-              const price = method.amount ?? method.price ?? method.total ?? 0;
-              console.log(` -> Method: ${method.name}, Price found: ${price}`);
-              return sum + price;
-          }, 0);
+          sellerGroups[sellerCompanyID].push(item);
+          totalOrderValue += (item.unit_price * item.quantity);
       }
 
-      console.log(`[Subscriber] => Phí Ship chốt: ${finalShippingTotal}`);
+      console.log(`[Subscriber] Tìm thấy ${Object.keys(sellerGroups).length} seller trong đơn hàng.`);
 
-      // =================================================================
-      // 4. TỔNG CỘNG (Amount Total)
-      // =================================================================
+      // 3. TÍNH TOÁN CHUNG
+      let totalShippingFee = order.shipping_total || 0;
       
-      // Công thức: Tổng hàng + Tổng ship
-      const calculatedTotal = calculatedProductTotal + finalShippingTotal;
+      // Check Payment Method (COD vs PREPAID)
+      let paymentMethod = "PREPAID";
+      if (order.payment_collections?.length > 0) {
+          const sessions = order.payment_collections[0].payment_sessions || [];
+          const activeSession = sessions.find((s: any) => s.status === "pending" || s.status === "authorized");
+          if (activeSession?.provider_id?.includes("cod")) {
+              paymentMethod = "COD";
+          }
+      }
 
-      // 5. THANH TOÁN
-      const paymentMethod = "PREPAID";
-      const calculatedCodAmount = 0; 
+      const shipperCode = order.metadata?.shipper_code || "GHN"; // Mặc định GHN nếu không có
 
-      // 6. TẠO PAYLOAD
-      const payload = {
-          orderID: order.id,
-          paymentMethod: paymentMethod, 
-          sellerID: "SellerOrgMSP",
-          shipperID: "ShipperOrgMSP",
+      // 4. DUYỆT TỪNG NHÓM VÀ GỬI BLOCKCHAIN
+      let subIndex = 1;
+      for (const [sellerID, items] of Object.entries(sellerGroups)) {
+          console.log(`--- Xử lý nhóm Seller: ${sellerID} ---`);
+
+          // 4.1. Lấy Public Key của Seller
+          let sellerPublicKey = null;
+          try {
+              const sellers = await marketplaceService.listSellers({ company_code: sellerID });
+              if (sellers.length > 0) {
+                  sellerPublicKey = sellers[0].metadata?.rsa_public_key;
+              }
+          } catch (e) { console.warn(`⚠️ Lỗi tìm seller ${sellerID}:`, e); }
+
+          if (!sellerPublicKey) {
+              console.error(`❌ BỎ QUA: Không có Public Key cho Seller ${sellerID}`);
+              continue; // Bỏ qua nếu không mã hóa được
+          }
+
+          // 4.2. Tính toán tiền cho Sub-order
+          const subTotalItems = items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
           
-          customerName: `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim(),
-          
-          product_lines: processedLines,
-          
-          amount_untaxed: calculatedProductTotal, // 30
-          
-          // Tổng này giờ đây sẽ bằng 30 + 10 = 40 (nếu ship = 10)
-          amount_total: calculatedTotal,      
-          
-          shipping_total: finalShippingTotal, // 10
-          cod_amount: calculatedCodAmount,    // 0
+          // Chia phí ship theo tỷ trọng giá trị
+          let subShipping = 0;
+          if (totalOrderValue > 0) {
+              subShipping = Math.round((subTotalItems / totalOrderValue) * totalShippingFee);
+          } else {
+              subShipping = Math.round(totalShippingFee / Object.keys(sellerGroups).length);
+          }
 
-          shipping_address: `${order.shipping_address?.address_1 || ''}, ${order.shipping_address?.city || ''}`,
-          shipping_phone: order.shipping_address?.phone || ''
-      };
+          const subTotal = subTotalItems + subShipping;
+          const splitOrderID = `${order.id}_${subIndex}`; // VD: order_123_1, order_123_2
+          const codAmount = paymentMethod === "COD" ? subTotal : 0;
 
-      console.log(`[Subscriber] Payload chuẩn bị gửi:`, JSON.stringify(payload, null, 2));
+          // 4.3. Tạo Product Lines Payload
+          const productLines = items.map((i: any) => ({
+              product_name: i.variant?.title ? `${i.title} (${i.variant.title})` : i.title,
+              quantity: i.quantity,
+              unit_price: i.unit_price,
+              subtotal: i.unit_price * i.quantity
+          }));
 
-      const txId = await fabricService.createOrder(payload);
-      console.log(`[Subscriber] ✅ Ghi Block thành công! TX ID: ${txId}`);
+          // 4.4. Payload gửi Blockchain
+          const payload = {
+              orderID: splitOrderID,
+              paymentMethod: paymentMethod,
+              sellerCompanyID: sellerID, // Dùng ID shop làm định danh trên chain
+              shipperCompanyID: shipperCode,
+              
+              customerName: `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim(),
+              shipping_address: `${order.shipping_address?.address_1 || ''}, ${order.shipping_address?.city || ''}`,
+              shipping_phone: order.shipping_address?.phone || '',
+              
+              product_lines: productLines,
+              amount_untaxed: subTotalItems,
+              amount_total: subTotal,
+              shipping_total: subShipping,
+              cod_amount: codAmount,
 
-  } catch (error) {
-      console.error(`[Subscriber] ❌ Lỗi xử lý đơn hàng:`, error);
+              _sellerPublicKey: sellerPublicKey 
+          };
+
+          // 4.5. Gọi Service Submit
+          try {
+              console.log('Payload: ', payload, "\nsellerid: ", sellerID)
+              const txId = await fabricService.createOrder(payload, sellerID);
+              console.log(`✅ [${splitOrderID}] Ghi thành công! TX: ${txId}`);
+          } catch (err: any) {
+              console.error(`❌ [${splitOrderID}] Lỗi ghi Blockchain:`, err.message);
+          }
+
+          subIndex++;
+      }
+
+  } catch (error: any) {
+      console.error(`[Subscriber] ❌ Lỗi tổng quát:`, error);
   }
 }
 

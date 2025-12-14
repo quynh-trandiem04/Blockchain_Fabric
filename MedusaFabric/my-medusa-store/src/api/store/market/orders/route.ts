@@ -30,9 +30,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     
     // 2. Tìm User ID từ Auth ID (SQL cho chắc chắn)
     const linkRes = await dbClient.query(
-        `SELECT user_id FROM link_user_auth_identity WHERE auth_identity_id = $1 
-         UNION ALL 
-         SELECT user_id FROM user_user_auth_auth_identity WHERE auth_identity_id = $1`,
+        `SELECT user_id FROM user_user_auth_auth_identity WHERE auth_identity_id = $1`,
         [authId]
     );
     if (linkRes.rows.length === 0) throw new Error("User not linked");

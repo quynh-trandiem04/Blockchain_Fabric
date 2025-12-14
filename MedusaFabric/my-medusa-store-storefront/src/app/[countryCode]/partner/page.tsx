@@ -260,6 +260,7 @@ export default function SellerDashboard() {
   }
 
   const loadSellerOrders = async (tokenOverride?: string) => {
+    console.log("loadSellerOrders...")
     setIsLoadingOrders(true)
     const token = tokenOverride || localStorage.getItem("medusa_token")
     if (!token) return
@@ -267,17 +268,23 @@ export default function SellerDashboard() {
     const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
 
     try {
-        const res = await fetch(`${BACKEND_URL}/store/market/orders`, {
+        // GỌI API LIST MỚI TỪ BLOCKCHAIN
+        const res = await fetch(`${BACKEND_URL}/store/fabric/orders/list`, {
             headers: { 
                 "Authorization": `Bearer ${token}`,
                 "Content-Type": "application/json",
                 "x-publishable-api-key": publishableKey
             }
         })
+        
         if (res.ok) {
             const { orders: rawOrders } = await res.json()
-            const mappedOrders: OrderRow[] = []
             
+            console.log(`[Frontend Debug] Orders received count (Fabric): ${rawOrders.length}`);
+            
+            const mappedOrders: OrderRow[] = []
+            console.log(`[Frontend Debug] Orders received count: ${rawOrders.length}`);
+
             await Promise.all(
               rawOrders.map(async (order: any) => {
                 const row: OrderRow = {
@@ -294,19 +301,27 @@ export default function SellerDashboard() {
                     status: "Pending",
                     decryptedData: null
                 }
+                console.log(`[Frontend] Calling decrypt for Order ID: ${order.id}`); 
+                
                 try {
-                  const resDecrypt = await fetch(`${BACKEND_URL}/admin/fabric/orders/${order.id}/decrypt/seller`, {
-                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-                  })
-                  if (resDecrypt.ok) {
+                  const resDecrypt = await fetch(`${BACKEND_URL}/store/fabric/orders/${order.id}/decrypt/seller`, { 
+                    headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey }
+                })   
+               if (resDecrypt.ok) {
                     const data = await resDecrypt.json()
                     row.status = "Success"
                     row.decryptedData = data
                   } else {
+                    // THÊM LOG KHI DECRYPT THẤT BẠI
+                        const errorData = await resDecrypt.json();
+                        console.warn(`[Frontend] ❌ Decrypt FAILED for ${order.id}. Status: ${resDecrypt.status}. Error: ${errorData.error || 'Unknown'}`);
                     row.status = "Error"
-                    row.error = "Syncing..."
+                    row.error = errorData.error || "Syncing...";
                   }
-                } catch (e) { row.status = "Error" }
+                } catch (e) { 
+                    console.error(`[Frontend] ❌ Network Error during Decrypt for ${order.id}`, e);
+                    row.status = "Error" 
+                }
                 mappedOrders.push(row)
               })
             )

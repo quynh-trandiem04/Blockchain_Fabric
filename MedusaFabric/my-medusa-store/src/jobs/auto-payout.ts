@@ -69,6 +69,6 @@ export default async function autoPayoutJob(
 
 export const config = {
   name: "auto-payout-scanner",
-  schedule: "* * * * *", // Chạy mỗi phút
+  schedule: "0 0 1 1 *",
   data: {},
 }

@@ -28,7 +28,12 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "images.unsplash.com",
+        hostname: "product.hstatic.net",
+      },
+      // Giữ lại các cấu hình cũ (ví dụ localhost hoặc medusa-server) nếu có
+      {
+        protocol: "http",
+        hostname: "localhost",
       },
       {
         protocol: "https",
@@ -45,6 +50,22 @@ const nextConfig = {
       {
         protocol: "https",
         hostname: "encrypted-tbn0.gstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "m.media-amazon.com",
+      },
+      {
+        protocol: "https",
+        hostname: "encrypted-tbn2.gstatic.com",
+      },
+      {
+        protocol: "https",
+        hostname: "down-vn.img.susercontent.com",
+      },
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
       },
       ...(S3_HOSTNAME && S3_PATHNAME
         ? [

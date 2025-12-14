@@ -4,6 +4,8 @@ import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
 import { Client } from "pg"; 
 
+export const AUTHENTICATE = false; 
+
 export const OPTIONS = async (req: MedusaRequest, res: MedusaResponse) => {
   res.set("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, DELETE, PUT");

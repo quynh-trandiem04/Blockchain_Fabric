@@ -2,6 +2,7 @@
 
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
+import crypto from 'crypto'; // [MỚI] Import crypto để sinh khóa
 
 const enrollSellerIdentity = require("../../../../../scripts/enroll-helper"); 
 
@@ -16,17 +17,34 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     const seller = await marketplaceService.retrieveSeller(id);
     if (!seller) return res.status(404).json({ error: "Seller not found" });
 
-    // [FIX LỖI]: updateSellers nhận mảng
+    console.log(`✅ Approving Seller: ${seller.name} (${seller.company_code})...`);
+
+    // 1. [MỚI] SINH CẶP KHÓA RSA RIÊNG CHO SELLER
+    // -------------------------------------------------------------
+    console.log(`🔑 Generating unique RSA keys for Seller: ${seller.company_code}...`);
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' }
+    });
+
+    // 2. Cập nhật Seller Profile (Lưu Public Key để KHÁCH HÀNG mã hóa đơn hàng)
+    // -------------------------------------------------------------
     await marketplaceService.updateSellers([
       {
         id: id,
-        status: "approved"
+        status: "approved",
+        metadata: {
+            ...seller.metadata,
+            rsa_public_key: publicKey // Lưu Public Key vào metadata của Seller
+        }
       }
     ]);
+    console.log("   -> Updated Seller Profile with Public Key");
 
-    // [FIX LỖI]: updateUsers nhận mảng
+    // 3. Cập nhật User (Lưu Private Key để SELLER tự giải mã)
+    // -------------------------------------------------------------
     if (seller.admin_user_id) {
-        // Lấy user hiện tại để merge metadata (tránh mất dữ liệu cũ)
         const currentUser = await userModuleService.retrieveUser(seller.admin_user_id);
         
         await userModuleService.updateUsers([
@@ -34,13 +52,18 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
             id: seller.admin_user_id,
             metadata: { 
                 ...(currentUser.metadata || {}), 
-                approver_status: "approved" 
+                approver_status: "approved",
+                rsa_private_key: privateKey
             }
           }
         ]);
+        console.log("   -> Updated User Profile with Private Key");
+    } else {
+        console.warn("⚠️ Warning: Seller has no admin_user_id linked!");
     }
 
-    // 4. [AUTO] Tạo Wallet
+    // 4. [AUTO] Tạo Wallet (Identity trên Blockchain)
+    // -------------------------------------------------------------
     console.log(`⚡ Auto-enrolling wallet for ${seller.company_code}...`);
     try {
         if (seller.company_code) {
@@ -51,10 +74,10 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         console.warn("⚠️ Enroll failed:", e.message);
     }
 
-    res.json({ message: "Approved successfully!" });
+    res.json({ message: "Approved & Keys Generated successfully!" });
 
   } catch (error: any) {
-    console.error(error);
+    console.error("❌ Approve Seller Error:", error);
     res.status(500).json({ error: error.message });
   }
 };
