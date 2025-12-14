@@ -198,7 +198,7 @@ class FabricService {
 
         const sellerPayload = JSON.stringify({
             customerName: data.customerName,
-           items: data.product_lines,
+            items: data.product_lines,
             amount_untaxed: data.amount_untaxed,
             amount_total: data.amount_total
         });
@@ -401,24 +401,34 @@ class FabricService {
         // Xử lý kết quả trả về từ Chaincode (thường là mảng JSON của các record)
         const rawResults = JSON.parse(resultBuffer.toString());
 
-        // Format lại kết quả cho Frontend
-        const sellerOrders = rawResults.map(record => ({
-            id: record.Key,
-            display_id: record.Key.split('_')[0],
+        const sellerOrders = rawResults.map(record => {
+            // XỬ LÝ ID: Chuyển "order_01KC..._1" thành "01KC..."
+            let cleanId = record.Key;
+            // Bỏ prefix "order_"
+            if (cleanId.startsWith("order_")) cleanId = cleanId.substring(6); 
+            // Bỏ suffix "_1" (nếu có logic suffix version)
+            if (cleanId.includes("_")) cleanId = cleanId.split("_")[0];
+
+            return {
+                id: record.Key,
+                display_id: cleanId, // ID đã làm sạch
                 created_at: record.Record.createdAt,
                 
-            // TRẢ VỀ PUBLIC DATA (Giả định Chaincode có trả về các trường này)
+                // PUBLIC DATA TẠM THỜI (Placeholder)
+                // Vì Chaincode chưa public các trường này, ta để mặc định.
+                // Frontend sẽ điền thông tin thật sau khi Decrypt xong.
                 publicData: {
-                email: record.Record.customerEmail || "Guest", // THÊM TRƯỜNG NÀY
-                currency_code: record.Record.currencyCode || 'USD', 
-                total: record.Record.totalAmount || 0, 
+                    email: "Loading...", 
+                    currency_code: 'USD', 
+                    total: 0, 
                 medusa_status: "synced", 
                 medusa_payment: record.Record.paymentMethod || "COD", 
             },
             
             status: "Pending", 
             decryptedData: null
-        }));
+    };
+});
 
         return sellerOrders;
     }

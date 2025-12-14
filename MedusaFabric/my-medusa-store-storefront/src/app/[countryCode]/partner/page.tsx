@@ -54,7 +54,7 @@ interface OrderRow {
       customerName: string;
       shipping_address: string;
       shipping_phone: string;
-      product_lines: any[];
+      items: any[];
       amount_untaxed: number;
       shipping_fee: number;
       cod_amount: number;
@@ -308,9 +308,24 @@ export default function SellerDashboard() {
                     headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey }
                 })   
                if (resDecrypt.ok) {
-                    const data = await resDecrypt.json()
-                    row.status = "Success"
-                    row.decryptedData = data
+                    const data = await resDecrypt.json();
+                    row.status = "Success";
+                    row.decryptedData = data;
+
+    // 🔥 CẬP NHẬT PUBLIC DATA TỪ DỮ LIỆU ĐÃ GIẢI MÃ 🔥
+                    if (data) {
+                        // 1. Cập nhật Tên Khách Hàng
+                        row.publicData.email = data.customerName || row.publicData.email;
+                        
+                        // 2. Cập nhật Tổng tiền
+                        // Ưu tiên amount_total, nếu không có thì dùng amount_untaxed
+                        row.publicData.total = data.amount_total || data.amount_untaxed || 0;
+                        
+                        // 3. Cập nhật Trạng thái (SỬA LỖI Ở ĐÂY)
+                        if (data.status && row.decryptedData) { // <-- Thêm check row.decryptedData
+                           row.decryptedData.status = data.status; 
+                        }
+                    }
                   } else {
                     // THÊM LOG KHI DECRYPT THẤT BẠI
                         const errorData = await resDecrypt.json();
@@ -892,10 +907,11 @@ export default function SellerDashboard() {
                     <div>
                         <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Sản phẩm</h3>
                         <ul className="space-y-3">
-                            {selectedOrder.decryptedData?.product_lines.map((p: any, i: number) => (
+                            {/* SỬA LỖI TẠI ĐÂY: Đổi product_lines thành items và thêm fallback mảng rỗng */}
+                            {(selectedOrder.decryptedData?.items || []).map((p: any, i: number) => (
                                 <li key={i} className="flex justify-between items-center text-sm">
                                     <div>
-                                        <span className="text-gray-800 font-medium">{p.product_name}</span>
+                                        <span className="text-gray-800 font-medium">{p.title || p.product_name}</span> {/* Hỗ trợ cả 2 tên biến */}
                                         <span className="text-xs text-gray-400 ml-2 font-mono bg-gray-100 px-1.5 py-0.5 rounded">x{p.quantity}</span>
                                     </div>
                                     <span className="font-mono font-medium text-gray-900">
