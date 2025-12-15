@@ -144,50 +144,36 @@ class FabricService {
     constructor(container) {
         this.container = container;
         this.gateways = {}; 
-        this.wallet = null; // Khởi tạo biến wallet
+        this.wallet = null; 
     }
 
     async _getContract(role = 'admin') {
         const userId = 'seller_admin'; 
-        // const mspId = 'SellerOrgMSP';
-
-        // // 1. Reuse gateway nếu đã kết nối
-        // if (this.gateways[userId]) {
-        //     try {
-        //     const network = await this.gateways[userId].getNetwork(CHANNEL_NAME);
-        //     return { contract: network.getContract(CC_NAME), gateway: this.gateways[userId] };
-        //     } catch (e) { this.gateways[userId] = null; }
-        // }
-
-        // 2. Load Config từ YAML
+        
         if (!fs.existsSync(CCP_PATH)) {
             throw new Error(`Connection Profile not found at ${CCP_PATH}`);
         }
         const yamlDocs = yaml.loadAll(fs.readFileSync(CCP_PATH, 'utf8'));
         const ccp = yamlDocs[0]; 
 
-        // 3. Khởi tạo Wallet (Lưu vào biến class this.wallet)
         if (!this.wallet) {
             const walletPath = path.join(process.cwd(), 'wallet');
             this.wallet = await Wallets.newFileSystemWallet(walletPath);
         }
 
-        // Kiểm tra Identity
         const identity = await this.wallet.get(userId);
         if (!identity) {
             throw new Error(`Identity '${userId}' not found in wallet.`);
         }
 
-        // 4. Kết nối Gateway
         const gateway = new Gateway();
         await gateway.connect(ccp, {
-            wallet: this.wallet, // <--- QUAN TRỌNG: Phải dùng this.wallet
+            wallet: this.wallet, 
             identity: userId,
             discovery: { enabled: false, asLocalhost: false } 
         });
 
         console.log(`✅ Gateway connected: ${userId} (YAML MODE)`);
-        // this.gateways[userId] = gateway;
         const network = await gateway.getNetwork(CHANNEL_NAME);
         return { contract: network.getContract(CC_NAME), gateway };
     }
@@ -236,9 +222,7 @@ class FabricService {
         }
     }
 
-    // =========================================================================
-    // 2. QUERY & DECRYPT (Truy vấn & Giải mã)
-    // =========================================================================
+    // --- Query & Decrypt ---
     async queryOrder(orderId, role = 'admin', companyID = '') { 
         const { contract } = await this._getContract(role);
 
@@ -262,34 +246,32 @@ class FabricService {
         return JSON.parse(result.toString());
     }
 
-    // --- Cập nhật hàm Decrypt ---
-    async decryptSellerData(orderId, privateKeyOverride = null, sellerCompanyID = '') { // Thêm sellerCompanyID
+    async decryptSellerData(orderId, privateKeyOverride = null, sellerCompanyID = '') {
         try {
-            // 1. Lấy dữ liệu thô từ Blockchain
             console.log(`[FabricService] Querying Fabric for Order: ${orderId}`);
-            const orderData = await this.queryOrder(orderId, 'seller', sellerCompanyID); // <-- TRUYỀN COMPANY ID
+            const orderData = await this.queryOrder(orderId, 'seller', sellerCompanyID);
             
             if (!orderData || !orderData.seller_sensitive_data) {
-                console.warn(`[FabricService] Order data or sensitive data not found for ${orderId}.`);
                 return { error: "No sensitive data found." };
             }
 
-            // 2. Xác định Private Key và giải mã
             const decryptionKey = privateKeyOverride || this.config.SELLER_PRIVATE;
-            
-            // hybridDecrypt đã có try/catch nội bộ, nhưng chúng ta log rõ hơn
             const decrypted = hybridDecrypt(orderData.seller_sensitive_data, decryptionKey);
 
             if (!decrypted) {
-                console.error(`[FabricService] ❌ DECRYPTION FAILED for ${orderId}. Key/Blob mismatch.`);
-                return { error: "Decryption failed (Key mismatch or corrupt data)." };
+                return { error: "Decryption failed." };
             }
             
-            return { ...orderData, decrypted_seller_data: decrypted };
-        } catch (e) {
+            // 🔥 MERGE DỮ LIỆU ĐỂ TRẢ VỀ ĐẦY ĐỦ 🔥
+            return { 
+                ...orderData, // Chứa status, paymentMethod, codStatus, createdAt...
+                ...decrypted, // Chứa customerName, items, amount...
+                decrypted_seller_data: decrypted 
+            };
+        } catch (e) {
             console.error(`[FabricService] ❌ Runtime Error in Decrypt: ${e.message}`);
             throw new Error(`Fabric Query/Process Error: ${e.message}`); 
-        }
+        }
     }
     // =========================================================================
     // 3. WORKFLOW ACTIONS (Chuyển trạng thái)
@@ -394,8 +376,8 @@ class FabricService {
         try {
             resultBuffer = await contract.evaluateTransaction('QueryOrdersByString', queryJSON);
         } catch (e) {
-            console.error(`[Fabric List] Query Error (Chaincode):`, e.message);
-            throw new Error("QueryByString failed. Check Chaincode implementation.");
+            console.error(`[Fabric List] Query Error:`, e.message);
+            throw new Error("QueryByString failed.");
         }
         
         // Xử lý kết quả trả về từ Chaincode (thường là mảng JSON của các record)
@@ -411,24 +393,27 @@ class FabricService {
 
             return {
                 id: record.Key,
-                display_id: cleanId, // ID đã làm sạch
+                display_id: cleanId,
                 created_at: record.Record.createdAt,
                 
                 // PUBLIC DATA TẠM THỜI (Placeholder)
                 // Vì Chaincode chưa public các trường này, ta để mặc định.
                 // Frontend sẽ điền thông tin thật sau khi Decrypt xong.
                 publicData: {
-                    email: "Loading...", 
+                    email: "Loading...", // Email nằm trong encrypted blob, phải chờ decrypt
                     currency_code: 'USD', 
-                    total: 0, 
-                medusa_status: "synced", 
-                medusa_payment: record.Record.paymentMethod || "COD", 
+                    total: 0, // Total cũng trong encrypted blob
+                    
+                    // LẤY TRỰC TIẾP TỪ BLOCKCHAIN RECORD
+                    medusa_status: record.Record.status, 
+                    medusa_payment: record.Record.paymentMethod,
+                    cod_status: record.Record.codStatus // Thêm trường này nếu cần
             },
             
             status: "Pending", 
             decryptedData: null
-    };
-});
+            };
+        });
 
         return sellerOrders;
     }

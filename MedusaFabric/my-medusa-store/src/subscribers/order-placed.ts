@@ -4,6 +4,7 @@ import {
   type SubscriberConfig, 
   type SubscriberArgs,
 } from "@medusajs/framework";
+import { Modules } from "@medusajs/utils";
 
 // Import Fabric Service (đảm bảo đường dẫn đúng)
 const FabricService = require("../services/fabric");
@@ -25,6 +26,7 @@ export default async function orderPlacedHandler({
           entryPoint: "order",
           fields: [
               "*", 
+              "metadata",
               "shipping_address.*",
               "items.*",
               "items.variant.title",
@@ -45,11 +47,11 @@ export default async function orderPlacedHandler({
       }
 
       // 2. GOM NHÓM ITEMS THEO SELLER
-      // Structure: { "Shop_A": [item1, item2], "Shop_B": [item3] }
       const sellerGroups: Record<string, any[]> = {};
       let totalOrderValue = 0;
 
       for (const item of order.items) {
+          // Lấy Seller ID từ metadata sản phẩm (đã gán khi tạo sản phẩm)
           const sellerCompanyID = item.variant?.product?.metadata?.seller_company_id || "Unknown_Seller";
           if (!sellerGroups[sellerCompanyID]) {
               sellerGroups[sellerCompanyID] = [];
@@ -63,8 +65,15 @@ export default async function orderPlacedHandler({
       // 3. TÍNH TOÁN CHUNG
       let totalShippingFee = order.shipping_total || 0;
       
-      // Check Payment Method (COD vs PREPAID)
-      let paymentMethod = "PREPAID";
+      // --- FIX LOGIC PAYMENT METHOD ---
+      // Ưu tiên lấy từ Metadata (do Frontend gửi lên)
+      let paymentMethod = "PREPAID"; // Mặc định
+      const metadataPaymentType = order.metadata?.payment_type;
+
+      if (metadataPaymentType === 'cod') {
+          paymentMethod = "COD";
+      } else {
+          // Fallback: Check provider_id nếu metadata không có (đề phòng)
       if (order.payment_collections?.length > 0) {
           const sessions = order.payment_collections[0].payment_sessions || [];
           const activeSession = sessions.find((s: any) => s.status === "pending" || s.status === "authorized");
@@ -72,8 +81,13 @@ export default async function orderPlacedHandler({
               paymentMethod = "COD";
           }
       }
+      }
+      
+      console.log(`[Subscriber] Payment Method Resolved: ${paymentMethod}`);
 
-      const shipperCode = order.metadata?.shipper_code || "GHN"; // Mặc định GHN nếu không có
+      // --- FIX LOGIC SHIPPER ID ---
+      // Lấy từ metadata hoặc mặc định là GHN
+      const shipperCode = order.metadata?.shipper_code || "GHN"; 
 
       // 4. DUYỆT TỪNG NHÓM VÀ GỬI BLOCKCHAIN
       let subIndex = 1;
@@ -91,7 +105,7 @@ export default async function orderPlacedHandler({
 
           if (!sellerPublicKey) {
               console.error(`❌ BỎ QUA: Không có Public Key cho Seller ${sellerID}`);
-              continue; // Bỏ qua nếu không mã hóa được
+              continue; 
           }
 
           // 4.2. Tính toán tiền cho Sub-order
@@ -106,7 +120,9 @@ export default async function orderPlacedHandler({
           }
 
           const subTotal = subTotalItems + subShipping;
-          const splitOrderID = `${order.id}_${subIndex}`; // VD: order_123_1, order_123_2
+          const splitOrderID = `${order.id}_${subIndex}`; // VD: order_123_1
+          
+          // Tính tiền thu hộ (COD Amount)
           const codAmount = paymentMethod === "COD" ? subTotal : 0;
 
           // 4.3. Tạo Product Lines Payload
@@ -121,7 +137,7 @@ export default async function orderPlacedHandler({
           const payload = {
               orderID: splitOrderID,
               paymentMethod: paymentMethod,
-              sellerCompanyID: sellerID, // Dùng ID shop làm định danh trên chain
+              sellerCompanyID: sellerID, 
               shipperCompanyID: shipperCode,
               
               customerName: `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim(),
@@ -139,7 +155,7 @@ export default async function orderPlacedHandler({
 
           // 4.5. Gọi Service Submit
           try {
-              console.log('Payload: ', payload, "\nsellerid: ", sellerID)
+              console.log('Payload gửi đi: ', { ...payload, _sellerPublicKey: "HIDDEN" });
               const txId = await fabricService.createOrder(payload, sellerID);
               console.log(`✅ [${splitOrderID}] Ghi thành công! TX: ${txId}`);
           } catch (err: any) {

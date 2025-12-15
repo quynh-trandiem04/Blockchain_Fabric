@@ -47,7 +47,7 @@ interface OrderRow {
     total: number; 
     medusa_status: string;
     medusa_payment: string;
-
+    cod_status?: string; // Thêm trường này cho UI List
   };
   status: "Pending" | "Success" | "Error";
   decryptedData: {
@@ -60,6 +60,7 @@ interface OrderRow {
       cod_amount: number;
       status: string;       
       paymentMethod: string;
+      codStatus?: string;
       updatedAt?: string; 
   } | null; 
   error?: string;
@@ -69,48 +70,39 @@ type SortKey = 'display_id' | 'created_at' | 'updated_at';
 type SortDirection = 'asc' | 'desc';
 
 export default function SellerDashboard() {
-  // --- STATE ---
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const router = useRouter()
   const params = useParams()
   
-  // Auth State
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isCheckingRole, setIsCheckingRole] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false) 
   const [loginError, setLoginError] = useState("")
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
 
-  // Dashboard State
   const [activeTab, setActiveTab] = useState<'orders' | 'products'>('orders');
   
-  // Orders State
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [isLoadingOrders, setIsLoadingOrders] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
   const [isShipping, setIsShipping] = useState<string | null>(null); 
   const [isConfirmingReturn, setIsConfirmingReturn] = useState<string | null>(null); 
 
-  // Products State
   const [products, setProducts] = useState<any[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
   
-  // Create Product Modal State
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [isCreatingProduct, setIsCreatingProduct] = useState(false);
   
-  // Product Form State
   const [newProduct, setNewProduct] = useState({ 
       title: "", subtitle: "", handle: "", description: "", price: 0, inventory_quantity: 10, image_url: "" 
   });
   
-  // Product Options (Size, Color...)
   const [optionName, setOptionName] = useState("");
   const [optionValues, setOptionValues] = useState("");
   const [prodOptions, setProdOptions] = useState<{title: string, values: string[]}[]>([]);
 
-  // Filter & Sort
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [paymentFilter, setPaymentFilter] = useState("ALL");
@@ -119,7 +111,6 @@ export default function SellerDashboard() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
-  // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
@@ -130,7 +121,6 @@ export default function SellerDashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- HELPERS ---
   const formatPrice = (amount: number | undefined, currency: string | undefined) => {
     if (amount === undefined || amount === null) return "0";
     const code = (currency || "USD").toUpperCase();
@@ -292,16 +282,16 @@ export default function SellerDashboard() {
                     display_id: `#${order.display_id}`,
                     created_at: new Date(order.created_at).toLocaleDateString('vi-VN'),
                     publicData: {
-                        email: order.email,
-                        total: order.total,
-                        currency_code: order.currency_code || "USD",
-                        medusa_status: order.status,
-                        medusa_payment: order.payment_status 
+                        email: order.publicData.email || "Loading...",
+                        total: order.publicData.total || 0,
+                        currency_code: order.publicData.currency_code || "USD",
+                        medusa_status: order.publicData.medusa_status,
+                        medusa_payment: order.publicData.medusa_payment,
+                        cod_status: order.publicData.cod_status
                     },
                     status: "Pending",
                     decryptedData: null
                 }
-                console.log(`[Frontend] Calling decrypt for Order ID: ${order.id}`); 
                 
                 try {
                   const resDecrypt = await fetch(`${BACKEND_URL}/store/fabric/orders/${order.id}/decrypt/seller`, { 
@@ -312,22 +302,22 @@ export default function SellerDashboard() {
                     row.status = "Success";
                     row.decryptedData = data;
 
-    // 🔥 CẬP NHẬT PUBLIC DATA TỪ DỮ LIỆU ĐÃ GIẢI MÃ 🔥
                     if (data) {
-                        // 1. Cập nhật Tên Khách Hàng
                         row.publicData.email = data.customerName || row.publicData.email;
-                        
-                        // 2. Cập nhật Tổng tiền
-                        // Ưu tiên amount_total, nếu không có thì dùng amount_untaxed
                         row.publicData.total = data.amount_total || data.amount_untaxed || 0;
                         
-                        // 3. Cập nhật Trạng thái (SỬA LỖI Ở ĐÂY)
-                        if (data.status && row.decryptedData) { // <-- Thêm check row.decryptedData
-                           row.decryptedData.status = data.status; 
+                        // Update status cho chính xác nhất
+                        if (data.status) {
+                            row.publicData.medusa_status = data.status;
+                            if (row.decryptedData) row.decryptedData.status = data.status;
+                        }
+
+                        // Cập nhật Payment sau khi decrypt nếu có
+                        if (data.paymentMethod) {
+                            row.publicData.medusa_payment = data.paymentMethod;
                         }
                     }
                   } else {
-                    // THÊM LOG KHI DECRYPT THẤT BẠI
                         const errorData = await resDecrypt.json();
                         console.warn(`[Frontend] ❌ Decrypt FAILED for ${order.id}. Status: ${resDecrypt.status}. Error: ${errorData.error || 'Unknown'}`);
                     row.status = "Error"
@@ -394,11 +384,6 @@ export default function SellerDashboard() {
           let variantsPayload: any[] = [];
 
           if (prodOptions.length > 0) {
-              // 1. Tạo tất cả tổ hợp biến thể (VD: S-Red, S-Blue...)
-              // Nếu chỉ có 1 option (Size: S, M) -> [[{title:'Size', value:'S'}], [{title:'Size', value:'M'}]]
-              // Nếu 2 options -> [[{title:'Size', value:'S'}, {title:'Color', value:'Red'}], ...]
-              
-              // Xử lý trường hợp reduce khởi tạo mảng rỗng đặc biệt của JS
               let combinations: any[] = [];
               if (prodOptions.length === 1) {
                   combinations = prodOptions[0].values.map(v => [{ title: prodOptions[0].title, value: v }]);
@@ -422,11 +407,8 @@ export default function SellerDashboard() {
                   combinations = cartesian(args);
               }
 
-              // 2. Map tổ hợp thành cấu trúc Variant của Medusa
               variantsPayload = combinations.map((combo: any[]) => {
-                  const title = combo.map(c => c.value).join(" / "); // VD: "S / Red"
-                  
-                  // Tạo object options: { "Size": "S", "Color": "Red" }
+                  const title = combo.map(c => c.value).join(" / ");
                   const optionsMap: Record<string, string> = {};
                   combo.forEach(c => {
                       optionsMap[c.title] = c.value;
@@ -439,18 +421,15 @@ export default function SellerDashboard() {
               });
 
           } else {
-              // Không có option nào -> Không tạo variant ở đây (Backend sẽ tự tạo default)
               variantsPayload = [];
           }
 
           const payload = {
               ...newProduct,
               images: newProduct.image_url ? [{ url: newProduct.image_url }] : [],
-              options: prodOptions, // Gửi định nghĩa Option (VD: Size, Color)
-              variants: variantsPayload // Gửi danh sách biến thể đầy đủ
+              options: prodOptions,
+              variants: variantsPayload
           };
-
-          console.log("Creating Product Payload:", payload); // Debug xem payload đúng chưa
 
           const res = await fetch(`${BACKEND_URL}/store/market/products`, {
               method: "POST",
@@ -466,7 +445,6 @@ export default function SellerDashboard() {
               alert("✅ Đăng bán thành công!");
               setShowCreateModal(false); 
               loadSellerProducts(token || "");
-              // Reset form
               setNewProduct({ title: "", subtitle: "", handle: "", description: "", price: 0, inventory_quantity: 10, image_url: "" });
               setProdOptions([]);
           } else {
@@ -528,13 +506,11 @@ export default function SellerDashboard() {
 
   const handleLogout = () => { localStorage.removeItem("medusa_token"); window.location.reload(); }
 
-  // Init
   useEffect(() => {
     const token = localStorage.getItem("medusa_token")
     if (token) { setIsLoggedIn(true); checkUserRole(token); } 
     else { setIsCheckingRole(false); setIsLoggedIn(false); }
   }, [])
-
 
   // ================= UI RENDERING =================
 
@@ -681,7 +657,27 @@ export default function SellerDashboard() {
                                             <span className="text-xs text-gray-400">{order.publicData.email}</span>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">{order.decryptedData ? getBlockchainStatusBadge(order.decryptedData.status) : <span className="text-xs text-gray-400">Syncing...</span>}</td>
+                                    {/* Cột Trạng thái & Thanh toán */}
+                                    <td className="px-6 py-4">
+                                        {/* HIỂN THỊ CẢ STATUS VÀ COD STATUS (UPDATE CHO PUBLIC DATA) */}
+                                        <div className="flex flex-col gap-1 items-start">
+                                            {getBlockchainStatusBadge(order.publicData.medusa_status)}
+
+                                                <div className="flex gap-1">
+                                                {getPaymentMethodBadge(order.publicData.medusa_payment)}
+
+                                                {order.publicData.medusa_payment === 'COD' && (
+                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
+                                                        order.publicData.cod_status === 'REMITTED' 
+                                                                ? 'bg-green-100 text-green-700 border-green-200' 
+                                                                : 'bg-gray-100 text-gray-500 border-gray-200'
+                                                        }`}>
+                                                        {order.publicData.cod_status || 'PENDING'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                    </td>
                                     <td className="px-6 py-4 text-right font-mono text-sm font-medium text-gray-900">{order.decryptedData ? formatPrice(order.decryptedData.amount_untaxed, order.publicData.currency_code) : "-"}</td>
                                 </tr>
                             ))}
@@ -881,11 +877,10 @@ export default function SellerDashboard() {
                         <p className="text-xs text-gray-500 mt-1 font-mono">{selectedOrder.created_at}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                         {selectedOrder.decryptedData && (
+                             {/* Dùng status từ decryptedData hoặc publicData */}
                             <span className="px-2.5 py-1 bg-gray-100 rounded-full text-[10px] font-bold text-gray-600 border border-gray-200 uppercase tracking-wide">
-                                {selectedOrder.decryptedData.status}
+                                {selectedOrder.decryptedData?.status || selectedOrder.publicData.medusa_status}
                             </span>
-                        )}
                         <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-700 bg-gray-50 p-1.5 rounded-full transition"><XMark /></button>
                     </div>
                 </div>
@@ -893,6 +888,7 @@ export default function SellerDashboard() {
                 <div className="p-6 space-y-6">
                     {/* Customer Info */}
                     <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                            {/* ... */}
                         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-lg font-bold">
                             {(selectedOrder.decryptedData?.customerName || "U").charAt(0).toUpperCase()}
                         </div>
@@ -907,11 +903,10 @@ export default function SellerDashboard() {
                     <div>
                         <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Sản phẩm</h3>
                         <ul className="space-y-3">
-                            {/* SỬA LỖI TẠI ĐÂY: Đổi product_lines thành items và thêm fallback mảng rỗng */}
                             {(selectedOrder.decryptedData?.items || []).map((p: any, i: number) => (
                                 <li key={i} className="flex justify-between items-center text-sm">
                                     <div>
-                                        <span className="text-gray-800 font-medium">{p.title || p.product_name}</span> {/* Hỗ trợ cả 2 tên biến */}
+                                            <span className="text-gray-800 font-medium">{p.title || p.product_name}</span>
                                         <span className="text-xs text-gray-400 ml-2 font-mono bg-gray-100 px-1.5 py-0.5 rounded">x{p.quantity}</span>
                                     </div>
                                     <span className="font-mono font-medium text-gray-900">
@@ -928,11 +923,7 @@ export default function SellerDashboard() {
                             <span>Tạm tính</span>
                             <span>{formatPrice(selectedOrder.decryptedData?.amount_untaxed, selectedOrder.publicData.currency_code)}</span>
                         </div>
-                         <div className="flex justify-between text-xs text-gray-500">
-                            <span>Phí vận chuyển</span>
-                            <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
-                        </div>
-                        <div className="flex justify-between text-base font-bold text-blue-700 pt-2 border-t border-gray-100 mt-2">
+                                                 <div className="flex justify-between text-base font-bold text-blue-700 pt-2 border-t border-gray-100 mt-2">
                             <span>Thành tiền</span>
                             <span>{formatPrice((selectedOrder.decryptedData?.amount_untaxed || 0) + (selectedOrder.decryptedData?.shipping_fee || 0), selectedOrder.publicData.currency_code)}</span>
                         </div>

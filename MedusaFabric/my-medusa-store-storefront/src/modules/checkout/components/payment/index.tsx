@@ -133,11 +133,21 @@ const Payment = ({
                   }
               })
           })
-      }
 
-      // 2. Init session nếu cần
+          // 3. FORCE UPDATE Payment Session
+          // Bắt buộc gọi hàm này kể cả khi provider_id không đổi để Backend nhận được context mới
+          await initiatePaymentSession(cart, { 
+            provider_id: realProviderId,
+            // Truyền context data (nếu backend hỗ trợ nhận data tại bước init)
+            // @ts-ignore
+            data: { payment_type: typeValue } 
+          })
+
+      } else {
+          // Logic cũ cho các provider khác (Stripe, v.v.)
       if (activeSession?.provider_id !== realProviderId) {
           await initiatePaymentSession(cart, { provider_id: realProviderId })
+          }
       }
 
       const isManual = isCodSelection || isPrepaidSelection;
