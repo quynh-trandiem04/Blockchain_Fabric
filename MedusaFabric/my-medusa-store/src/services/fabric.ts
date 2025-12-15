@@ -441,6 +441,50 @@ class FabricService {
 
         return sellerOrders;
     }
+
+    // --- ADMIN: Lấy tất cả đơn hàng trên Blockchain ---
+    async listAllOrdersForAdmin() {
+        const { contract } = await this._getContract('admin'); 
+
+        // Query tất cả record có docType là Order
+        const queryString = {
+            selector: {
+                docType: 'Order'
+            }
+        };
+
+        const queryJSON = JSON.stringify(queryString);
+        console.log(`[Fabric Admin] List All Orders: ${queryJSON}`);
+
+        let resultBuffer;
+        try {
+            resultBuffer = await contract.evaluateTransaction('QueryOrdersByString', queryJSON);
+        } catch (e) {
+            console.error(`[Fabric Admin] List Error:`, e.message);
+            throw new Error("Failed to list orders from Blockchain.");
+        }
+        
+        const rawResults = JSON.parse(resultBuffer.toString());
+
+        // Format dữ liệu trả về
+        const allOrders = rawResults.map(record => {
+            return {
+                blockchain_id: record.Key, // ID gốc trên chain (VD: order_..._1)
+                created_at: record.Record.createdAt,
+                status: record.Record.status,
+                payment_method: record.Record.paymentMethod,
+                cod_status: record.Record.codStatus || "",
+                seller_id: record.Record.sellerCompanyID,
+                shipper_id: record.Record.shipperCompanyID,
+                // Lưu ý: Các thông tin nhạy cảm (Tên khách, Tiền) đang được mã hóa
+                // Admin chỉ thấy được các trường public này
+            };
+        });
+
+        // Sắp xếp mới nhất trước
+        return allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    }
+
 }
 
 module.exports = FabricService;
