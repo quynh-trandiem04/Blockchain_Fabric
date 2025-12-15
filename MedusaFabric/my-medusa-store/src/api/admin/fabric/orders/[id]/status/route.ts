@@ -1,42 +1,60 @@
 // src\api\admin\fabric\orders\[id]\status\route.ts
 
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
-const FabricService = require("../../../../../../services/fabric");
-const fabricService = new FabricService();
+
+const FabricServiceClass = require("../../../../../../services/fabric");
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  const { id } = req.params;
-
-  // Lưu ý: Endpoint này không cần kiểm tra RBAC khắt khe
-  // vì nó chỉ trả về trạng thái công khai của đơn hàng.
-  // Chỉ cần xác thực người dùng đã đăng nhập là được.
+  const orderId = req.params.id;
   
-  const authContext = (req as any).auth;
-  if (!authContext?.actor_id) {
-
-  }
-
   try {
-    // Gọi hàm queryOrder (Lấy dữ liệu thô từ Blockchain)
-    const orderData = await fabricService.queryOrder(id);
+    const fabricService = new FabricServiceClass(req.scope);
 
-    // LỌC DỮ LIỆU: Chỉ trả về các trường công khai
-    const publicData = {
-        orderID: orderData.orderID,
-        status: orderData.status,
-        paymentMethod: orderData.paymentMethod,
-        codStatus: orderData.codStatus,
-        txID: orderData.history?.[0]?.txID || "",
-        updatedAt: orderData.updatedAt
-    };
+    let orderData: any = null;
 
-    res.json(publicData);
-  } catch (error: any) {
-    // Nếu đơn hàng chưa có trên blockchain
-    if (error.message && error.message.includes("không tồn tại")) {
-        res.status(404).json({ message: "Not Found on Blockchain" });
-    } else {
-        res.status(500).json({ error: error.message });
+    // 1. Thử tìm với ID gốc
+    try {
+        console.log(`[Admin API] Querying: ${orderId}`);
+        // Dùng role 'admin' để query (hoặc 'seller' nếu bạn đang dùng identity seller_admin cho tất cả)
+        orderData = await fabricService.queryOrder(orderId, 'admin');
+    } catch (e) {
+        // Bỏ qua lỗi nếu không tìm thấy
     }
+
+    // BƯỚC 2: Nếu không thấy, thử tìm với suffix "_1" (Logic tách đơn)
+    if (!orderData || orderData.error) {
+        const splitId = `${orderId}_1`;
+        try {
+            console.log(`[Admin API] Original ID not found. Trying split ID: ${splitId}`);
+            // Gọi queryOrder với ID đã thêm suffix
+            orderData = await fabricService.queryOrder(splitId, 'admin');
+        } catch (e) {
+             console.warn(`[Admin API] Split ID ${splitId} also failed.`);
+        }
+    }
+
+    // BƯỚC 3: Kiểm tra kết quả cuối cùng
+    if (!orderData || orderData.error) {
+      console.warn(`[Admin API] ❌ Order ${orderId} not found on chain.`);
+      return res.status(404).json({ 
+          status: "NOT_SYNCED", 
+          paymentMethod: "-" 
+      });
+    }
+
+    // BƯỚC 4: Trả về dữ liệu chuẩn cho UI
+    console.log(`[Admin API] ✅ Found data for ${orderId}: ${orderData.status}`);
+
+    return res.json({
+      status: orderData.status,
+      paymentMethod: orderData.paymentMethod,
+      // Đảm bảo trả về codStatus nếu có
+      codStatus: orderData.codStatus || (orderData.paymentMethod === 'COD' ? 'PENDING' : ""),
+        updatedAt: orderData.updatedAt
+    });
+
+  } catch (error: any) {
+    console.error(`[Admin API] System Error querying ${orderId}:`, error.message);
+    return res.status(500).json({ error: error.message });
   }
 };

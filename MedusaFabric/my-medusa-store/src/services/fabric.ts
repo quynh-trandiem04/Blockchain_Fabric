@@ -147,11 +147,19 @@ class FabricService {
         this.wallet = null; 
     }
 
-    async _getContract(role = 'admin') {
-        const userId = 'seller_admin'; 
+    async _getContract(role){
+        let userId = 'seller_admin';
         
-        if (!fs.existsSync(CCP_PATH)) {
+        if (role === 'admin') {
+            userId = 'admin'; 
+        } else if (role === 'shipper') {
+            userId = 'shipper_admin';
+        } else {
+            // role === 'seller'
+
+            if (!fs.existsSync(CCP_PATH)) {
             throw new Error(`Connection Profile not found at ${CCP_PATH}`);
+            }
         }
         const yamlDocs = yaml.loadAll(fs.readFileSync(CCP_PATH, 'utf8'));
         const ccp = yamlDocs[0]; 
@@ -163,6 +171,7 @@ class FabricService {
 
         const identity = await this.wallet.get(userId);
         if (!identity) {
+            console.error(`[FabricService] ❌ Identity '${userId}' not found in wallet!`);
             throw new Error(`Identity '${userId}' not found in wallet.`);
         }
 
@@ -173,13 +182,12 @@ class FabricService {
             discovery: { enabled: false, asLocalhost: false } 
         });
 
-        console.log(`✅ Gateway connected: ${userId} (YAML MODE)`);
         const network = await gateway.getNetwork(CHANNEL_NAME);
         return { contract: network.getContract(CC_NAME), gateway };
     }
 
     // --- Create Order ---
-    async createOrder(data, sellerCompanyId) {
+    async createOrder(data, sellerCompanyId){
         const { contract } = await this._getContract('seller'); 
 
         const sellerPayload = JSON.stringify({
@@ -211,7 +219,7 @@ class FabricService {
             encryptedShipperBlob,
             sellerCompanyId
         );
-           console.log(`[Fabric] ✅ Success: ${data.orderID}`);
+           console.log(`[Fabric] Success: ${data.orderID}`);
         return transaction.getTransactionId();
         } catch (error) {
            console.error(`[Fabric] Submit Error: ${error.message}`);
@@ -223,27 +231,43 @@ class FabricService {
     }
 
     // --- Query & Decrypt ---
-    async queryOrder(orderId, role = 'admin', companyID = '') { 
+    async queryOrder(orderId, role, companyID = '') { 
+        // 1. Kiểm tra Role trước
+        if (!role) {
+            return { error: "Role is required for querying." };
+        }
+
+        // 2. Lấy Contract (Khai báo const ở đây để dùng được cho toàn hàm)
         const { contract } = await this._getContract(role);
 
-        if (companyID) {
-            // Nếu có Company ID, gọi hàm Chaincode chung (QueryOrderForOrg)
-            let mspId = '';
-            if (role === 'seller') {
-                mspId = 'SellerOrgMSP';
-            } else if (role === 'shipper') {
-                mspId = 'ShipperOrgMSP';
-            } else {
-                throw new Error(`Invalid role '${role}' for company query.`);
-            }
+        try {
+            // TRƯỜNG HỢP 1: Query có kiểm tra sở hữu (Seller/Shipper)
+            if (companyID) {
+                let mspId = '';
+                if (role === 'seller') {
+                    mspId = 'SellerOrgMSP';
+                } else if (role === 'shipper') {
+                    mspId = 'ShipperOrgMSP';
+                } else {
+                    throw new Error(`Invalid role '${role}' for company query.`);
+                }
 
-            console.log(`[FabricService] Executing QueryOrderForOrg: ${orderId}, ${mspId}, ${companyID}`);
-            const result = await contract.evaluateTransaction('QueryOrderForOrg', orderId, mspId, companyID); 
+                console.log(`[FabricService] Executing QueryOrderForOrg: ${orderId}, ${mspId}, ${companyID}`);
+                
+                const result = await contract.evaluateTransaction('QueryOrderForOrg', orderId, mspId, companyID); 
+                return JSON.parse(result.toString());
+            }
+            
+            // TRƯỜNG HỢP 2: Query Admin (Hoặc query public không cần companyID)
+            console.log(`[FabricService] Executing QueryOrder (Admin): ${orderId}`);
+            const result = await contract.evaluateTransaction('QueryOrder', orderId);
             return JSON.parse(result.toString());
+
+        } catch (e) {
+            // console.error(`[FabricService] Query Failed for ${orderId}. Error Details:`, e.message);
+            // Trả về object lỗi để API Route xử lý fallback (không throw để tránh crash app)
+            return { error: e.message }; 
         }
-        
-        const result = await contract.evaluateTransaction('QueryOrder', orderId);
-        return JSON.parse(result.toString());
     }
 
     async decryptSellerData(orderId, privateKeyOverride = null, sellerCompanyID = '') {

@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 // --- 1. Error Boundary ---
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
   const [hasError, setHasError] = useState(false);
-  if (hasError) return <div style={{ padding: 20, color: 'red' }}>Widget Error</div>;
+  if (hasError) return <div className="p-4 text-red-500">Widget Error</div>;
   try { return <>{children}</>; } catch (e) { setHasError(true); return null; }
 };
 
@@ -366,6 +366,7 @@ const BlockchainOrderList = () => {
                             
                             {/* STATUS */}
                             <td style={{ padding: '14px 24px' }}>
+                                <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4}}>
                                 <span style={{ 
                                     padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
                                     background: bStyle.bg, color: bStyle.color,
@@ -374,6 +375,16 @@ const BlockchainOrderList = () => {
                                 }}>
                                     {bStatus.replace(/_/g, ' ')}
                                 </span>
+                                    {/* HIỂN THỊ COD STATUS NẾU CÓ */}
+                                    {cData.codStatus && (
+                                        <span style={{ 
+                                            fontSize: 10, fontWeight: 600, padding: '1px 4px', borderRadius: 3,
+                                            background: '#fff', border: '1px solid #e5e7eb', color: '#6b7280'
+                                        }}>
+                                            {cData.codStatus}
+                                        </span>
+                                    )}
+                                </div>
                             </td>
 
                             {/* PAYMENT */}
