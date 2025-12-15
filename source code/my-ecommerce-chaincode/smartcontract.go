@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
+	"github.com/hyperledger/fabric-chaincode-go/shim"
 )
 
 // SmartContract cung cấp các hàm logic cho chaincode
@@ -102,7 +103,8 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 	paymentMethod string, 
 	shipperCompanyID string,
 	sellerDataBlob string, 
-	shipperDataBlob string) error {
+	shipperDataBlob string,
+    sellerCompanyID string) error {
 
 	// 1. Kiểm tra đầu vào
 	if shipperCompanyID == "" {
@@ -113,7 +115,7 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 	actorOrg, err := getActorOrg(ctx)
 	if err != nil { return err }
 
-	callerCompanyID, _ := getCallerCompanyID(ctx)
+	//callerCompanyID, _ := getCallerCompanyID(ctx)
 
 	// Chỉ Seller hoặc Sàn được tạo đơn
 	if actorOrg != "SellerOrgMSP"{
@@ -151,7 +153,7 @@ func (s *SmartContract) CreateOrder(ctx contractapi.TransactionContextInterface,
 		
 		// Gán thông tin chủ sở hữu
 		SellerID:        actorOrg,        
-		SellerCompanyID: callerCompanyID, 
+		SellerCompanyID: sellerCompanyID, 
 		
 		// Gán thông tin vận chuyển
 		ShipperID:        "ShipperOrgMSP", 
@@ -710,4 +712,86 @@ func (s *SmartContract) QueryOrder(ctx contractapi.TransactionContextInterface, 
 }
 
 	return nil, fmt.Errorf("tổ chức '%s' không có quyền truy cập", actorOrg)
+}
+
+// [HÀM HELPER] getQueryResult: Chuyển iterator kết quả thành slice of QueryResult
+func getQueryResult(resultsIterator shim.StateQueryIteratorInterface) ([]*QueryResult, error) {
+	defer resultsIterator.Close()
+
+	var results []*QueryResult
+	for resultsIterator.HasNext() {
+		queryResponse, err := resultsIterator.Next()
+		if err != nil {
+			return nil, err
+		}
+
+		var order Order
+		err = json.Unmarshal(queryResponse.Value, &order)
+		if err != nil {
+			return nil, err
+		}
+
+		queryResult := QueryResult{Key: queryResponse.Key, Record: &order}
+		results = append(results, &queryResult)
+	}
+
+	return results, nil
+}
+
+
+// -----------------------------------------------------------------------------------
+// [HÀM MỚI] QueryOrdersByString: Thực hiện Rich Query (CouchDB)
+// -----------------------------------------------------------------------------------
+// Logic: Trả về tất cả đơn hàng có sellerCompanyID khớp với query
+func (s *SmartContract) QueryOrdersByString(ctx contractapi.TransactionContextInterface, queryString string) ([]*QueryResult, error) {
+
+    // 1. Kiểm tra ACL (Chỉ cho Seller, Shipper, hoặc Sàn truy vấn danh sách)
+    actorOrg, err := getActorOrg(ctx)
+    if err != nil { return nil, err }
+
+    if actorOrg != "SellerOrgMSP" && actorOrg != "ECommercePlatformOrgMSP" && actorOrg != "ShipperOrgMSP" {
+        return nil, fmt.Errorf("KHÔNG CÓ QUYỀN: Tổ chức '%s' không được gọi hàm truy vấn danh sách", actorOrg)
+    }
+
+	// 2. Thực hiện Rich Query trên sổ cái
+	resultsIterator, err := ctx.GetStub().GetQueryResult(queryString)
+	if err != nil {
+		return nil, fmt.Errorf("lỗi thực hiện Rich Query: %v", err)
+	}
+
+	// 3. Chuyển đổi kết quả Iterator thành slice of QueryResult
+	return getQueryResult(resultsIterator)
+}
+
+func (s *SmartContract) QueryOrderForOrg(ctx contractapi.TransactionContextInterface, orderID string, requiredMSP string, requiredCompanyID string) (*Order, error) {
+    order, err := getOrderState(ctx, orderID)
+    if err != nil {
+        return nil, err
+    }
+
+    // 1. Kiểm tra MSP người gọi (Client Identity)
+    actorOrg, _ := getActorOrg(ctx)
+    if actorOrg != requiredMSP {
+        return nil, fmt.Errorf("KHÔNG CÓ QUYỀN: Bạn phải là %s để truy vấn đơn này.", requiredMSP)
+    }
+
+    // 2. Kiểm tra quyền sở hữu bằng CompanyID
+    var orderOwnerID string
+
+    if requiredMSP == "SellerOrgMSP" {
+        orderOwnerID = order.SellerCompanyID
+    } else if requiredMSP == "ShipperOrgMSP" {
+        orderOwnerID = order.ShipperCompanyID
+    } else {
+        // Trường hợp không xác định (nên dùng QueryOrder cho Admin)
+        return nil, fmt.Errorf("MSP không hợp lệ cho truy vấn thành viên.")
+    }
+
+    // So sánh CompanyID được Chaincode lưu với CompanyID được ứng dụng client truyền vào
+    if orderOwnerID != requiredCompanyID {
+        return nil, fmt.Errorf("KHÔNG CÓ QUYỀN: Đơn hàng thuộc '%s', bạn là '%s'.", orderOwnerID, requiredCompanyID)
+    }
+
+    // Vượt qua kiểm tra
+    return order, nil
 }

@@ -238,12 +238,12 @@ Profiles:
             Organizations:
                 - *OrdererOrg
             Capabilities: *OrdererCapabilities
-        Application:
-            <<: *ApplicationDefaults
-            Organizations:
-                - *ECommercePlatformOrg
-                - *SellerOrg
-                - *ShipperOrg
+      # Application:
+      #     <<: *ApplicationDefaults
+      #     Organizations:
+      #         - *ECommercePlatformOrg
+      #         - *SellerOrg
+      #         - *ShipperOrg
         # Định nghĩa Consortium (nhóm các tổ chức có thể tạo kênh)
         Consortiums:
             SampleConsortium:

@@ -35,3 +35,8 @@ type HistoryEntry struct {
 	Action    string    `json:"action"`   // Tên hàm chaincode được gọi
 	ActorOrg  string    `json:"actorOrg"` // MSP ID của tổ chức gọi
 }
+
+type QueryResult struct {
+	Key 	string 	`json:"Key"`
+	Record 	*Order 	`json:"Record"`
+}

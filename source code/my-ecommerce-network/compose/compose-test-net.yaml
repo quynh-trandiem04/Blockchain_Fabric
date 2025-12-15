@@ -50,7 +50,7 @@ services:
       # --- CẬP NHẬT ĐỂ SỬA LỖI "channel does not exist" (CHO ORDERER 0) ---
       - ORDERER_GENERAL_GENESISMETHOD=file
       - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
-      - ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
+      #- ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
       # --- KẾT THÚC CẬP NHẬT ---
       
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
@@ -95,7 +95,7 @@ services:
       # --- CẬP NHẬT ĐỂ SỬA LỖI "channel does not exist" (CHO ORDERER 1) ---
       - ORDERER_GENERAL_GENESISMETHOD=file
       - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
-      - ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
+      #- ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
       # --- KẾT THÚC CẬP NHẬT ---
 
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
@@ -140,7 +140,7 @@ services:
       # --- CẬP NHẬT ĐỂ SỬA LỖI "channel does not exist" (CHO ORDERER 2) ---
       - ORDERER_GENERAL_GENESISMETHOD=file
       - ORDERER_GENERAL_GENESISFILE=/var/hyperledger/orderer/genesis.block
-      - ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
+      #- ORDERER_GENERAL_SYSTEMCHANNELID=system-channel
       # --- KẾT THÚC CẬP NHẬT ---
 
       - ORDERER_CHANNELPARTICIPATION_ENABLED=true
