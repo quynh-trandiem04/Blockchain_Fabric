@@ -2,7 +2,7 @@
 
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 
-const FabricServiceClass = require("../../../../../../services/fabric");
+const FabricServiceClass = require("../../../../../services/fabric");
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   try {

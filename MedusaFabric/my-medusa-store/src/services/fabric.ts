@@ -446,13 +446,7 @@ class FabricService {
     async listAllOrdersForAdmin() {
         const { contract } = await this._getContract('admin'); 
 
-        // Query tất cả record có docType là Order
-        const queryString = {
-            selector: {
-                docType: 'Order'
-            }
-        };
-
+        const queryString = { selector: { docType: 'Order' } };
         const queryJSON = JSON.stringify(queryString);
         console.log(`[Fabric Admin] List All Orders: ${queryJSON}`);
 
