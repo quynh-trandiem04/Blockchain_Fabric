@@ -23,6 +23,7 @@ const Icons = {
       <path d="M15.3125 5.625V14.375" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
+  // 🔥 BỔ SUNG ICON CHECK VÀO ĐÂY ĐỂ FIX LỖI 🔥
   Check: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12"></polyline>
@@ -65,7 +66,8 @@ interface OrderRow {
       cod_amount: number;
       status: string;        
       paymentMethod: string; 
-      product_lines: any[];
+      codStatus?: string;
+      product_lines?: any[];
       updatedAt?: string; 
       amount_untaxed: number;
   } | null; 
@@ -112,16 +114,14 @@ export default function ShipperDashboard() {
   const [showSortMenu, setShowSortMenu] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
 
-    // State Form Settings
     const [settingsForm, setSettingsForm] = useState({
         carrier_name: "",
         phone: "",
         email: "",
-        shipping_fee: 10, // Default value
+      shipping_fee: 10,
     });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
-  // Click outside to close sort menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
@@ -134,12 +134,10 @@ export default function ShipperDashboard() {
 
   // --- LOGIC FILTER & SORT ---
   const processedOrders = useMemo(() => {
-      // 1. Filter
       let filtered = orders.filter(o => {
           const status = o.decryptedData?.status || "";
           const payment = o.decryptedData?.paymentMethod || "";
           
-          // Search text (ID or Email or Phone)
           const matchSearch = 
             o.display_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
             o.publicData.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -151,14 +149,13 @@ export default function ShipperDashboard() {
           return matchSearch && matchStatus && matchPayment;
       });
 
-      // 2. Sort
       return filtered.sort((a, b) => {
           let aVal: any;
           let bVal: any;
 
           if (sortKey === 'display_id') {
-              aVal = parseInt(a.display_id.replace('#', ''));
-              bVal = parseInt(b.display_id.replace('#', ''));
+              aVal = parseInt(a.display_id.replace(/\D/g, ''), 10);
+              bVal = parseInt(b.display_id.replace(/\D/g, ''), 10);
           } else if (sortKey === 'updated_at') {
               // Ưu tiên lấy updated từ blockchain, nếu không có thì lấy created_at
               aVal = new Date(a.decryptedData?.updatedAt || a.created_at).getTime();
@@ -173,7 +170,7 @@ export default function ShipperDashboard() {
           if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
           return 0;
       });
-    }, [orders, searchQuery, statusFilter, sortKey, sortDir]);
+    }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
 
   // Helper Format Tiền
   const formatPrice = (amount: number | undefined, currency: string | undefined) => {
@@ -183,6 +180,7 @@ export default function ShipperDashboard() {
       return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: code }).format(amount); 
     } catch (e) { return `${amount} ${code}`; }
   }
+
   const getBlockchainStatusBadge = (status: string) => {
       const styles: Record<string, string> = {
           CREATED: "bg-gray-100 text-gray-700 border-gray-300",
@@ -194,6 +192,7 @@ export default function ShipperDashboard() {
           SETTLED: "bg-purple-100 text-purple-700 border-purple-300",
           CANCELLED: "bg-red-100 text-red-700 border-red-300",
           RETURN_REQUESTED: "bg-yellow-100 text-yellow-700 border-yellow-300",
+          RETURN_IN_TRANSIT: "bg-amber-100 text-amber-700 border-amber-300",
           RETURNED: "bg-pink-100 text-pink-700 border-pink-300"
       };
       
@@ -212,11 +211,9 @@ export default function ShipperDashboard() {
       console.log("🔍 [FE CHECK] Shipper Auth...");
       setIsCheckingRole(true);
       
-      // Lấy Publishable Key (Bắt buộc cho các request /store)
       const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
 
       try {
-          // (API seller-me được viết generic, trả về user info dựa trên token nên dùng chung được)
           const res = await fetch(`${BACKEND_URL}/store/market/seller-me`, {
               headers: { 
                   "Authorization": `Bearer ${token}`,
@@ -228,7 +225,6 @@ export default function ShipperDashboard() {
           if (!res.ok) {
               console.warn("Token không hợp lệ hoặc hết hạn.");
               localStorage.removeItem("medusa_token");
-              // Reset state để hiện form login
               setIsLoggedIn(false);
               setIsAuthorized(false);
               return;
@@ -238,7 +234,7 @@ export default function ShipperDashboard() {
           const role = user.metadata?.fabric_role;
           const status = user.metadata?.approver_status;
 
-          console.log(`   -> User Role: ${role} | Status: ${status}`);
+          console.log(`   -> User Role: ${role} | Status: ${status}`);
 
           if (role !== 'shipperorgmsp') {
               alert("Tài khoản này không phải là Shipper.");
@@ -246,31 +242,28 @@ export default function ShipperDashboard() {
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
           } else if (status === 'pending') {
-              alert("Tài khoản đang chờ Admin phê duyệt. Vui lòng quay lại sau.");
+              alert("Tài khoản đang chờ Admin phê duyệt.");
               setIsAuthorized(false);
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
           } else if (status === 'rejected') {
-              alert("Tài khoản của bạn đã bị từ chối.");
+              alert("Tài khoản đã bị từ chối.");
               setIsAuthorized(false);
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
           } else {
-              console.log(`   ✅ [ALLOW] Quyền hợp lệ.`);
+              console.log(`   ✅ [ALLOW] Quyền hợp lệ.`);
               setIsAuthorized(true)
               setCurrentUser(user);
               
-              // Init Settings Form
               setSettingsForm({
                   carrier_name: user.metadata?.carrier_name || "",
                   phone: user.metadata?.phone || "",
                 email: user.email || "",
-                // Lấy fee từ metadata, nếu không có thì mặc định 10
                 shipping_fee: user.metadata?.shipping_fee ? parseInt(user.metadata.shipping_fee) : 10
               });
               
-              // Load dữ liệu
-              loadShipperOrders(token, user.metadata?.company_code);
+              loadShipperOrders(token);
           }
       } catch (e) { 
           console.error("Lỗi kết nối Auth:", e);
@@ -282,18 +275,6 @@ export default function ShipperDashboard() {
       }
   }
 
-//   const getPaymentLabel = (id: string) => {
-//       if (id === 'manual' || id === 'pp_system_default') return 'PREPAID';
-//       return id.toUpperCase();
-//   }
-  const getPaymentLabel = (id: string) => {
-      if (id === 'manual' || id === 'pp_system_default' || id === 'PREPAID') return 'PREPAID';
-      if (id === 'COD') return 'COD';
-      if (id === 'unknown') return 'Checking...';
-      return id.toUpperCase();
-  }
-
-  // --- 3. XỬ LÝ LOGIN ---
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoginError("")
@@ -321,22 +302,35 @@ export default function ShipperDashboard() {
 
   const handleLogout = () => { localStorage.removeItem("medusa_token"); window.location.reload() }
 
-  const handleConfirmDelivery = async (orderId: string) => {
-    if (!confirm("Xác nhận đã giao hàng thành công cho khách?")) return;
+  const handleConfirmDelivery = async (orderId: string, isCod: boolean) => {
+    // Xác định endpoint dựa trên loại đơn (COD dùng endpoint riêng để trigger update codStatus)
+    const endpoint = isCod ? 'cod-deliver' : 'deliver';
+    
+    if (!confirm(`Xác nhận đã giao hàng thành công? ${isCod ? '(Và đã thu tiền COD)' : ''}`)) return;
+    
     setIsDelivering(orderId);
     const token = localStorage.getItem("medusa_token");
+    
     try {
-        const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/deliver`, {
+        const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/${endpoint}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+            headers: { 
+                "Content-Type": "application/json", 
+                "Authorization": `Bearer ${token}`,
+                "x-publishable-api-key": process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+            }
         });
+        
         const result = await res.json();
         if (res.ok) {
-            loadShipperOrders(token || "", currentUser?.metadata?.company_code);
+            alert("✅ Giao hàng thành công!");
+            loadShipperOrders(token || "");
+            if (selectedOrder?.id === orderId) setSelectedOrder(null);
         } else {
-            alert(" Lỗi: " + (result.error || "Thất bại"));
+            alert("❌ Lỗi: " + (result.error || "Thất bại"));
         }
-    } catch (err) { alert(" Lỗi kết nối server"); } finally { setIsDelivering(null); }
+    } catch (err) { alert("Lỗi kết nối server"); } 
+    finally { setIsDelivering(null); }
   }
 
   const handleShipReturn = async (orderId: string) => {
@@ -344,18 +338,24 @@ export default function ShipperDashboard() {
     setIsReturning(orderId);
     const token = localStorage.getItem("medusa_token");
     try {
-        const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/return-ship`, {
+        const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/return-ship`, {
             method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+            headers: { 
+                "Content-Type": "application/json", 
+                "Authorization": `Bearer ${token}`,
+                "x-publishable-api-key": process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+            }
         });
         const result = await res.json();
         if (res.ok) {
-            loadShipperOrders(token || "", currentUser?.metadata?.company_code);
+            alert("✅ Xác nhận lấy hàng hoàn thành công!");
+            loadShipperOrders(token || "");
             if (selectedOrder?.id === orderId) setSelectedOrder(null);
         } else {
-            alert(" Lỗi: " + (result.error || "Thất bại"));
+            alert("❌ Lỗi: " + (result.error || "Thất bại"));
         }
-    } catch (err) { alert(" Lỗi kết nối server"); } finally { setIsReturning(null); }
+    } catch (err) { alert("Lỗi kết nối server"); } 
+    finally { setIsReturning(null); }
   }
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -365,7 +365,6 @@ export default function ShipperDashboard() {
       const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
 
       try {
-          // 👇 GỌI API CUSTOM thay vì API Admin
           const res = await fetch(`${BACKEND_URL}/store/market/shipper/update`, {
               method: "POST",
               headers: { 
@@ -382,7 +381,6 @@ export default function ShipperDashboard() {
 
           if (res.ok) {
               alert("Cập nhật thông tin thành công!");
-              // Update local state
               setCurrentUser({
                   ...currentUser,
                   metadata: {
@@ -403,13 +401,14 @@ export default function ShipperDashboard() {
       }
   }
   
-  const loadShipperOrders = async (tokenOverride?: string, carrierCode?: string) => {
+  const loadShipperOrders = async (tokenOverride?: string) => {
     setIsLoadingData(true)
     const token = tokenOverride || localStorage.getItem("medusa_token")
     if (!token) return
     const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
 
     try {
+        // 1. Lấy danh sách ID đơn hàng thuộc Shipper này từ Blockchain
         const ordersRes = await fetch(`${BACKEND_URL}/store/market/shipper/orders`, {
             headers: { 
                 "Authorization": `Bearer ${token}`,
@@ -418,34 +417,27 @@ export default function ShipperDashboard() {
         })
 
         if (!ordersRes.ok) { 
-            console.error("Backend block access");
+            console.error("Lỗi lấy danh sách đơn hàng");
             setIsLoadingData(false); 
             return 
         }
 
-        const { orders: medusaOrders } = await ordersRes.json()
+        const { orders: fabricOrders } = await ordersRes.json()
         const loadedOrders: OrderRow[] = []
 
+        // 2. Loop qua từng đơn để Decrypt thông tin chi tiết
         await Promise.all(
-          medusaOrders.map(async (order: any) => {
-            let providerId = 'unknown';
-            if (order.payment_collections && order.payment_collections.length > 0) {
-                const sessions = order.payment_collections[0].payment_sessions;
-                if (sessions && sessions.length > 0) {
-                    providerId = sessions[0].provider_id;
-                }
-            }
-
+          fabricOrders.map(async (order: any) => {
             const row: OrderRow = {
-                id: order.id,
-                display_id: `#${order.display_id}`,
+                id: order.blockchain_id,
+                display_id: order.blockchain_id, 
                 created_at: new Date(order.created_at).toLocaleDateString('vi-VN'),
                 publicData: {
-                    email: order.email,
-                    currency_code: order.currency_code || "USD",
-                    total: order.total,
-                    payment_method_id: providerId,
-                    fulfillment_status: order.fulfillment_status,
+                    email: "Loading...",
+                    currency_code: "USD",
+                    total: 0,
+                    payment_method_id: order.payment_method,
+                    fulfillment_status: "unknown",
                     status: order.status
                 },
                 status: "Pending",
@@ -453,22 +445,27 @@ export default function ShipperDashboard() {
             }
 
             try {
-              const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${order.id}/decrypt/shipper`, {
+              // Gọi API Decrypt dành cho Shipper
+              const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${order.blockchain_id}/decrypt/shipper`, {
                 headers: { 
                     "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
+                    "Authorization": `Bearer ${token}`,
+                    "x-publishable-api-key": publishableKey
                 }
               })
+              
               if (res.ok) {
                 const data = await res.json()
                 row.status = "Success"
                 row.decryptedData = data
-                if (row.publicData.payment_method_id === 'unknown' && data.paymentMethod) {
-                    row.publicData.payment_method_id = data.paymentMethod;
+                
+                if (data) {
+                    row.publicData.email = data.customerName; 
+                    row.publicData.status = data.status;
                 }
               } else {
                 row.status = "Error"
-                row.error = "Chưa đồng bộ Blockchain"
+                row.error = "Encypt Error"
               }
             } catch (e) { row.status = "Error" }
             loadedOrders.push(row)
@@ -476,9 +473,11 @@ export default function ShipperDashboard() {
         )
         const sortedOrders = loadedOrders.sort((a, b) => b.id.localeCompare(a.id));
         setOrders(sortedOrders)
+        
+        // Refresh selected order nếu đang mở
         if (selectedOrder) {
-            const updatedOrder = sortedOrders.find(o => o.id === selectedOrder.id);
-            if (updatedOrder) setSelectedOrder(updatedOrder);
+            const updated = sortedOrders.find(o => o.id === selectedOrder.id);
+            if (updated) setSelectedOrder(updated);
         }
     } catch (err) { console.error(err) } finally { setIsLoadingData(false) }
   }
@@ -498,10 +497,8 @@ export default function ShipperDashboard() {
 
     // ================= UI RENDERING =================
 
-    // 1. Loading & Error States
     if (isCheckingRole) return <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div><p className="text-gray-600 font-medium">Đang xác thực...</p></div>
 
-  // 2. Access Denied State
   if (isLoggedIn && !isAuthorized) {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
@@ -519,7 +516,6 @@ export default function ShipperDashboard() {
       )
   }
 
-  // 3. Login State
     if (!isLoggedIn) {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -628,8 +624,8 @@ export default function ShipperDashboard() {
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="flex justify-between items-end mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Quản lý Đơn hàng</h2>
-                                <p className="text-sm text-gray-500 mt-1">Danh sách đơn hàng cần giao</p>
+                                <h2 className="text-2xl font-bold text-gray-900">Quản lý Vận chuyển</h2>
+                                <p className="text-sm text-gray-500 mt-1">Danh sách đơn hàng được phân công</p>
                             </div>
                             <button onClick={() => loadShipperOrders()} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium shadow-sm transition flex items-center gap-2">
                                 <span className={isLoadingData ? "animate-spin" : ""}>⟳</span> Làm mới
@@ -659,10 +655,11 @@ export default function ShipperDashboard() {
                                         className="border-none bg-transparent text-sm font-medium text-gray-700 cursor-pointer focus:ring-0 outline-none hover:text-orange-600 transition"
                                     >
                                         <option value="ALL">Tất cả trạng thái</option>
+                                        <option value="CREATED">Chờ lấy hàng (Created)</option>
                                         <option value="SHIPPED">Đang giao (Shipped)</option>
                                         <option value="DELIVERED">Đã giao (Delivered)</option>
                                         <option value="RETURN_REQUESTED">Yêu cầu hoàn trả</option>
-                                        <option value="RETURNED">Đã hoàn trả</option>
+                                        <option value="RETURN_IN_TRANSIT">Đang hoàn trả</option>
                                     </select>
                                 </div>
                             </div>
@@ -685,7 +682,7 @@ export default function ShipperDashboard() {
                                         ].map((item) => (
                                             <div
                                                 key={item.key}
-                                                onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }} // Keep menu open to select direction
+                                                onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }}
                                                 className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortKey === item.key ? 'text-orange-600 font-medium' : 'text-gray-700'}`}
                                             >
                                                 {item.label} {sortKey === item.key && <Icons.Check />}
@@ -715,7 +712,7 @@ export default function ShipperDashboard() {
                                         <th className="px-6 py-4">Ngày tạo</th>
                                         <th className="px-6 py-4">Khách hàng</th>
                                         <th className="px-6 py-4">Trạng thái</th>
-                                        <th className="px-6 py-4 text-right">Phí Ship</th>
+                                        <th className="px-6 py-4 text-right">Phí Ship / COD</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -724,16 +721,23 @@ export default function ShipperDashboard() {
                                     ) : (
                                         processedOrders.map((order) => (
                                             <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-orange-50 cursor-pointer transition-colors">
-                                                <td className="px-6 py-4 text-sm font-bold text-gray-900">{order.display_id}</td>
+                                                <td className="px-6 py-4 text-sm font-bold text-blue-600 font-mono">{order.display_id}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-500">{order.created_at}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-700">
                                                     <div className="flex flex-col">
-                                                        <span className="font-medium">{order.decryptedData?.customerName || order.publicData.email}</span>
-                                                        <span className="text-xs text-gray-400">{order.decryptedData?.shipping_phone}</span>
+                                                        <span className="font-medium">{order.decryptedData?.customerName || "Hidden"}</span>
+                                                        <span className="text-xs text-gray-400">{order.decryptedData?.shipping_phone || "..."}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">{order.decryptedData ? getBlockchainStatusBadge(order.decryptedData.status) : <span className="text-xs bg-gray-100 px-2 py-1 rounded">Syncing...</span>}</td>
-                                                <td className="px-6 py-4 text-sm text-right font-medium">{order.decryptedData ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) : "-"}</td>
+                                                <td className="px-6 py-4 text-sm text-right">
+                                                    <div className="flex flex-col items-end">
+                                                        <span className="font-medium">{order.decryptedData ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) : "-"}</span>
+                                                        {order.decryptedData?.paymentMethod === 'COD' && (
+                                                            <span className="text-[10px] text-orange-600 bg-orange-50 px-1 rounded">COD: {formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}</span>
+                                                        )}
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -823,7 +827,7 @@ export default function ShipperDashboard() {
 
             </main>
 
-            {/* Modal Chi Tiết (Giữ nguyên) */}
+            {/* Modal Chi Tiết */}
             {selectedOrder && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
                     {/* ... (Nội dung modal chi tiết đơn hàng giữ nguyên như cũ hoặc update theo style mới) ... */}
@@ -844,19 +848,6 @@ export default function ShipperDashboard() {
                                 <p className="text-xs text-blue-600 font-mono">{selectedOrder.decryptedData?.shipping_phone}</p>
                             </div>
 
-                            {/* Products */}
-                            <div className="mb-6">
-                                <h4 className="text-xs font-bold text-gray-500 uppercase mb-2">Sản phẩm</h4>
-                                <ul className="space-y-2">
-                                    {selectedOrder.decryptedData?.product_lines.map((p: any, i: number) => (
-                                        <li key={i} className="flex justify-between text-sm border-b border-gray-100 pb-2 last:border-0">
-                                            <span>{p.product_name} <span className="text-gray-400 text-xs">x{p.quantity}</span></span>
-                                            <span className="font-medium">{formatPrice(p.subtotal, selectedOrder.publicData.currency_code)}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-
                             {/* Totals */}
                             <div className="border-t border-gray-200 pt-4 space-y-1 text-sm">
                                 <div className="flex justify-between text-gray-600">
@@ -867,19 +858,25 @@ export default function ShipperDashboard() {
                                     <span>Thu hộ (COD)</span>
                                     <span>{formatPrice(selectedOrder.decryptedData?.cod_amount, selectedOrder.publicData.currency_code)}</span>
                                 </div>
-                                <div className="flex justify-between font-bold text-gray-900 text-base mt-2 pt-2 border-t border-gray-100">
-                                    <span>Tổng tiền</span>
-                                    <span>{formatPrice((selectedOrder.decryptedData?.amount_untaxed || 0) + (selectedOrder.decryptedData?.shipping_fee || 0), selectedOrder.publicData.currency_code)}</span>
-                                </div>
                             </div>
 
                             {/* Actions */}
                             <div className="mt-6 flex flex-col gap-3">
+                                {/* LOGIC XÁC NHẬN GIAO HÀNG */}
+                                {/* 1. Đơn PREPAID -> Phải SHIPPED mới được giao */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' && (
-                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id)} disabled={isDelivering === selectedOrder.id} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
+                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
                                         {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><RocketLaunch/> Xác nhận giao hàng</>}
                                     </button>
                                 )}
+                                
+                                {/* 2. Đơn COD -> Phải SHIPPED mới được giao (và thu tiền) */}
+                                {selectedOrder.decryptedData?.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'SHIPPED' && (
+                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, true)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
+                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CurrencyDollar/> Xác nhận giao & Thu tiền</>}
+                                    </button>
+                                )}
+
                                 {selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
                                     <button onClick={() => handleShipReturn(selectedOrder.id)} disabled={isReturning === selectedOrder.id} className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
                                         {isReturning === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CheckCircle/> Xác nhận đã nhận hàng hoàn</>}

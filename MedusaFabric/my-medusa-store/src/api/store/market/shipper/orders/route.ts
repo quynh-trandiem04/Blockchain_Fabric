@@ -1,67 +1,96 @@
-// my-medusa-store/src/api/store/market/shipper/update/route.ts
+// src/api/store/market/shipper/orders/route.ts
 
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
-import jwt from "jsonwebtoken";
-import { Client } from "pg";
 
-const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
-
-export const OPTIONS = async (req: MedusaRequest, res: MedusaResponse) => {
-  res.set("Access-Control-Allow-Origin", req.headers.origin || "*");
-  res.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.set("Access-Control-Allow-Headers", "Content-Type, x-publishable-api-key, Authorization");
-  res.sendStatus(200);
-};
+// Import FabricService
+const FabricServiceClass = require("../../../../../services/fabric");
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
-  const container = req.scope;
-  const userModuleService = container.resolve(Modules.USER);
-  const orderModuleService = container.resolve(Modules.ORDER);
-
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: "No token provided" });
-
-  const dbClient = new Client({ connectionString: process.env.DATABASE_URL });
+  const fabricService = new FabricServiceClass(req.scope);
+  const orderModuleService = req.scope.resolve(Modules.ORDER);
+  
+  // 1. Resolve User Module để lấy thông tin Shipper đang login
+  const userModuleService = req.scope.resolve(Modules.USER);
 
   try {
-    const token = authHeader.split(" ")[1];
-    const decoded: any = jwt.verify(token, JWT_SECRET);
-    const authId = decoded.auth_identity_id || decoded.sub;
+    // FIX LỖI SYNTAX: Ép kiểu (req as any) để truy cập auth_context
+    const authContext = (req as any).auth_context;
 
-    await dbClient.connect();
-    
-    // Tìm User & Carrier Code
-    const linkRes = await dbClient.query(
-        `SELECT user_id FROM user_user_auth_auth_identity WHERE auth_identity_id = $1`,
-        [authId]
-    );
-    if (linkRes.rows.length === 0) return res.status(404).json({ message: "User not found" });
-    const userId = linkRes.rows[0].user_id;
-    const user = await userModuleService.retrieveUser(userId);
-    
-    // Check Role
-    if (user.metadata?.fabric_role !== 'shipperorgmsp') {
-        return res.status(403).json({ message: "Access denied" });
+    if (!authContext || !authContext.actor_id) {
+        return res.status(401).json({ message: "Unauthorized" });
     }
 
-    // LẤY LIST ORDER
-    // [FIX LỖI]: Chuyển 'take' sang tham số thứ 2 (config object)
-    const orders = await orderModuleService.listOrders(
-        {}, // Tham số 1: Filters (Để rỗng để lấy hết hoặc thêm điều kiện lọc nếu cần)
-        {   // Tham số 2: Config (Phân trang, Relations, Select...)
-            take: 100, 
-            relations: ["payment_collections", "payment_collections.payment_sessions"],
-            order: { created_at: "DESC" } // Sắp xếp mới nhất trước
+    // Lấy thông tin User chi tiết để lấy metadata
+    const user = await userModuleService.retrieveUser(authContext.actor_id);
+    
+    // Lấy company_code (VD: "GHN", "J&T")
+    const shipperCompanyID = user.metadata?.company_code as string;
+
+    if (!shipperCompanyID) {
+        return res.status(400).json({ message: "Account does not have a linked Company Code." });
+    }
+
+    console.log(`[Shipper API] Fetching orders for: ${shipperCompanyID}`);
+
+    // 2. Gọi Service với tham số companyID vừa lấy được
+    const fabricOrders = await fabricService.listShipperOrders(shipperCompanyID); 
+    
+    if (!fabricOrders || fabricOrders.length === 0) {
+        return res.json({ orders: [] });
+    }
+
+    // 3. Lấy danh sách ID gốc
+    const medusaOrderIds: string[] = [...new Set<string>(
+        fabricOrders.map((o: any) => String(o.blockchain_id).split('_')[0])
+    )];
+
+    // 4. Query Medusa DB
+    const medusaOrders = await orderModuleService.listOrders(
+        { 
+            id: medusaOrderIds 
+        },
+        {
+            relations: [
+                "items", 
+                "shipping_address", 
+                "payment_collections"
+            ],
+            select: [
+                "id", 
+                "display_id", 
+                "created_at", 
+                "email", 
+                "total", 
+                "currency_code", 
+                "status", 
+                "fulfillment_status"
+            ],
+            order: { created_at: "DESC" }
         }
     );
 
-    res.json({ orders });
+    // 5. Merge Data
+    const mergedOrders = fabricOrders.map((fOrder: any) => {
+        const originalId = String(fOrder.blockchain_id).split('_')[0];
+        const mOrder = medusaOrders.find((m: any) => m.id === originalId) as any;
+
+        if (!mOrder) return null; 
+
+        return {
+            ...fOrder, 
+            email: mOrder.email,
+            currency_code: mOrder.currency_code,
+            total: mOrder.total,
+            fulfillment_status: mOrder.fulfillment_status,
+            payment_collections: mOrder.payment_collections || []
+        };
+    }).filter(Boolean);
+
+    return res.json({ orders: mergedOrders });
 
   } catch (error: any) {
-    console.error(error);
-    res.status(500).json({ message: error.message });
-  } finally {
-      await dbClient.end();
+    console.error("[Shipper API] Error:", error);
+    return res.status(500).json({ message: error.message });
   }
 };

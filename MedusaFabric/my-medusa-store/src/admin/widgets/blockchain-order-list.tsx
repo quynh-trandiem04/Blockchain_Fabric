@@ -2,10 +2,10 @@ import { defineWidgetConfig } from "@medusajs/admin-sdk";
 import { useEffect, useState, useMemo, useRef } from "react";
 import React from "react";
 import { 
-    Container, Heading, Table, StatusBadge, Badge, Text, Drawer, 
+    Heading, StatusBadge, Badge, Text, Drawer, 
     Button 
 } from "@medusajs/ui";
-import { Spinner, Photo } from "@medusajs/icons"; // Import Spinner và Photo từ icons
+import { Spinner, Photo } from "@medusajs/icons"; 
 
 // --- 1. Error Boundary ---
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -51,13 +51,11 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
     const [medusaOrder, setMedusaOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
-    // Tính toán ID gốc (bỏ _1, _2)
     const originalId = blockchainOrder.blockchain_id.replace(/_\d+$/, '');
 
     useEffect(() => {
         const fetchMedusaOrder = async () => {
             try {
-                // Fetch full order từ Medusa để lấy danh sách items
                 const res = await fetch(`/admin/orders/${originalId}`, { credentials: "include" });
                 const data = await res.json();
                 setMedusaOrder(data.order);
@@ -70,18 +68,23 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
         fetchMedusaOrder();
     }, [originalId]);
 
-    // 🔥 LOGIC LỌC SẢN PHẨM THEO SELLER ID 🔥
+    // Lọc sản phẩm theo Seller
     const subOrderItems = useMemo(() => {
         if (!medusaOrder || !medusaOrder.items) return [];
         return medusaOrder.items.filter((item: any) => {
-            // Lấy seller_id từ metadata của product
             const itemSellerId = item.variant?.product?.metadata?.seller_company_id;
             return itemSellerId === blockchainOrder.seller_id;
         });
     }, [medusaOrder, blockchainOrder.seller_id]);
 
-    // Tính tổng tiền của Sub-order
-    const subTotalAmount = subOrderItems.reduce((sum: number, item: any) => sum + (item.unit_price * item.quantity), 0);
+    // --- LOGIC TÍNH TOÁN ---
+    
+    // 1. Tiền hàng (Subtotal)
+    const subTotalItems = subOrderItems.reduce((sum: number, item: any) => sum + (item.unit_price * item.quantity), 0);
+    
+    // 2. Phí ship gốc từ DB (Original Total Shipping)
+    const originalShippingFee = medusaOrder?.shipping_total || 0;
+
     const currencyCode = medusaOrder?.currency_code?.toUpperCase() || "USD";
 
     const formatMoney = (amount: number) => {
@@ -111,6 +114,17 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
                                     <Text size="small" className="text-ui-fg-subtle">Shop (Seller)</Text>
                                     <Text size="small" className="font-medium">{blockchainOrder.seller_id}</Text>
                                 </div>
+                                
+                                <div className="flex justify-between items-center">
+                                    <Text size="small" className="text-ui-fg-subtle">Shipper (Carrier)</Text>
+                                    <div className="flex items-center gap-1">
+                                        <span className="h-2 w-2 rounded-full"></span>
+                                        <Text size="small" className="font-medium">
+                                            {blockchainOrder.shipper_id || "Unknown"}
+                                        </Text>
+                                    </div>
+                                </div>
+
                                 <div className="flex justify-between items-center">
                                     <Text size="small" className="text-ui-fg-subtle">Status</Text>
                                     <StatusBadge color={getStatusStyle(blockchainOrder.status).color as any}>
@@ -138,7 +152,6 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
                                 <div className="flex flex-col gap-y-4">
                                     {subOrderItems.length > 0 ? subOrderItems.map((item: any) => (
                                         <div key={item.id} className="flex gap-x-4 items-start border-b border-ui-border-base pb-4 last:border-0">
-                                            {/* THAY THẾ Thumbnail COMPONENT BẰNG DIV + IMG */}
                                             <div className="h-10 w-10 rounded-md overflow-hidden bg-ui-bg-subtle border border-ui-border-base flex items-center justify-center shrink-0">
                                                 {item.thumbnail ? (
                                                     <img src={item.thumbnail} alt={item.title} className="h-full w-full object-cover" />
@@ -162,21 +175,20 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
                                     )) : (
                                         <Text className="text-ui-fg-subtle italic">
                                             No items found matching this seller ID ({blockchainOrder.seller_id}). 
-                                            This might be a data sync issue or missing product metadata.
                                         </Text>
                                     )}
                                 </div>
                             </div>
 
-                            {/* Totals */}
-                            <div className="border-t border-ui-border-base pt-4">
+                            {/* Totals Section */}
+                            <div className="border-t border-ui-border-base pt-4 space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <Text className="font-medium">Subtotal (This Split)</Text>
-                                    <Text className="font-medium">{formatMoney(subTotalAmount)}</Text>
+                                    <Text className="text-ui-fg-subtle">Subtotal (This Seller)</Text>
+                                    <Text className="font-medium">{formatMoney(subTotalItems)}</Text>
                                 </div>
-                                <div className="flex justify-between items-center mt-2">
-                                    <Text className="text-ui-fg-subtle">Shipping (Estimated)</Text>
-                                    <Text className="text-ui-fg-subtle">Calculated on Chain</Text>
+                                <div className="flex justify-between items-center">
+                                    <Text className="text-ui-fg-subtle">Shipping Fee (Original Order)</Text>
+                                    <Text className="font-medium">{formatMoney(originalShippingFee)}</Text>
                                 </div>
                             </div>
                         </div>

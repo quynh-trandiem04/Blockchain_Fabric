@@ -304,9 +304,68 @@ class FabricService {
     // Sàn xác nhận thanh toán (Cho đơn PREPAID)
     async confirmPayment(orderId) {
         const { contract } = await this._getContract('admin');
-        console.log(`[Fabric] Admin confirming payment: ${orderId}`);
-        await contract.submitTransaction('ConfirmPayment', orderId);
-        return { success: true };
+        console.log(`[Fabric] Received ConfirmPayment request for Base ID: ${orderId}`);
+
+        // BƯỚC 1: Tìm tất cả đơn hàng con (Split Orders) liên quan
+        // Logic: Tìm các đơn có orderID bắt đầu bằng orderId gốc
+        const queryString = {
+            selector: {
+                docType: 'Order',
+                orderID: { "$regex": `^${orderId}` } // Regex: Bắt đầu bằng ID gốc
+            }
+        };
+
+        const queryJSON = JSON.stringify(queryString);
+        let relatedOrders = [];
+
+        try {
+            // Dùng hàm query có sẵn để tìm
+            const resultBuffer = await contract.evaluateTransaction('QueryOrdersByString', queryJSON);
+            const rawResults = JSON.parse(resultBuffer.toString());
+            
+            // Map ra danh sách ID
+            relatedOrders = rawResults.map(r => ({
+                id: r.Key,
+                status: r.Record.status,
+                paymentMethod: r.Record.paymentMethod
+            }));
+
+            console.log(`[Fabric] Found ${relatedOrders.length} sub-orders for ${orderId}:`, relatedOrders.map(o => o.id));
+
+        } catch (e) {
+            console.error(`[Fabric] Failed to query sub-orders: ${e.message}`);
+            // Nếu query thất bại, fallback về việc thử confirm chính ID đó (trường hợp không tách đơn)
+            relatedOrders = [{ id: orderId, status: 'UNKNOWN' }];
+        }
+
+        if (relatedOrders.length === 0) {
+            throw new Error(`Order ${orderId} does not exist on Blockchain.`);
+        }
+
+        // BƯỚC 2: Duyệt và Confirm từng đơn hàng con
+        const results = [];
+        for (const subOrder of relatedOrders) {
+            // Chỉ confirm nếu đơn hàng là PREPAID và chưa PAID
+            
+            try {
+                console.log(`[Fabric] Confirming payment for sub-order: ${subOrder.id}...`);
+                await contract.submitTransaction('ConfirmPayment', subOrder.id);
+                results.push({ id: subOrder.id, status: 'SUCCESS' });
+            } catch (err) {
+                // Nếu lỗi do đã confirm rồi thì bỏ qua, còn lỗi khác thì log
+                console.warn(`[Fabric] Failed to confirm ${subOrder.id}: ${err.message}`);
+                results.push({ id: subOrder.id, status: 'FAILED', reason: err.message });
+            }
+        }
+
+        // Kiểm tra nếu tất cả đều thất bại
+        const successCount = results.filter(r => r.status === 'SUCCESS').length;
+        if (successCount === 0 && results.length > 0) {
+             // Ném lỗi của đơn đầu tiên để UI biết
+             throw new Error(results[0].reason || "Failed to confirm payment for sub-orders.");
+        }
+
+        return { success: true, details: results };
     }
 
     // Shipper lấy hàng (Dùng chung cho cả COD và Prepaid)
@@ -479,6 +538,44 @@ class FabricService {
         return allOrders.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     }
 
+    async listShipperOrders(shipperCompanyID) {
+        // 1. Kiểm tra đầu vào
+        if (!shipperCompanyID) {
+            console.warn("[Fabric] listShipperOrders: Missing shipperCompanyID. Returning empty list.");
+            return [];
+        }
+
+        // 2. Kết nối với role Shipper
+        const { contract } = await this._getContract('shipper');
+
+        // 3. Tạo Query Selector lọc theo docType VÀ shipperCompanyID
+        const queryString = {
+            selector: {
+                docType: 'Order',
+                shipperCompanyID: shipperCompanyID // <--- LỌC THEO COMPANY CODE Ở ĐÂY
+            }
+        };
+
+        const queryJSON = JSON.stringify(queryString);
+        console.log(`[Fabric Shipper] Executing Query: ${queryJSON}`);
+
+        try {
+            const resultBuffer = await contract.evaluateTransaction('QueryOrdersByString', queryJSON);
+            const rawResults = JSON.parse(resultBuffer.toString());
+            
+            // Map dữ liệu trả về
+            return rawResults.map(r => ({
+                blockchain_id: r.Key,
+                created_at: r.Record.createdAt,
+                status: r.Record.status,
+                payment_method: r.Record.paymentMethod,
+                shipper_id: r.Record.shipperCompanyID
+            }));
+        } catch (e) {
+            console.error("[Fabric Shipper] List Error:", e.message);
+            return [];
+        }
+    }    
 }
 
 module.exports = FabricService;
