@@ -4,7 +4,7 @@ import {
   type SubscriberConfig, 
   type SubscriberArgs,
 } from "@medusajs/framework";
-import { Modules } from "@medusajs/utils"; // Import Modules để gọi User Service
+import { Modules } from "@medusajs/utils"; 
 
 // Import Fabric Service
 const FabricService = require("../services/fabric");
@@ -34,7 +34,7 @@ export default async function orderPlacedHandler({
               "metadata",
               "shipping_address.*",
               "items.*", 
-              "shipping_methods.*", // Lấy phương thức vận chuyển
+              "shipping_methods.*", 
               "payment_collections.*",
               "payment_collections.payment_sessions.*"
           ],
@@ -91,8 +91,7 @@ export default async function orderPlacedHandler({
           totalOrderValue += (item.unit_price * item.quantity);
       }
 
-      // --- FIX LOGIC TÍNH PHÍ SHIP ---
-      // Nếu shipping_total = 0 nhưng có shipping_methods, hãy cộng thủ công
+      // Fix tính phí ship
       let totalShippingFee = order.shipping_total || 0;
       if (totalShippingFee === 0 && order.shipping_methods && order.shipping_methods.length > 0) {
           totalShippingFee = order.shipping_methods.reduce((acc: number, method: any) => acc + (method.amount || 0), 0);
@@ -115,30 +114,54 @@ export default async function orderPlacedHandler({
       // =================================================================
       // 🔥 BƯỚC QUAN TRỌNG: LẤY SHIPPER COMPANY CODE TỪ DB 🔥
       // =================================================================
-      let shipperCode = "GHN"; // Giá trị mặc định
+      let shipperCode = "GHN"; 
+      // FIX LỖI SYNTAX: Khai báo rõ kiểu string | null
+      let shipperPublicKey: string | null = null; 
       const shipperUserId = order.metadata?.shipper_id;
 
       if (shipperUserId) {
           try {
-              console.log(`[Subscriber] Tìm Shipper info cho UserID: ${shipperUserId}`);
-              // Gọi User Service để lấy thông tin shipper
-              const shipperUser = await userModuleService.retrieveUser(shipperUserId);
+              console.log(`[Subscriber] Tìm User Shipper ID: ${shipperUserId}`);
               
-              // Lấy company_code từ metadata của user
+              // 1. Lấy User để tìm Company Code (Link)
+              const shipperUser = await userModuleService.retrieveUser(shipperUserId, { 
+                  select: ["id", "metadata"] 
+              });
+            
               if (shipperUser && shipperUser.metadata?.company_code) {
                   shipperCode = shipperUser.metadata.company_code as string;
-                  console.log(`[Subscriber] ✅ Đã tìm thấy Company Code: ${shipperCode}`);
+                  console.log(`[Subscriber] 🔗 User linked to Carrier Code: ${shipperCode}`);
+
+                  // 2. Query bảng Carrier (Marketplace Module) để lấy Public Key
+                  // Giả sử service có hàm listCarriers và cột tìm kiếm là 'code' hoặc 'id'
+                  try {
+                      const carriers = await marketplaceService.listCarriers({ 
+                          code: shipperCode // Map với cột code trong bảng carrier
+                      });
+
+                      if (carriers.length > 0) {
+                          const carrierData = carriers[0];
+                          if (carrierData.metadata?.rsa_public_key) {
+                              shipperPublicKey = carrierData.metadata.rsa_public_key;
+                  }
+                      } else {
+                          console.warn(`[Subscriber] ⚠️ Không tìm thấy Carrier nào với code: ${shipperCode}`);
+                      }
+                  } catch (marketErr: any) {
+                      console.error(`[Subscriber] ❌ Lỗi query Marketplace Carrier: ${marketErr.message}`);
+                  }
+                  
               } else {
-                  console.warn(`[Subscriber] User ${shipperUserId} không có metadata.company_code. Dùng mặc định GHN.`);
+                  console.warn(`[Subscriber] User ${shipperUserId} không có metadata.company_code.`);
               }
           } catch (e: any) {
-              console.error(`[Subscriber] ❌ Lỗi tra cứu Shipper User: ${e.message}`);
+              console.error(`[Subscriber] ❌ Lỗi tra cứu User: ${e.message}`);
           }
       } else {
-          console.log("[Subscriber] Không tìm thấy shipper_id trong order metadata. Dùng mặc định GHN.");
+          console.log("[Subscriber] Không tìm thấy shipper_id. Dùng mặc định GHN.");
       }
-
-      console.log(`[Subscriber] Final Config -> Payment: ${paymentMethod} | ShipFee: ${totalShippingFee} | Shipper: ${shipperCode}`);
+      
+      console.log(`[Subscriber] ✅ Shipper Config -> Code: ${shipperCode}, HasKey: ${shipperPublicKey}`);
 
       // =================================================================
       // BƯỚC 5: SUBMIT LÊN BLOCKCHAIN
@@ -160,7 +183,6 @@ export default async function orderPlacedHandler({
 
           const subTotalItems = items.reduce((sum, i) => sum + (i.unit_price * i.quantity), 0);
           
-          // Chia phí ship theo tỷ trọng
           let subShipping = 0;
           if (totalOrderValue > 0) {
               subShipping = Math.round((subTotalItems / totalOrderValue) * totalShippingFee);
@@ -183,7 +205,7 @@ export default async function orderPlacedHandler({
               orderID: splitOrderID,
               paymentMethod: paymentMethod,
               sellerCompanyID: sellerID, 
-              shipperCompanyID: shipperCode, // Đã được lấy từ DB User
+              shipperCompanyID: shipperCode, 
               
               customerName: `${order.shipping_address?.first_name || ''} ${order.shipping_address?.last_name || ''}`.trim(),
               shipping_address: `${order.shipping_address?.address_1 || ''}, ${order.shipping_address?.city || ''}`,
@@ -195,13 +217,15 @@ export default async function orderPlacedHandler({
               shipping_total: subShipping,
               cod_amount: codAmount,
 
-              _sellerPublicKey: sellerPublicKey 
+              _sellerPublicKey: sellerPublicKey,
+              _shipperPublicKey: shipperPublicKey,
           };
 
           try {
-              console.log(`[Submit] ${splitOrderID} -> Shipper: ${shipperCode}, Fee: ${subShipping}, COD: ${codAmount}`);
-              await fabricService.createOrder(payload, sellerID);
-              console.log(`✅ [${splitOrderID}] Ghi thành công!`);
+              console.log('payload', payload);
+              console.log(`[Submit] ${splitOrderID} -> Shipper: ${shipperCode}, HasShipperKey: ${!!shipperPublicKey}`);
+              const txId = await fabricService.createOrder(payload, sellerID);
+              console.log(`✅ [${splitOrderID}] Ghi thành công! TX: ${txId}`);
           } catch (err: any) {
               console.error(`❌ [${splitOrderID}] Lỗi ghi Blockchain:`, err.message);
           }

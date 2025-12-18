@@ -1,0 +1,49 @@
+{
+    "name": "test-network-seller",
+    "version": "1.0.0",
+    "client": {
+        "organization": "Seller",
+        "connection": {
+            "timeout": {
+                "peer": {
+                    "endorser": "300"
+                }
+            }
+        }
+    },
+    "organizations": {
+        "Seller": {
+            "mspid": "SellerOrgMSP",
+            "peers": [
+                "peer0.seller.com"
+            ],
+            "certificateAuthorities": [
+                "ca.seller.com"
+            ]
+        }
+    },
+    "peers": {
+        "peer0.seller.com": {
+            "url": "grpcs://192.168.40.11:9051", 
+            "tlsCACerts": {
+                "path": "organizations/peerOrganizations/seller.com/tlsca/tlsca.seller.com-cert.pem"
+            },
+            "grpcOptions": {
+                "ssl-target-name-override": "peer0.seller.com",
+                "hostnameOverride": "peer0.seller.com"
+            }
+        }
+    },
+    "certificateAuthorities": {
+        "ca.seller.com": {
+            "url": "https://192.168.40.11:8054",
+            "caName": "ca-seller",
+            "tlsCACerts": {
+                "path": "organizations/peerOrganizations/seller.com/ca/ca.seller.com-cert.pem"
+            },
+            "httpOptions": {
+                "verify": false
+            }
+        }
+    }
+}

@@ -1,3 +1,5 @@
+// src/admin/widgets/blockchain-order-list.tsx
+
 import { defineWidgetConfig } from "@medusajs/admin-sdk";
 import { useEffect, useState, useMemo, useRef } from "react";
 import React from "react";
@@ -5,7 +7,7 @@ import {
     Heading, StatusBadge, Badge, Text, Drawer, 
     Button 
 } from "@medusajs/ui";
-import { Spinner, Photo } from "@medusajs/icons"; 
+import { Spinner, Photo, Envelope } from "@medusajs/icons"; 
 
 // --- 1. Error Boundary ---
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -46,7 +48,7 @@ const Icons = {
   )
 };
 
-// --- 4. Sub-Component: Order Drawer (Chi tiết đơn tách) ---
+// --- 4. Sub-Component: Order Drawer ---
 const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClose: () => void }) => {
     const [medusaOrder, setMedusaOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -56,6 +58,7 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
     useEffect(() => {
         const fetchMedusaOrder = async () => {
             try {
+                // Chỉ lấy chi tiết đơn hàng gốc từ DB
                 const res = await fetch(`/admin/orders/${originalId}`, { credentials: "include" });
                 const data = await res.json();
                 setMedusaOrder(data.order);
@@ -66,6 +69,7 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
             }
         };
         fetchMedusaOrder();
+        
     }, [originalId]);
 
     // Lọc sản phẩm theo Seller
@@ -108,24 +112,39 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
                             <div className="bg-ui-bg-subtle p-4 rounded-lg border border-ui-border-base flex flex-col gap-2">
                                 <div className="flex justify-between items-center">
                                     <Text size="small" className="text-ui-fg-subtle">Blockchain ID</Text>
-                                    <Text size="small" className="font-mono text-blue-600">{blockchainOrder.blockchain_id}</Text>
-                                </div>
-                                <div className="flex justify-between items-center">
-                                    <Text size="small" className="text-ui-fg-subtle">Shop (Seller)</Text>
-                                    <Text size="small" className="font-medium">{blockchainOrder.seller_id}</Text>
+                                    <Text size="small" className="font-mono text">{blockchainOrder.blockchain_id}</Text>
                                 </div>
                                 
-                                <div className="flex justify-between items-center">
+                                {/* SELLER INFO */}
+                                <div className="flex justify-between items-start pt-2 border-t border-ui-border-base">
+                                    <Text size="small" className="text-ui-fg-subtle">Shop (Seller)</Text>
+                                    <div className="flex flex-col items-end">
+                                    <Text size="small" className="font-medium">{blockchainOrder.seller_id}</Text>
+                                        <div className="flex items-center gap-1 text-[10px] text-ui-fg-muted">
+                                            <Envelope className="w-3 h-3"/> 
+                                            {/* 🔥 HIỂN THỊ TRỰC TIẾP TỪ PROP 🔥 */}
+                                            {blockchainOrder.seller_email || "No Email"}
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* SHIPPER INFO */}
+                                <div className="flex justify-between items-start pt-2 border-t border-ui-border-base">
                                     <Text size="small" className="text-ui-fg-subtle">Shipper (Carrier)</Text>
+                                    <div className="flex flex-col items-end">
                                     <div className="flex items-center gap-1">
-                                        <span className="h-2 w-2 rounded-full"></span>
-                                        <Text size="small" className="font-medium">
-                                            {blockchainOrder.shipper_id || "Unknown"}
-                                        </Text>
+                                            <span className="h-2 w-2 rounded-full"></span>
+                                            <Text size="small" className="font-medium">{blockchainOrder.shipper_id || "Unknown"}</Text>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-[10px] text-ui-fg-muted">
+                                            <Envelope className="w-3 h-3"/> 
+                                            {/* 🔥 HIỂN THỊ TRỰC TIẾP TỪ PROP 🔥 */}
+                                            {blockchainOrder.shipper_email || "No Email"}
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pt-2 border-t border-ui-border-base">
                                     <Text size="small" className="text-ui-fg-subtle">Status</Text>
                                     <StatusBadge color={getStatusStyle(blockchainOrder.status).color as any}>
                                         {blockchainOrder.status}
@@ -410,7 +429,7 @@ const BlockchainOrderList = () => {
                             onMouseOver={(e) => e.currentTarget.style.background = '#F9FAFB'}
                             onMouseOut={(e) => e.currentTarget.style.background = 'white'}
                         >
-                            <td style={{ padding: '14px 24px', color: '#2563EB', fontWeight: 500, fontFamily: 'monospace' }}>{o.blockchain_id}</td>
+                            <td style={{ padding: '14px 24px', color: '#374151', fontWeight: 500, fontFamily: 'monospace' }}>{o.blockchain_id}</td>
                             <td style={{ padding: '14px 24px', color: '#6b7280' }}>{formatDate(o.created_at)}</td>
                             <td style={{ padding: '14px 24px', color: '#374151' }}>{o.seller_id}</td>
                             

@@ -23,7 +23,6 @@ const Icons = {
       <path d="M15.3125 5.625V14.375" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   ),
-  // 🔥 BỔ SUNG ICON CHECK VÀO ĐÂY ĐỂ FIX LỖI 🔥
   Check: () => (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12"></polyline>
@@ -40,6 +39,14 @@ const Icons = {
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+    </svg>
+  ),
+  Truck: () => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="3" width="15" height="13"></rect>
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+      <circle cx="5.5" cy="18.5" r="2.5"></circle>
+      <circle cx="18.5" cy="18.5" r="2.5"></circle>
     </svg>
   )
 };
@@ -70,6 +77,7 @@ interface OrderRow {
       product_lines?: any[];
       updatedAt?: string; 
       amount_untaxed: number;
+      sellerCompanyID?: string;
   } | null; 
   error?: string;
 }
@@ -99,6 +107,9 @@ export default function ShipperDashboard() {
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
+  
+  // --- STATE ACTION BUTTONS ---
+  const [isShipping, setIsShipping] = useState<string | null>(null); // State cho nút lấy hàng
   const [isDelivering, setIsDelivering] = useState<string | null>(null);
   const [isReturning, setIsReturning] = useState<string | null>(null);
   
@@ -234,7 +245,7 @@ export default function ShipperDashboard() {
           const role = user.metadata?.fabric_role;
           const status = user.metadata?.approver_status;
 
-          console.log(`   -> User Role: ${role} | Status: ${status}`);
+          console.log(`   -> User Role: ${role} | Status: ${status}`);
 
           if (role !== 'shipperorgmsp') {
               alert("Tài khoản này không phải là Shipper.");
@@ -302,6 +313,49 @@ export default function ShipperDashboard() {
 
   const handleLogout = () => { localStorage.removeItem("medusa_token"); window.location.reload() }
 
+  // --- 2. HÀM XỬ LÝ ACTIONS ---
+
+  // ==> A. HÀM SHIP ORDER (Lấy hàng từ Seller)
+  const handleShipOrder = async (orderId: string) => {
+      if(!confirm("Xác nhận đã nhận hàng từ Seller và bắt đầu giao?")) return;
+      
+      setIsShipping(orderId);
+      const token = localStorage.getItem("medusa_token");
+      const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
+      console.log("🔑 Debug API Key:", publishableKey); 
+
+      if (!publishableKey) {
+        alert("Lỗi Config: Thiếu Publishable API Key trong file .env");
+        return;
+      }
+      
+      try {
+          const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/ship`, {
+              method: "POST",
+              headers: { 
+                  "Content-Type": "application/json", 
+                  "Authorization": `Bearer ${token}`,
+                  "x-publishable-api-key": publishableKey
+              }
+          });
+          
+          const result = await res.json();
+
+          if (res.ok) {
+              alert("Đã xác nhận lấy hàng thành công!");
+              loadShipperOrders(token || "");
+              if (selectedOrder?.id === orderId) setSelectedOrder(null);
+          } else {
+              alert("Thất bại: " + (result.message || result.error || "Lỗi không xác định"));
+          }
+      } catch (err) { 
+          alert("Lỗi kết nối server");
+      } finally { 
+          setIsShipping(null); 
+      }
+  }
+
+  // ==> B. HÀM CONFIRM DELIVERY (Giao thành công)
   const handleConfirmDelivery = async (orderId: string, isCod: boolean) => {
     // Xác định endpoint dựa trên loại đơn (COD dùng endpoint riêng để trigger update codStatus)
     const endpoint = isCod ? 'cod-deliver' : 'deliver';
@@ -323,7 +377,7 @@ export default function ShipperDashboard() {
         
         const result = await res.json();
         if (res.ok) {
-            alert("✅ Giao hàng thành công!");
+            alert("Giao hàng thành công!");
             loadShipperOrders(token || "");
             if (selectedOrder?.id === orderId) setSelectedOrder(null);
         } else {
@@ -415,7 +469,7 @@ export default function ShipperDashboard() {
                 "x-publishable-api-key": publishableKey
             }
         })
-
+        console.log("Orders Res:", ordersRes);
         if (!ordersRes.ok) { 
             console.error("Lỗi lấy danh sách đơn hàng");
             setIsLoadingData(false); 
@@ -423,6 +477,7 @@ export default function ShipperDashboard() {
         }
 
         const { orders: fabricOrders } = await ordersRes.json()
+        console.log("Fabric Orders:", fabricOrders);
         const loadedOrders: OrderRow[] = []
 
         // 2. Loop qua từng đơn để Decrypt thông tin chi tiết
@@ -460,12 +515,34 @@ export default function ShipperDashboard() {
                 row.decryptedData = data
                 
                 if (data) {
+                    // 🔥 FIX LỖI & MAP DỮ LIỆU ĐẦY ĐỦ 🔥
+                    // Thay vì gán từng dòng (gây lỗi null), ta gán nguyên object
+                    row.decryptedData = {
+                        customerName: data.customerName,
+                        shipping_address: data.shipping_address,
+                        
+                        // Map số điện thoại (Backend trả về 'phone', Frontend dùng 'shipping_phone')
+                        shipping_phone: data.phone || data.shipping_phone || "",
+                        
+                        // Map phí ship (Backend trả về 'shipping_fee' hoặc 'shipping_total')
+                        shipping_fee: data.shipping_fee || data.shipping_total || 0,
+                        
+                        // Map tiền COD
+                        cod_amount: data.cod_amount || 0,
+                        
+                        status: data.status,
+                        paymentMethod: data.paymentMethod,
+                        amount_untaxed: data.amount_untaxed || 0,
+                        sellerCompanyID: data.sellerCompanyID
+                    };
+
+                    // Cập nhật dữ liệu hiển thị bên ngoài bảng (Public Data)
                     row.publicData.email = data.customerName; 
                     row.publicData.status = data.status;
                 }
               } else {
                 row.status = "Error"
-                row.error = "Encypt Error"
+                row.error = "Decrypt Error"
               }
             } catch (e) { row.status = "Error" }
             loadedOrders.push(row)
@@ -545,11 +622,7 @@ export default function ShipperDashboard() {
                 placeholder="Password"
                 required
             />
-
-            {loginError && (
-                <div className="text-red-600 text-sm">{loginError}</div>
-            )}
-
+            {loginError && (<div className="text-red-600 text-sm">{loginError}</div>)}
             <button
                 type="submit"
                 disabled={isLoadingLogin}
@@ -558,15 +631,10 @@ export default function ShipperDashboard() {
                 Login
             </button>
             </form>
-
-            {/* ====== THÊM MỤC ĐĂNG KÝ Ở ĐÂY ====== */}
             <div className="text-center mt-6">
             <p className="text-sm text-gray-600">
                 Chưa có tài khoản?
-                <a
-                href="http://localhost:8000/dk/shipper/register"
-                className="ml-1 text-orange-600 font-semibold hover:underline"
-                >
+                <a href="http://localhost:8000/dk/shipper/register" className="ml-1 text-orange-600 font-semibold hover:underline">
                 Đăng ký ngay
                 </a>
             </p>
@@ -585,8 +653,7 @@ export default function ShipperDashboard() {
                 <div className="p-6 border-b border-gray-100">
                     <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
                         <div className="flex items-center gap-2 text-gray-900">
-                            {/* SVG TRUCK */}
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                            <Icons.Truck />
                             <span>Shipper</span>
                         </div>
                     </h1>
@@ -594,17 +661,10 @@ export default function ShipperDashboard() {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1">
-                    <button
-                        onClick={() => setActiveTab('orders')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}
-                    >
+                    <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}>
                         <Icons.Box /> Đơn hàng
                     </button>
-
-                    <button
-                        onClick={() => setActiveTab('settings')}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}
-                    >
+                    <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}>
                         <Icons.Settings /> Cấu hình đơn vị
                     </button>
                 </nav>
@@ -721,7 +781,7 @@ export default function ShipperDashboard() {
                                     ) : (
                                         processedOrders.map((order) => (
                                             <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-orange-50 cursor-pointer transition-colors">
-                                                <td className="px-6 py-4 text-sm font-bold text-blue-600 font-mono">{order.display_id}</td>
+                                                <td className="px-6 py-4 text-sm font-bold text-black-600 font-mono">{order.display_id}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-500">{order.created_at}</td>
                                                 <td className="px-6 py-4 text-sm text-gray-700">
                                                     <div className="flex flex-col">
@@ -841,11 +901,17 @@ export default function ShipperDashboard() {
                         </div>
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
                             {/* Customer */}
-                            <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                <p className="text-sm font-bold text-blue-900 mb-1">Khách hàng</p>
-                                <p className="text-sm text-blue-800">{selectedOrder.decryptedData?.customerName}</p>
-                                <p className="text-xs text-blue-600 mt-1">{selectedOrder.decryptedData?.shipping_address}</p>
-                                <p className="text-xs text-blue-600 font-mono">{selectedOrder.decryptedData?.shipping_phone}</p>
+                            <div className="mb-6 bg-orange-50 p-4 rounded-lg border border-orange-100">
+                                <p className="text-sm font-bold text-black-900 mb-1">Khách hàng</p>
+                                <p className="text-sm text-black-800">{selectedOrder.decryptedData?.customerName}</p>
+                                {/* Display Phone Number */}
+                                    {selectedOrder.decryptedData?.shipping_phone && (
+                                        <span className="text-xs font-mono bg-white px-2 py-0.5 rounded border border-orange-200 text-orange-700">
+                                            📞 {selectedOrder.decryptedData.shipping_phone}
+                                        </span>
+                                    )}
+                                <p className="text-xs text-black-600 mt-1">{selectedOrder.decryptedData?.shipping_address}</p>
+                                <p className="text-xs text-black-600 font-mono">{selectedOrder.decryptedData?.shipping_phone}</p>
                             </div>
 
                             {/* Totals */}
@@ -863,6 +929,14 @@ export default function ShipperDashboard() {
                             {/* Actions */}
                             <div className="mt-6 flex flex-col gap-3">
                                 {/* LOGIC XÁC NHẬN GIAO HÀNG */}
+
+                                {/* 0. Đơn mới tạo -> SHIPPER PHẢI BẤM LẤY HÀNG TRƯỚC */}
+                                {selectedOrder.decryptedData?.status === 'CREATED' && (
+                                    <button onClick={() => handleShipOrder(selectedOrder.id)} disabled={isShipping === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
+                                        {isShipping === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Xác nhận đã lấy hàng (Ship)</>}
+                                    </button>
+                                )}
+
                                 {/* 1. Đơn PREPAID -> Phải SHIPPED mới được giao */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' && (
                                     <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">

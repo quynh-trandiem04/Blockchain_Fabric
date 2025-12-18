@@ -459,19 +459,19 @@ export default function SellerDashboard() {
       }
   }
 
-  const handleShipOrder = async (orderId: string) => {
-      if(!confirm("Xác nhận bàn giao đơn hàng?")) return;
-      setIsShipping(orderId);
-      const token = localStorage.getItem("medusa_token");
-      try {
-          const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/ship`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
-          });
-          if (res.ok) loadSellerOrders(token || "");
-          else alert("Thất bại");
-      } catch (err) {} finally { setIsShipping(null); }
-  }
+//   const handleShipOrder = async (orderId: string) => {
+//       if(!confirm("Xác nhận bàn giao đơn hàng?")) return;
+//       setIsShipping(orderId);
+//       const token = localStorage.getItem("medusa_token");
+//       try {
+//           const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/ship`, {
+//               method: "POST",
+//               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+//           });
+//           if (res.ok) loadSellerOrders(token || "");
+//           else alert("Thất bại");
+//       } catch (err) {} finally { setIsShipping(null); }
+//   }
 
   const handleConfirmReturn = async (orderId: string) => {
       if(!confirm("Xác nhận đã nhận lại hàng hoàn?")) return;
@@ -931,7 +931,7 @@ export default function SellerDashboard() {
 
                     {/* Actions */}
                     <div className="pt-2">
-                        {/* SHIP ORDER */}
+                        {/* SHIP ORDER
                         {selectedOrder.status === "Success" && selectedOrder.decryptedData && 
                          ((selectedOrder.decryptedData.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'PAID') ||
                           (selectedOrder.decryptedData.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'CREATED')) && (
@@ -939,7 +939,7 @@ export default function SellerDashboard() {
                                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg transition text-sm flex justify-center gap-2 items-center transform active:scale-95 disabled:opacity-70">
                                 {isShipping === selectedOrder.id ? <><Spinner className="animate-spin" /> Processing...</> : <><RocketLaunch/> GIAO VẬN CHUYỂN</>}
                             </button>
-                        )}
+                        )} */}
 
                         {/* RETURN ORDER */}
                         {selectedOrder.status === "Success" && selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
