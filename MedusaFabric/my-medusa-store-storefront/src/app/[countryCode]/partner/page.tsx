@@ -459,32 +459,38 @@ export default function SellerDashboard() {
       }
   }
 
-//   const handleShipOrder = async (orderId: string) => {
-//       if(!confirm("Xác nhận bàn giao đơn hàng?")) return;
-//       setIsShipping(orderId);
-//       const token = localStorage.getItem("medusa_token");
-//       try {
-//           const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/ship`, {
-//               method: "POST",
-//               headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
-//           });
-//           if (res.ok) loadSellerOrders(token || "");
-//           else alert("Thất bại");
-//       } catch (err) {} finally { setIsShipping(null); }
-//   }
-
-  const handleConfirmReturn = async (orderId: string) => {
-      if(!confirm("Xác nhận đã nhận lại hàng hoàn?")) return;
+    const handleConfirmReturn = async (orderId: string) => {
+      if(!confirm("Xác nhận đã nhận lại hàng hoàn từ Shipper?")) return;
+      
       setIsConfirmingReturn(orderId);
       const token = localStorage.getItem("medusa_token");
+      const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
+
       try {
-          const res = await fetch(`${BACKEND_URL}/admin/fabric/orders/${orderId}/confirm-return`, {
+          // 🔥 GỌI ĐÚNG API STORE MỚI TẠO
+          const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/confirm-return`, {
               method: "POST",
-              headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+              headers: { 
+                  "Content-Type": "application/json", 
+                  "Authorization": `Bearer ${token}`,
+                  "x-publishable-api-key": publishableKey
+              }
           });
-          if (res.ok) loadSellerOrders(token || "");
-          else alert("Thất bại");
-      } catch (err) {} finally { setIsConfirmingReturn(null); }
+          
+          const result = await res.json();
+
+          if (res.ok) {
+              alert("✅ Thành công! Đã xác nhận nhận hàng.");
+              loadSellerOrders(token || "");
+              if (selectedOrder?.id === orderId) setSelectedOrder(null); // Đóng modal
+          } else {
+              alert("❌ Lỗi: " + (result.message || "Thất bại"));
+          }
+      } catch (err) {
+          alert("Lỗi kết nối server");
+      } finally { 
+          setIsConfirmingReturn(null); 
+      }
   }
 
   // --- AUTH FLOW ---
@@ -869,51 +875,71 @@ export default function SellerDashboard() {
 
       {/* MODAL ORDER DETAIL (CLEAN UI) */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in duration-200">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white z-10">
+        // 1. Thêm onClick vào lớp phủ (backdrop) để bấm ra ngoài là đóng
+        <div 
+            className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
+            onClick={() => setSelectedOrder(null)} 
+        >
+            {/* 2. Thêm onClick stopPropagation để bấm vào nội dung không bị đóng */}
+            <div 
+                className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-in zoom-in duration-200"
+                onClick={(e) => e.stopPropagation()} 
+            >
+                {/* HEADER - Sticky Top */}
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-xl z-10 shrink-0">
                     <div>
                         <h2 className="text-lg font-bold text-gray-900">Order {selectedOrder.display_id}</h2>
                         <p className="text-xs text-gray-500 mt-1 font-mono">{selectedOrder.created_at}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                             {/* Dùng status từ decryptedData hoặc publicData */}
+                         {/* Badge Status */}
                             <span className="px-2.5 py-1 bg-gray-100 rounded-full text-[10px] font-bold text-gray-600 border border-gray-200 uppercase tracking-wide">
-                                {selectedOrder.decryptedData?.status || selectedOrder.publicData.medusa_status}
+                            {/* 🔥 ƯU TIÊN LẤY STATUS TỪ PUBLIC DATA 🔥 */}
+                            {selectedOrder.publicData.medusa_status}
                             </span>
-                        <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-700 bg-gray-50 p-1.5 rounded-full transition"><XMark /></button>
                     </div>
                 </div>
                 
-                <div className="p-6 space-y-6">
+                {/* BODY - Scrollable */}
+                <div className="p-6 space-y-6 overflow-y-auto">
+                    
                     {/* Customer Info */}
-                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                            {/* ... */}
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-lg font-bold">
+                    <div className="flex items-center gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-lg font-bold shrink-0">
                             {(selectedOrder.decryptedData?.customerName || "U").charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 overflow-hidden">
-                            <p className="font-semibold text-gray-900 text-sm truncate">{selectedOrder.decryptedData?.customerName || "Guest"}</p>
-                            <p className="text-xs text-gray-500 truncate mt-0.5">{selectedOrder.decryptedData?.shipping_address}</p>
-                            <p className="text-xs text-blue-600 font-medium mt-0.5">{selectedOrder.decryptedData?.shipping_phone}</p>
+                            <p className="font-bold text-gray-900 text-sm truncate">
+                                {selectedOrder.decryptedData?.customerName || "Guest (Loading...)"}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">
+                                {selectedOrder.decryptedData?.shipping_address || "..."}
+                            </p>
+                            <p className="text-xs text-blue-600 font-mono mt-0.5">
+                                {selectedOrder.decryptedData?.shipping_phone}
+                            </p>
                         </div>
                     </div>
 
-                    {/* Products */}
+                    {/* Products List */}
                     <div>
                         <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Sản phẩm</h3>
                         <ul className="space-y-3">
-                            {(selectedOrder.decryptedData?.items || []).map((p: any, i: number) => (
-                                <li key={i} className="flex justify-between items-center text-sm">
+                            {(selectedOrder.decryptedData?.items || []).length > 0 ? (
+                                selectedOrder.decryptedData?.items.map((p: any, i: number) => (
+                                    <li key={i} className="flex justify-between items-start text-sm">
                                     <div>
-                                            <span className="text-gray-800 font-medium">{p.title || p.product_name}</span>
-                                        <span className="text-xs text-gray-400 ml-2 font-mono bg-gray-100 px-1.5 py-0.5 rounded">x{p.quantity}</span>
+                                            <span className="text-gray-800 font-medium line-clamp-1">{p.title || p.product_name}</span>
+                                            <span className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">x{p.quantity}</span>
                                     </div>
-                                    <span className="font-mono font-medium text-gray-900">
-                                        {formatPrice(p.subtotal, selectedOrder.publicData.currency_code)}
+                                        <span className="font-mono font-medium text-gray-900 whitespace-nowrap ml-4">
+                                            {formatPrice(p.subtotal || (p.unit_price * p.quantity), selectedOrder.publicData.currency_code)}
                                     </span>
                                 </li>
-                            ))}
+                                ))
+                            ) : (
+                                <li className="text-xs text-gray-400 italic text-center">Đang tải chi tiết sản phẩm...</li>
+                            )}
                         </ul>
                     </div>
 
@@ -921,38 +947,54 @@ export default function SellerDashboard() {
                     <div className="space-y-2 pt-4 border-t border-dashed border-gray-200">
                         <div className="flex justify-between text-xs text-gray-500">
                             <span>Tạm tính</span>
-                            <span>{formatPrice(selectedOrder.decryptedData?.amount_untaxed, selectedOrder.publicData.currency_code)}</span>
+                            <span>{formatPrice(selectedOrder.decryptedData?.amount_untaxed || selectedOrder.publicData.total, selectedOrder.publicData.currency_code)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-gray-500">
+                            <span>Phí vận chuyển</span>
+                            <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
                         </div>
                                                  <div className="flex justify-between text-base font-bold text-blue-700 pt-2 border-t border-gray-100 mt-2">
                             <span>Thành tiền</span>
-                            <span>{formatPrice((selectedOrder.decryptedData?.amount_untaxed || 0) + (selectedOrder.decryptedData?.shipping_fee || 0), selectedOrder.publicData.currency_code)}</span>
+                            <span>
+                                {formatPrice(
+                                    (selectedOrder.decryptedData?.amount_untaxed || selectedOrder.publicData.total) + 
+                                    (selectedOrder.decryptedData?.shipping_fee || 0), 
+                                    selectedOrder.publicData.currency_code
+                                )}
+                            </span>
                         </div>
                     </div>
 
-                    {/* Actions */}
+                    {/* ACTIONS */}
                     <div className="pt-2">
-                        {/* SHIP ORDER
-                        {selectedOrder.status === "Success" && selectedOrder.decryptedData && 
-                         ((selectedOrder.decryptedData.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'PAID') ||
-                          (selectedOrder.decryptedData.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'CREATED')) && (
-                            <button onClick={() => handleShipOrder(selectedOrder.id)} disabled={isShipping === selectedOrder.id}
-                                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold shadow-lg transition text-sm flex justify-center gap-2 items-center transform active:scale-95 disabled:opacity-70">
-                                {isShipping === selectedOrder.id ? <><Spinner className="animate-spin" /> Processing...</> : <><RocketLaunch/> GIAO VẬN CHUYỂN</>}
-                            </button>
-                        )} */}
 
-                        {/* RETURN ORDER */}
-                        {selectedOrder.status === "Success" && selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
-                            <button onClick={() => handleConfirmReturn(selectedOrder.id)} disabled={isConfirmingReturn === selectedOrder.id}
-                                className="w-full py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold shadow-lg transition text-sm flex justify-center gap-2 items-center transform active:scale-95 disabled:opacity-70">
-                                {isConfirmingReturn === selectedOrder.id ? <><Spinner className="animate-spin" /> Processing...</> : <><CheckCircle/> XÁC NHẬN NHẬN HÀNG</>}
+                        {/* 🔥 1. NÚT XÁC NHẬN NHẬN HÀNG HOÀN (Seller Confirm Return) 🔥 */}
+                        {/* Logic: Kiểm tra publicData.medusa_status là 'RETURN_IN_TRANSIT' */}
+                        {selectedOrder.publicData.medusa_status === 'RETURN_IN_TRANSIT' && (
+                            <button 
+                                onClick={() => handleConfirmReturn(selectedOrder.id)} 
+                                disabled={isConfirmingReturn === selectedOrder.id}
+                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition text-sm flex justify-center gap-2 items-center transform active:scale-95 disabled:opacity-70 disabled:scale-100"
+                            >
+                                {isConfirmingReturn === selectedOrder.id ? (
+                                    <><Spinner className="animate-spin" /> Đang xử lý...</>
+                                ) : (
+                                    <><CheckCircle/> XÁC NHẬN ĐÃ NHẬN HÀNG HOÀN</>
+                                )}
                             </button>
                         )}
                         
-                        {/* COMPLETED */}
-                        {selectedOrder.decryptedData?.status === 'RETURNED' && (
-                             <div className="w-full py-2.5 bg-gray-50 text-gray-500 rounded-xl text-xs font-bold text-center border border-gray-200 flex items-center justify-center gap-2">
-                                <CheckCircle className="text-green-500" /> Đơn hàng đã hoàn tất trả hàng
+                        {/* Thông báo chờ */}
+                        {selectedOrder.publicData.medusa_status === 'RETURN_REQUESTED' && (
+                             <div className="w-full py-3 bg-yellow-50 text-yellow-700 rounded-xl text-xs font-medium text-center border border-yellow-200">
+                                Khách đã yêu cầu trả hàng. Chờ Shipper lấy hàng.
+                             </div>
+                        )}
+
+                        {/* Thông báo hoàn tất */}
+                        {selectedOrder.publicData.medusa_status === 'RETURNED' && (
+                             <div className="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold text-center border border-green-200 flex items-center justify-center gap-2">
+                                <CheckCircle className="text-blue-600" /> Đơn hàng đã hoàn tất trả hàng
                              </div>
                         )}
                     </div>

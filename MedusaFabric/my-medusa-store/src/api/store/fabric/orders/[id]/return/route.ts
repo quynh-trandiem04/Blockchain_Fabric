@@ -2,32 +2,55 @@
 
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 
+// Import Service
 const FabricService = require("../../../../../../services/fabric");
-const fabricService = new FabricService();
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
-  const { id } = req.params;
-  console.log(`[Store API] Requesting Return for: ${id}`);
+  const { id } = req.params; // Đây là sub-order ID (VD: order_..._1)
+  
+  // Khởi tạo Service
+  const fabricService = new FabricService(req.scope);
 
   try {
-    // Gọi hàm requestReturn trong Service
-    const txId = await fabricService.requestReturn(id);
+    console.log(`[API] Processing Return Request for: ${id}`);
 
-    res.json({
-      message: "Đã gửi yêu cầu trả hàng thành công!",
-      tx_id: txId
+    // Gọi hàm requestReturn trong service (Hàm này đã dùng identity 'admin' như cấu hình cũ)
+    await fabricService.requestReturn(id);
+
+    return res.json({
+      success: true,
+      message: "Yêu cầu trả hàng đã được gửi thành công!",
     });
 
   } catch (error: any) {
-    console.error("[Store API] Return Error:", error.message);
+    console.error("RETURN ERROR:", error);
     
-    // Bắt lỗi logic từ Chaincode (ví dụ: quá hạn 5 phút)
+    // Xử lý thông báo lỗi từ Chaincode (VD: Quá hạn 5 phút)
     // Chaincode trả về: "đã quá 7 ngày..."
-    if (error.message && (error.message.includes("đã quá") || error.message.includes("thời gian"))) {
-         return res.status(400).json({ error: "Đã quá thời hạn trả hàng (5 phút)!" });
+    let errorMessage = error.message || "Lỗi hệ thống.";
+    
+    if (errorMessage.includes("đã quá")) {
+        return res.status(400).json({ error: "Đã hết thời hạn đổi trả (5 phút demo)." });
     }
     
-    // Các lỗi khác (ví dụ: chưa Delivered)
-    res.status(500).json({ error: error.message || "Lỗi hệ thống." });
+    if (errorMessage.includes("DELIVERED")) {
+        return res.status(400).json({ error: "Đơn hàng chưa giao thành công, không thể trả." });
+    }
+
+    return res.status(500).json({ error: errorMessage });
   }
 };
+
+// CORS OPTIONS
+export async function OPTIONS(req: MedusaRequest, res: MedusaResponse) {
+  const origin = (req.headers["origin"] as string) || "*";
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": origin,
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-publishable-api-key",
+      "Access-Control-Allow-Credentials": "true", 
+    },
+  });
+}

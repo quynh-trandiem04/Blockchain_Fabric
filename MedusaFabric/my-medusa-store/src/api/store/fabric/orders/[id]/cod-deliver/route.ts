@@ -1,4 +1,4 @@
-// src/api/store/fabric/orders/[id]/ship/route.ts
+// my-medusa-store\src\api\store\fabric\orders\[id]\cod-deliver\route.ts
 
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
@@ -9,15 +9,12 @@ const FabricService = require("../../../../../../services/fabric");
 const JWT_SECRET = process.env.JWT_SECRET || "supersecret";
 const ALLOWED_ROLES = ['shipperorgmsp'];
 
-// --- POST HANDLER ---
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const { id } = req.params;
-  
-  // 1. Khởi tạo Service với Scope
   const fabricService = new FabricService(req.scope);
-  console.log(`[API] ShipOrder called for Order ID: ${id}`);
+
   try {
-    // 2. Kiểm tra Token (Authentication)
+    // 1. Auth Check
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Unauthorized: Missing Token" });
@@ -25,7 +22,6 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
     const token = authHeader.split(" ")[1];
     let actorId = "";
-    
     try {
         const decoded: any = jwt.verify(token, JWT_SECRET);
         actorId = decoded.actor_id || decoded.user_id;
@@ -35,7 +31,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
     if (!actorId) return res.status(401).json({ message: "Unauthorized: No Actor ID" });
 
-    // 3. Lấy thông tin User từ Database Medusa
+    // 2. Get User & Company Code
     const userModuleService = req.scope.resolve(Modules.USER);
     const user = await userModuleService.retrieveUser(actorId, { 
         select: ["id", "metadata", "email"] 
@@ -44,46 +40,34 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     const role = (user.metadata?.fabric_role as string || "").toLowerCase();
     const companyCode = user.metadata?.company_code as string;
 
-    // 4. Kiểm tra Quyền (Authorization)
     if (!ALLOWED_ROLES.includes(role)) {
-        return res.status(403).json({ message: "Forbidden: Chỉ tài khoản Shipper mới được quyền giao hàng." });
+        return res.status(403).json({ message: "Forbidden: Chỉ Shipper mới được xác nhận giao hàng." });
     }
-    
+
     if (!companyCode) {
-        return res.status(400).json({ message: "Lỗi dữ liệu: Tài khoản Shipper này chưa có mã công ty (company_code)." });
+        return res.status(400).json({ message: "Lỗi: Tài khoản Shipper thiếu mã công ty." });
     }
 
-    // 5. Gọi Blockchain
-    console.log(`[API] Processing ShipOrder for ${id}`);
-    console.log(`      -> Actor: ${user.email}`);
-    console.log(`      -> Verification Company Code: ${companyCode}`);
+    // 3. Call Fabric (Confirm COD Delivery)
+    console.log(`[API] Confirm COD Delivery for ${id} | By: ${user.email} | Org: ${companyCode}`);
+    
+    // 🔥 Gọi hàm confirmCODDelivery
+    await fabricService.confirmCODDelivery(id, companyCode);
 
-    await fabricService.shipOrder(id, companyCode);
-
-    return res.json({
-      success: true,
-      message: "Đã xác nhận lấy hàng thành công (Shipped)!",
+    res.json({ 
+        success: true,
+        message: "Giao hàng & Thu tiền thành công! (COD)" 
     });
 
   } catch (error: any) {
-    console.error("SHIP ORDER ERROR:", error);
-    
-    // Xử lý lỗi trả về từ Fabric để hiển thị rõ ràng hơn cho Frontend
-    const errorMessage = error.message || "Lỗi hệ thống khi giao hàng.";
-    
-    return res.status(500).json({ 
-        message: errorMessage,
-        details: error.responses ? error.responses : undefined
-    });
+    console.error("COD DELIVERY ERROR:", error);
+    res.status(500).json({ message: error.message || "Lỗi hệ thống." });
   }
 };
 
-// --- OPTIONS HANDLER (FIX CORS & TYPESCRIPT) ---
+// CORS OPTIONS
 export async function OPTIONS(req: MedusaRequest, res: MedusaResponse) {
-  // Lấy origin từ request header để trả về chính xác
-  // Ép kiểu (as string) để tránh lỗi TypeScript: "Type 'string | string[]' is not assignable..."
   const origin = (req.headers["origin"] as string) || "*";
-
   return new Response(null, {
     status: 204,
     headers: {

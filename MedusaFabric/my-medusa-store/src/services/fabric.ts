@@ -408,27 +408,24 @@ class FabricService {
         return { success: true, details: results };
     }
 
-    // Shipper lấy hàng (Dùng chung cho cả COD và Prepaid)
-    async shipOrder(orderId) {
+    async shipOrder(orderId, shipperCompanyID) {
         const { contract } = await this._getContract('shipper');
-        console.log(`[Fabric] Shipper shipping order: ${orderId}`);
-        await contract.submitTransaction('ShipOrder', orderId);
+        console.log(`[Fabric] Shipper shipping order: ${orderId} for Company ID: ${shipperCompanyID}`);
+        await contract.submitTransaction('ShipOrder', orderId, shipperCompanyID);
         return { success: true };
     }
 
-    // Shipper giao thành công & thu tiền (Cho COD)
-    async confirmCODDelivery(orderId) {
+    async confirmCODDelivery(orderId, shipperCompanyID) {
         const { contract } = await this._getContract('shipper');
-        console.log(`[Fabric] Shipper confirmed COD delivery: ${orderId}`);
-        await contract.submitTransaction('ConfirmCODDelivery', orderId);
+        console.log(`[Fabric] Shipper confirming COD delivery: ${orderId} for Company ID: ${shipperCompanyID}`);
+        await contract.submitTransaction('ConfirmCODDelivery', orderId, shipperCompanyID);
         return { success: true };
     }
 
-    // Shipper giao thành công (Cho Prepaid)
-    async confirmDelivery(orderId) {
+    async confirmDelivery(orderId, shipperCompanyID) {
         const { contract } = await this._getContract('shipper');
-        console.log(`[Fabric] Shipper confirmed delivery: ${orderId}`);
-        await contract.submitTransaction('ConfirmDelivery', orderId);
+        console.log(`[Fabric] Shipper confirming delivery: ${orderId} for Company ID: ${shipperCompanyID}`);
+        await contract.submitTransaction('ConfirmDelivery', orderId, shipperCompanyID);
         return { success: true };
     }
 
@@ -452,24 +449,24 @@ class FabricService {
     // 4. RETURN FLOW (Trả hàng)
     // =========================================================================
     
-    // Khách yêu cầu trả hàng (Sàn duyệt)
+    // Khách yêu cầu trả hàng
     async requestReturn(orderId) {
         const { contract } = await this._getContract('admin');
         await contract.submitTransaction('RequestReturn', orderId);
         return { success: true };
     }
 
-    // Shipper lấy hàng trả
-    async shipReturn(orderId) {
+    async shipReturn(orderId, shipperCompanyID) {
         const { contract } = await this._getContract('shipper');
-        await contract.submitTransaction('ShipReturn', orderId);
+        console.log(`[Fabric] Shipper shipping return: ${orderId} for Company ID: ${shipperCompanyID}`);
+        await contract.submitTransaction('ShipReturn', orderId, shipperCompanyID);
         return { success: true };
     }
 
-    // Seller nhận lại hàng
-    async confirmReturnReceived(orderId) {
+    async confirmReturnReceived(orderId, sellerCompanyID) {
         const { contract } = await this._getContract('seller');
-        await contract.submitTransaction('ConfirmReturnReceived', orderId);
+        console.log(`[Fabric] Seller confirming return received: ${orderId} for Company ID: ${sellerCompanyID}`);
+        await contract.submitTransaction('ConfirmReturnReceived', orderId, sellerCompanyID);
         return { success: true };
     }
 
@@ -614,6 +611,50 @@ class FabricService {
             return [];
         }
     }    
+
+    async getSubOrders(baseOrderId) {
+        // Dùng identity 'admin' (Sàn) để query thay cho khách
+        const { contract } = await this._getContract('admin');
+
+        // Regex: Tìm tất cả orderID bắt đầu bằng baseOrderId
+        // Ví dụ: base="order_123" -> tìm được "order_123", "order_123_1", "order_123_2"
+        const queryString = JSON.stringify({
+            selector: {
+                docType: 'Order',
+                orderID: { "$regex": `^${baseOrderId}` }
+            }
+        });
+
+        console.log(`[Fabric] Querying sub-orders for: ${baseOrderId}`);
+
+        try {
+            const resultBuffer = await contract.evaluateTransaction('QueryOrdersByString', queryString);
+            const resultString = resultBuffer.toString();
+
+            if (!resultString || resultString === "null") return [];
+
+            const rawResults = JSON.parse(resultString);
+            
+            // Map dữ liệu trả về cho Frontend
+            return rawResults.map(r => {
+                const rec = r.Record;
+                return {
+                    blockchain_id: rec.orderID, // ID đầy đủ (kèm _1, _2)
+                    status: rec.status,
+                    payment_method: rec.paymentMethod,
+                    cod_status: rec.codStatus,
+                    shipper_id: rec.shipperCompanyID,
+                    seller_id: rec.sellerCompanyID,
+                    updated_at: rec.updatedAt || rec.createdAt,
+                    delivery_timestamp: rec.deliveryTimestamp
+                };
+            }).sort((a, b) => a.blockchain_id.localeCompare(b.blockchain_id)); // Sắp xếp theo ID
+
+        } catch (e) {
+            console.error(`[Fabric] Get SubOrders Error:`, e.message);
+            return [];
+        }
+    }
 }
 
 module.exports = FabricService;

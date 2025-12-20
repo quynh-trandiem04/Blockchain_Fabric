@@ -5,9 +5,9 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import React from "react";
 import { 
     Heading, StatusBadge, Badge, Text, Drawer, 
-    Button 
+    Button, toast 
 } from "@medusajs/ui";
-import { Spinner, Photo, Envelope } from "@medusajs/icons"; 
+import { Spinner, Photo, Envelope, CurrencyDollar } from "@medusajs/icons"; 
 
 // --- 1. Error Boundary ---
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -49,9 +49,10 @@ const Icons = {
 };
 
 // --- 4. Sub-Component: Order Drawer ---
-const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClose: () => void }) => {
+const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder: any, onClose: () => void, onRefresh: () => void }) => {
     const [medusaOrder, setMedusaOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [isRemitting, setIsRemitting] = useState(false); // State loading cho nút Remit
 
     const originalId = blockchainOrder.blockchain_id.replace(/_\d+$/, '');
 
@@ -71,6 +72,35 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
         fetchMedusaOrder();
         
     }, [originalId]);
+
+    // Hàm gọi API Remit
+    const handleRemitCOD = async () => {
+        if (!confirm("Xác nhận đã nhận đủ tiền COD từ đơn vị vận chuyển?")) return;
+        
+        setIsRemitting(true);
+        try {
+            // Gọi API Remit với ID blockchain
+            const res = await fetch(`/admin/fabric/orders/${blockchainOrder.blockchain_id}/remit`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                toast.success("Payment received successfully!");
+                onRefresh();
+                onClose();
+            } else {
+                toast.error("ERROR: " + (result.message || "FALIED to remit COD payment."));
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Network error during remittance.");
+        } finally {
+            setIsRemitting(false);
+        }
+    };
 
     // Lọc sản phẩm theo Seller
     const subOrderItems = useMemo(() => {
@@ -213,13 +243,26 @@ const OrderDrawer = ({ blockchainOrder, onClose }: { blockchainOrder: any, onClo
                         </div>
                     )}
                 </Drawer.Body>
-                <Drawer.Footer>
+                <Drawer.Footer className="flex justify-between items-center">
+                    <div className="flex gap-2">
                     <Drawer.Close asChild>
                         <Button variant="secondary">Close</Button>
                     </Drawer.Close>
                     <Button onClick={() => window.open(`/app/orders/${originalId}`, '_blank')}>
-                        View Original Order
+                            Original Order
+                        </Button>
+                    </div>
+
+                    {/* 🔥 NÚT REMIT COD DÀNH CHO ADMIN 🔥 */}
+                    {blockchainOrder.payment_method === 'COD' && blockchainOrder.cod_status === 'PENDING_REMITTANCE' && (
+                        <Button 
+                            variant="primary" 
+                            onClick={handleRemitCOD} 
+                            isLoading={isRemitting}
+                        >
+                            <CurrencyDollar /> Confirm COD Payment
                     </Button>
+                    )}
                 </Drawer.Footer>
             </Drawer.Content>
         </Drawer>
@@ -258,26 +301,24 @@ const BlockchainOrderList = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
     const fetchData = async () => {
+      setIsLoading(true);
       try {
         const res = await fetch(`/admin/fabric/orders/list`, {
             method: "GET", credentials: "include"
         });
         if (res.ok) {
             const data = await res.json();
-            if (isMounted) {
                 setOrders(data.orders || []);
-                setIsLoading(false);
-            }
         } else {
-            if (isMounted) setErrorMsg("Lỗi tải dữ liệu Blockchain");
+            setErrorMsg("Lỗi tải dữ liệu Blockchain");
         }
-      } catch (e) { if (isMounted) setErrorMsg("Lỗi kết nối"); }
+      } catch (e) { setErrorMsg("Lỗi kết nối"); }
+      finally { setIsLoading(false); }
     };
+
+  useEffect(() => {
     fetchData();
-    return () => { isMounted = false; };
   }, []);
 
   const processedOrders = useMemo(() => {
@@ -346,6 +387,7 @@ const BlockchainOrderList = () => {
                 <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Blockchain Ledger</h1>
                 <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Live tracking of split orders from Hyperledger Fabric</p>
             </div>
+            <Button onClick={fetchData} variant="secondary">Refresh</Button>
         </div>
 
         <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
@@ -493,7 +535,8 @@ const BlockchainOrderList = () => {
             {selectedOrder && (
                 <OrderDrawer 
                     blockchainOrder={selectedOrder} 
-                    onClose={() => setSelectedOrder(null)} 
+                    onClose={() => setSelectedOrder(null)}
+                    onRefresh={fetchData} 
                 />
             )}
         </div>

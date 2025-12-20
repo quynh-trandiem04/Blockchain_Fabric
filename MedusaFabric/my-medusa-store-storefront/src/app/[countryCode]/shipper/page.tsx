@@ -129,7 +129,7 @@ export default function ShipperDashboard() {
         carrier_name: "",
         phone: "",
         email: "",
-      shipping_fee: 10,
+        shipping_fee: 10,
     });
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -388,7 +388,7 @@ export default function ShipperDashboard() {
   }
 
   const handleShipReturn = async (orderId: string) => {
-    if (!confirm("Xác nhận đã lấy hàng trả từ khách thành công?")) return;
+    if (!confirm("Confirm that the returned item has been successfully collected from the customer?")) return;
     setIsReturning(orderId);
     const token = localStorage.getItem("medusa_token");
     try {
@@ -402,13 +402,15 @@ export default function ShipperDashboard() {
         });
         const result = await res.json();
         if (res.ok) {
-            alert("✅ Xác nhận lấy hàng hoàn thành công!");
+            alert("Success!");
             loadShipperOrders(token || "");
             if (selectedOrder?.id === orderId) setSelectedOrder(null);
         } else {
-            alert("❌ Lỗi: " + (result.error || "Thất bại"));
+            alert("Error: " + (result.error || "Failed"));
         }
-    } catch (err) { alert("Lỗi kết nối server"); } 
+    } catch (err) { 
+        // alert("Lỗi kết nối server"); 
+    } 
     finally { setIsReturning(null); }
   }
 
@@ -930,31 +932,60 @@ export default function ShipperDashboard() {
                             <div className="mt-6 flex flex-col gap-3">
                                 {/* LOGIC XÁC NHẬN GIAO HÀNG */}
 
-                                {/* 0. Đơn mới tạo -> SHIPPER PHẢI BẤM LẤY HÀNG TRƯỚC */}
-                                {selectedOrder.decryptedData?.status === 'CREATED' && (
-                                    <button onClick={() => handleShipOrder(selectedOrder.id)} disabled={isShipping === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isShipping === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Xác nhận đã lấy hàng (Ship)</>}
+                                {/* BUTTON 1: SHIP ORDER (Lấy hàng từ Seller) 
+                                    - COD: Hiện khi status = CREATED (Chưa thu tiền, lấy hàng luôn)
+                                    - PREPAID: Hiện khi status = PAID (Khách đã trả tiền Sàn mới cho lấy)
+                                */}
+                                {((selectedOrder.decryptedData?.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'CREATED') ||
+                                  (selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'PAID')) && (
+                                    <button 
+                                        onClick={() => handleShipOrder(selectedOrder.id)} 
+                                        disabled={isShipping === selectedOrder.id} 
+                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2"
+                                    >
+                                        {isShipping === selectedOrder.id ? (
+                                            <Spinner className="animate-spin" />
+                                        ) : (
+                                            <><Icons.Truck/> Xác nhận đã lấy hàng (Ship)</>
+                                        )}
                                     </button>
                                 )}
 
-                                {/* 1. Đơn PREPAID -> Phải SHIPPED mới được giao */}
+                                {/* BUTTON 2: GIAO HÀNG THÀNH CÔNG (PREPAID) */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' && (
-                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-teal-600 hover:bg-teal-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><RocketLaunch/> Xác nhận giao hàng</>}
+                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
+                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Xác nhận giao hàng</>}
                                     </button>
                                 )}
                                 
-                                {/* 2. Đơn COD -> Phải SHIPPED mới được giao (và thu tiền) */}
+                                {/* BUTTON 3: GIAO HÀNG & THU TIỀN (COD) */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'SHIPPED' && (
                                     <button onClick={() => handleConfirmDelivery(selectedOrder.id, true)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
                                         {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CurrencyDollar/> Xác nhận giao & Thu tiền</>}
                                     </button>
                                 )}
 
-                                {selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
-                                    <button onClick={() => handleShipReturn(selectedOrder.id)} disabled={isReturning === selectedOrder.id} className="w-full bg-green-600 hover:bg-green-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isReturning === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CheckCircle/> Xác nhận đã nhận hàng hoàn</>}
+                                {/* --- 4. LẤY HÀNG HOÀN TRẢ (SHIP RETURN) --- */}
+                                {/* Hiển thị khi Khách đã yêu cầu trả hàng (RETURN_REQUESTED) */}
+                                {selectedOrder.decryptedData?.status === 'RETURN_REQUESTED' && (
+                                    <button 
+                                        onClick={() => handleShipReturn(selectedOrder.id)} 
+                                        disabled={isReturning === selectedOrder.id} 
+                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2"
+                                    >
+                                        {isReturning === selectedOrder.id ? (
+                                            <Spinner className="animate-spin" />
+                                        ) : (
+                                            <><Icons.Truck/> Xác nhận đã lấy hàng hoàn (Return Pickup)</>
+                                        )}
                                     </button>
+                                )}
+                                
+                                {/* Trạng thái đang hoàn trả (chỉ hiển thị thông báo) */}
+                                {selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
+                                    <div className="p-3 bg-indigo-50 text-indigo-700 rounded text-center text-sm font-medium border border-indigo-200">
+                                        Đang vận chuyển hàng hoàn về Shop
+                                    </div>
                                 )}
                             </div>
                         </div>

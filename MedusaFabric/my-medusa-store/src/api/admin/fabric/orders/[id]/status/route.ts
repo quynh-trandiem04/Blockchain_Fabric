@@ -12,15 +12,6 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     let orderData: any = null;
 
-    // 1. Thử tìm với ID gốc
-    try {
-        console.log(`[Admin API] Querying: ${orderId}`);
-        // Dùng role 'admin' để query (hoặc 'seller' nếu bạn đang dùng identity seller_admin cho tất cả)
-        orderData = await fabricService.queryOrder(orderId, 'admin');
-    } catch (e) {
-        // Bỏ qua lỗi nếu không tìm thấy
-    }
-
     // BƯỚC 2: Nếu không thấy, thử tìm với suffix "_1" (Logic tách đơn)
     if (!orderData || orderData.error) {
         const splitId = `${orderId}_1`;

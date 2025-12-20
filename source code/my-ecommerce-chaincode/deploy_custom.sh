@@ -9,7 +9,7 @@ set -eu
 
 export CC_NAME="ecommerce"
 export NEW_VERSION="1.0" # PHIÊN BẢN MỚI
-export NEW_SEQUENCE="2"  # SEQUENCE MỚI (PHẢI TĂNG SAU MỖI LẦN THẤT BẠI COMMIT)
+export NEW_SEQUENCE="6"  # SEQUENCE MỚI (LƯU Ý: Nếu lần trước đã Commit SEQ 3 thành công thì phải tăng lên 4)
 export CC_DIR_IN_CLI="/opt/gopath/src/github.com/hyperledger/fabric/peer/" 
 export CHANNEL_NAME="orderchannel"
 export TEMP_SCRIPT="update_temp.sh"
@@ -101,33 +101,30 @@ echo "✅ Đóng gói OK."
 
 
 # --- 4. CÀI ĐẶT (INSTALL) ---
-echo -e "\n--- 4. Cài đặt v\${NEW_VERSION} lên 3 Peer (Timeout 10s) ---"
-export CORE_CONN_TIMEOUT=10s # Tăng thời gian chờ
-
-# Thêm || true để bỏ qua lỗi "Chaincode already installed"
+echo -e "\n--- 4. Cài đặt v\${NEW_VERSION} lên 3 Peer ---"
+# Lưu ý: Cài đặt từng Peer bằng cách switch environment, không dùng --peerAddresses để tránh lỗi kết nối
 echo "  -> Cài đặt lên Peer0 ECommerce..."
 set_env_ecommerce
-peer lifecycle chaincode install \${CC_NAME}_v\${NEW_VERSION}.tar.gz --peerAddresses peer0.ecommerce.com:7051 --tlsRootCertFiles \${CORE_PEER_TLS_ROOTCERT_FILE} --connTimeout 10s || true
+peer lifecycle chaincode install \${CC_NAME}_v\${NEW_VERSION}.tar.gz
 
 echo "  -> Cài đặt lên Peer0 Seller..."
 set_env_seller
-peer lifecycle chaincode install \${CC_NAME}_v\${NEW_VERSION}.tar.gz --peerAddresses peer0.seller.com:9051 --tlsRootCertFiles \${CORE_PEER_TLS_ROOTCERT_FILE} --connTimeout 10s || true
+peer lifecycle chaincode install \${CC_NAME}_v\${NEW_VERSION}.tar.gz
 
 echo "  -> Cài đặt lên Peer0 Shipper..."
 set_env_shipper
-peer lifecycle chaincode install \${CC_NAME}_v\${NEW_VERSION}.tar.gz --peerAddresses peer0.shipper.com:11051 --tlsRootCertFiles \${CORE_PEER_TLS_ROOTCERT_FILE} --connTimeout 10s || true
+peer lifecycle chaincode install \${CC_NAME}_v\${NEW_VERSION}.tar.gz
 echo "✅ Install OK."
 
 
 # --- 5. LẤY PACKAGE ID MỚI ---
 set_env_ecommerce # Dùng Peer ECommerce để Query
-
-# Lọc: Query ra plain text, tìm dòng chứa Label mới, trích xuất ID (trường thứ 3)
-export CC_PACKAGE_ID=\$(peer lifecycle chaincode queryinstalled 2>&1 | grep "Label: \${CC_NAME}_\${NEW_VERSION}" | awk -F'[, ]' '{print \$3}' | head -n 1)
+# Sử dụng SED để lấy ID chính xác, tránh lỗi định dạng
+export CC_PACKAGE_ID=\$(peer lifecycle chaincode queryinstalled | grep "Label: \${CC_NAME}_\${NEW_VERSION}" | sed -n 's/.*Package ID: \(.*\), Label:.*/\1/p')
 
 echo "  -> Package ID mới: \${CC_PACKAGE_ID}"
 if [ -z "\${CC_PACKAGE_ID}" ]; then
-    echo "LỖẼI: Không lấy được Package ID. Dừng lại."
+    echo "LỖI: Không lấy được Package ID. Dừng lại."
     exit 1
 fi
 
@@ -152,15 +149,8 @@ set_env_ecommerce # Sử dụng Admin ECommerce để ký Commit
 # SỬA LỖI QUAN TRỌNG: Xóa Hostname Override để CLI có thể kết nối nhiều Peer khác nhau
 unset CORE_PEER_TLS_SERVERHOSTOVERRIDE
 
-PEER_ADDRESSES="peer0.ecommerce.com:7051 peer0.seller.com:9051 peer0.shipper.com:11051"
-PEER_TLS_ROOT_CERTS_FILES="\${CC_DIR}organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com/tls/ca.crt \${CC_DIR}organizations/peerOrganizations/seller.com/peers/peer0.seller.com/tls/ca.crt \${CC_DIR}organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com/tls/ca.crt"
-
-COMMIT_ARGS=""
-for PEER_ADDR in \${PEER_ADDRESSES}; do
-    PEER_NAME=\$(echo \${PEER_ADDR} | cut -d':' -f1)
-    CERT_FILE=\$(echo \${PEER_TLS_ROOT_CERTS_FILES} | tr ' ' '\n' | grep \${PEER_NAME} | head -n 1) 
-    COMMIT_ARGS+="--peerAddresses \${PEER_ADDR} --tlsRootCertFiles \${CERT_FILE} "
-done
+# Định nghĩa cứng các tham số Peer để tránh lỗi vòng lặp
+PEER_CONN_PARAMS="--peerAddresses peer0.ecommerce.com:7051 --tlsRootCertFiles \${CC_DIR}organizations/peerOrganizations/ecommerce.com/peers/peer0.ecommerce.com/tls/ca.crt --peerAddresses peer0.seller.com:9051 --tlsRootCertFiles \${CC_DIR}organizations/peerOrganizations/seller.com/peers/peer0.seller.com/tls/ca.crt --peerAddresses peer0.shipper.com:11051 --tlsRootCertFiles \${CC_DIR}organizations/peerOrganizations/shipper.com/peers/peer0.shipper.com/tls/ca.crt"
 
 peer lifecycle chaincode commit -o orderer0.example.com:7050 \
   --ordererTLSHostnameOverride orderer0.example.com \
@@ -174,25 +164,17 @@ peer lifecycle chaincode commit -o orderer0.example.com:7050 \
   --sequence \${NEW_SEQUENCE} \
   --init-required \
   --clientauth \
-  --waitForEventTimeout 60s \
-  \${COMMIT_ARGS}
+  \${PEER_CONN_PARAMS}
 
+echo "✅ Commit OK."
 
 # --- 8. KHỞI TẠO (INVOKE INIT) ---
 echo -e "\n--- 8. Khởi tạo Chaincode (Invoke InitLedger) ---"
-set_env_ecommerce # Dùng Peer ECommerce để gọi
-
-# BẮT BUỘC: Xóa Hostname Override trước Invoke (lỗi giống Commit)
+set_env_ecommerce 
 unset CORE_PEER_TLS_SERVERHOSTOVERRIDE
 
-# Xây dựng peerAddresses cho Invoke
-INVOKE_PEER_ARGS=""
-for PEER_ADDR in \${PEER_ADDRESSES}; do
-    PEER_NAME=\$(echo \${PEER_ADDR} | cut -d':' -f1)
-    CERT_FILE=\$(echo \${PEER_TLS_ROOT_CERTS_FILES} | tr ' ' '\n' | grep \${PEER_NAME} | head -n 1)
-    INVOKE_PEER_ARGS+="--peerAddresses \${PEER_ADDR} --tlsRootCertFiles \${CERT_FILE} "
-done
-
+# Sử dụng cùng tham số kết nối như Commit để đảm bảo đồng thuận
+# Thêm || true để bỏ qua lỗi nếu Chaincode đã được Init rồi
 peer chaincode invoke -o orderer0.example.com:7050 \
   --ordererTLSHostnameOverride orderer0.example.com \
   --tls \
@@ -201,9 +183,9 @@ peer chaincode invoke -o orderer0.example.com:7050 \
   --keyfile \${CORE_PEER_TLS_CLIENTKEY_FILE} \
   --channelID \${CHANNEL_NAME} \
   --name \${CC_NAME} \
-  \${INVOKE_PEER_ARGS} \
+  \${PEER_CONN_PARAMS} \
   --isInit \
-  -c '{"Args":["InitLedger"]}'
+  -c '{"Args":["InitLedger"]}' || true
 
 echo "✅ Chaincode đã được khởi tạo thành công (InitLedger invoked)."
 
@@ -223,3 +205,4 @@ rm -f ${TEMP_SCRIPT}
 echo "====================================================="
 echo "  TRIỂN KHAI HOÀN TẤT!"
 echo "====================================================="
+

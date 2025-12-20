@@ -1,8 +1,9 @@
 // src/api/middlewares.ts
 
 import { defineMiddlewares } from "@medusajs/medusa";
-import { MedusaRequest, MedusaResponse, MedusaNextFunction } from "@medusajs/framework/http";
+import { MedusaRequest, MedusaResponse, MedusaNextFunction } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
+import { NextFunction } from "express";
 
 const ALLOWED_ADMIN_ROLES = ['ecommerceplatformorgmsp']; 
 const SELLER_ROLE = 'sellerorgmsp';
@@ -101,8 +102,35 @@ export default defineMiddlewares({
     {
       matcher: "/store/market/seller-me",
       method: "GET",
-      middlewares: [], // Không dùng middleware auth mặc định
-      auth: false,     // Tắt check auth của framework
+      middlewares: [], 
+      auth: false, // Bypass Auth
+    },
+    {
+      // Áp dụng cho tất cả các route fabric
+      matcher: "/store/fabric/*",
+      method: ["POST", "GET", "OPTIONS"], // Áp dụng cho cả OPTIONS
+      middlewares: [
+        // Middleware xử lý CORS cho OPTIONS request
+        (req: MedusaRequest, res: MedusaResponse, next: NextFunction) => {
+          // Xử lý CORS headers cho mọi request (bao gồm cả POST/GET sau này)
+          const origin = (req.headers.origin as string) || "*";
+          
+          res.set("Access-Control-Allow-Origin", origin);
+          res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+          res.set("Access-Control-Allow-Headers", "Content-Type, Authorization, x-publishable-api-key, X-Requested-With");
+          res.set("Access-Control-Allow-Credentials", "true");
+
+          // Nếu là OPTIONS request -> Trả về 204 ngay lập tức
+          if (req.method === "OPTIONS") {
+            res.sendStatus(204);
+            return;
+          }
+          next();
+        },
+      ],
+      // 🔥 QUAN TRỌNG: Tắt Authentication của Medusa framework cho route này
+      // Để ta tự xử lý Auth trong route handler hoặc middleware riêng
+      auth: false, 
     },
   ],
 });
