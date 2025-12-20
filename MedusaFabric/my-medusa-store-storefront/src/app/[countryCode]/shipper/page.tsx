@@ -234,7 +234,7 @@ export default function ShipperDashboard() {
           })
 
           if (!res.ok) {
-              console.warn("Token không hợp lệ hoặc hết hạn.");
+              console.warn("Token invalid or expired.");
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
               setIsAuthorized(false);
@@ -248,22 +248,22 @@ export default function ShipperDashboard() {
           console.log(`   -> User Role: ${role} | Status: ${status}`);
 
           if (role !== 'shipperorgmsp') {
-              alert("Tài khoản này không phải là Shipper.");
+              alert("This account does not have SHIPPER access.");
               setIsAuthorized(false);
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
           } else if (status === 'pending') {
-              alert("Tài khoản đang chờ Admin phê duyệt.");
+              alert("This account is still pending approval.");
               setIsAuthorized(false);
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
           } else if (status === 'rejected') {
-              alert("Tài khoản đã bị từ chối.");
+              alert("This account has been rejected.");
               setIsAuthorized(false);
               localStorage.removeItem("medusa_token");
               setIsLoggedIn(false);
           } else {
-              console.log(`   ✅ [ALLOW] Quyền hợp lệ.`);
+            //   console.log(`  [ALLOW] Quyền hợp lệ.`);
               setIsAuthorized(true)
               setCurrentUser(user);
               
@@ -277,7 +277,7 @@ export default function ShipperDashboard() {
               loadShipperOrders(token);
           }
       } catch (e) { 
-          console.error("Lỗi kết nối Auth:", e);
+          console.error("Connection error:", e);
           setIsAuthorized(false);
           localStorage.removeItem("medusa_token");
           setIsLoggedIn(false);
@@ -302,11 +302,11 @@ export default function ShipperDashboard() {
         setIsLoggedIn(true)
         checkUserRole(data.token);
       } else {
-        setLoginError("Đăng nhập thất bại.")
+        setLoginError("Login failed.")
         setIsLoadingLogin(false)
       }
     } catch (err) { 
-        setLoginError("Lỗi kết nối.")
+        setLoginError("Connection error.")
         setIsLoadingLogin(false) 
     } 
   }
@@ -317,15 +317,15 @@ export default function ShipperDashboard() {
 
   // ==> A. HÀM SHIP ORDER (Lấy hàng từ Seller)
   const handleShipOrder = async (orderId: string) => {
-      if(!confirm("Xác nhận đã nhận hàng từ Seller và bắt đầu giao?")) return;
+      if(!confirm("Confirm that the order has been successfully picked up from the seller and shipping has started?")) return;
       
       setIsShipping(orderId);
       const token = localStorage.getItem("medusa_token");
       const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
-      console.log("🔑 Debug API Key:", publishableKey); 
+    //   console.log("🔑 Debug API Key:", publishableKey); 
 
       if (!publishableKey) {
-        alert("Lỗi Config: Thiếu Publishable API Key trong file .env");
+        // alert("Lỗi Config: Thiếu Publishable API Key trong file .env");
         return;
       }
       
@@ -342,14 +342,14 @@ export default function ShipperDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-              alert("Đã xác nhận lấy hàng thành công!");
+              alert("Confirmed: Shipping started!");
               loadShipperOrders(token || "");
               if (selectedOrder?.id === orderId) setSelectedOrder(null);
           } else {
-              alert("Thất bại: " + (result.message || result.error || "Lỗi không xác định"));
+              alert("Error: " + (result.message || result.error || "Unknown error"));
           }
       } catch (err) { 
-          alert("Lỗi kết nối server");
+          alert("Connection error.");
       } finally { 
           setIsShipping(null); 
       }
@@ -360,7 +360,7 @@ export default function ShipperDashboard() {
     // Xác định endpoint dựa trên loại đơn (COD dùng endpoint riêng để trigger update codStatus)
     const endpoint = isCod ? 'cod-deliver' : 'deliver';
     
-    if (!confirm(`Xác nhận đã giao hàng thành công? ${isCod ? '(Và đã thu tiền COD)' : ''}`)) return;
+    if (!confirm(`Confirm that the order has been successfully delivered? ${isCod ? '(And COD has been collected)' : ''}`)) return;
     
     setIsDelivering(orderId);
     const token = localStorage.getItem("medusa_token");
@@ -377,13 +377,13 @@ export default function ShipperDashboard() {
         
         const result = await res.json();
         if (res.ok) {
-            alert("Giao hàng thành công!");
+            alert("Delivery confirmed!");
             loadShipperOrders(token || "");
             if (selectedOrder?.id === orderId) setSelectedOrder(null);
         } else {
-            alert("❌ Lỗi: " + (result.error || "Thất bại"));
+            alert("❌ Error: " + (result.error || "Failed"));
         }
-    } catch (err) { alert("Lỗi kết nối server"); } 
+    } catch (err) { alert("Connection error."); } 
     finally { setIsDelivering(null); }
   }
 
@@ -436,7 +436,7 @@ export default function ShipperDashboard() {
           });
 
           if (res.ok) {
-              alert("Cập nhật thông tin thành công!");
+              alert("Successfully updated settings.");
               setCurrentUser({
                   ...currentUser,
                   metadata: {
@@ -448,10 +448,10 @@ export default function ShipperDashboard() {
               });
           } else {
               const err = await res.json();
-              alert("Lỗi: " + (err.message || "Không thể cập nhật"));
+              alert("Error: " + (err.message || "Failed to update"));
           }
       } catch (err) {
-          alert("Lỗi kết nối.");
+          alert("Connection error.");
       } finally {
           setIsSavingSettings(false);
       }
@@ -471,9 +471,9 @@ export default function ShipperDashboard() {
                 "x-publishable-api-key": publishableKey
             }
         })
-        console.log("Orders Res:", ordersRes);
+        // console.log("Orders Res:", ordersRes);
         if (!ordersRes.ok) { 
-            console.error("Lỗi lấy danh sách đơn hàng");
+            console.error("Failed to fetch shipper orders.");
             setIsLoadingData(false); 
             return 
         }
@@ -517,19 +517,14 @@ export default function ShipperDashboard() {
                 row.decryptedData = data
                 
                 if (data) {
-                    // 🔥 FIX LỖI & MAP DỮ LIỆU ĐẦY ĐỦ 🔥
-                    // Thay vì gán từng dòng (gây lỗi null), ta gán nguyên object
                     row.decryptedData = {
                         customerName: data.customerName,
                         shipping_address: data.shipping_address,
                         
-                        // Map số điện thoại (Backend trả về 'phone', Frontend dùng 'shipping_phone')
                         shipping_phone: data.phone || data.shipping_phone || "",
                         
-                        // Map phí ship (Backend trả về 'shipping_fee' hoặc 'shipping_total')
                         shipping_fee: data.shipping_fee || data.shipping_total || 0,
                         
-                        // Map tiền COD
                         cod_amount: data.cod_amount || 0,
                         
                         status: data.status,
@@ -538,7 +533,6 @@ export default function ShipperDashboard() {
                         sellerCompanyID: data.sellerCompanyID
                     };
 
-                    // Cập nhật dữ liệu hiển thị bên ngoài bảng (Public Data)
                     row.publicData.email = data.customerName; 
                     row.publicData.status = data.status;
                 }
@@ -582,13 +576,13 @@ export default function ShipperDashboard() {
       return (
           <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
             <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md border border-red-100">
-                <h1 className="text-2xl font-bold text-red-600 mb-2">TRUY CẬP BỊ TỪ CHỐI</h1>
+                <h1 className="text-2xl font-bold text-red-600 mb-2">ACCESS DENIED</h1>
                 <p className="text-gray-600 mb-6">
-                    Tài khoản này không có quyền truy cập trang <b>SHIPPER</b>.
-                    <br/>Vui lòng liên hệ Admin hoặc đăng nhập tài khoản khác.
+                    This account does not have access to the <b>SHIPPER</b> page.
+                    <br/>Please contact Admin or log in with another account.
                 </p>
                 <button onClick={handleLogout} className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-bold transition">
-                    Đăng xuất
+                    Logout
                 </button>
             </div>
           </div>
@@ -601,9 +595,9 @@ export default function ShipperDashboard() {
         <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
             <div className="text-center mb-8">
             <h2 className="text-2xl font-bold mt-2 text-gray-800">
-                Cổng Vận Chuyển
+                Shipper Portal
             </h2>
-            <p className="text-gray-500 text-sm">Đăng nhập để nhận đơn hàng</p>
+            <p className="text-gray-500 text-sm">Login to receive orders</p>
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5">
@@ -635,9 +629,9 @@ export default function ShipperDashboard() {
             </form>
             <div className="text-center mt-6">
             <p className="text-sm text-gray-600">
-                Chưa có tài khoản?
+                Don't have a shipper account?
                 <a href="http://localhost:8000/dk/shipper/register" className="ml-1 text-orange-600 font-semibold hover:underline">
-                Đăng ký ngay
+                Register now
                 </a>
             </p>
             </div>
@@ -664,16 +658,16 @@ export default function ShipperDashboard() {
 
                 <nav className="flex-1 p-4 space-y-1">
                     <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                        <Icons.Box /> Đơn hàng
+                        <Icons.Box /> Orders
                     </button>
                     <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                        <Icons.Settings /> Cấu hình đơn vị
+                        <Icons.Settings /> Unit Configuration
                     </button>
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
                     <button onClick={handleLogout} className="w-full px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-medium transition flex items-center justify-center gap-2">
-                        <ArrowRightOnRectangle /> Đăng xuất
+                        <ArrowRightOnRectangle /> Logout
                     </button>
                 </div>
             </aside>
@@ -686,11 +680,11 @@ export default function ShipperDashboard() {
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="flex justify-between items-end mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Quản lý Vận chuyển</h2>
-                                <p className="text-sm text-gray-500 mt-1">Danh sách đơn hàng được phân công</p>
+                                <h2 className="text-2xl font-bold text-gray-900">Order Management</h2>
+                                <p className="text-sm text-gray-500 mt-1">List of assigned orders</p>
                             </div>
                             <button onClick={() => loadShipperOrders()} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium shadow-sm transition flex items-center gap-2">
-                                <span className={isLoadingData ? "animate-spin" : ""}>⟳</span> Làm mới
+                                <span className={isLoadingData ? "animate-spin" : ""}>⟳</span>
                             </button>
                         </div>
 
@@ -701,7 +695,7 @@ export default function ShipperDashboard() {
                                 <div className="relative flex-1 max-w-md">
                                     <span className="absolute left-3 top-2.5 text-gray-400"><MagnifyingGlass /></span>
                                     <input
-                                        placeholder="Tìm kiếm (Mã đơn, Email, SĐT)..."
+                                        placeholder="Search (Order ID, Email, Phone)..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
@@ -716,12 +710,17 @@ export default function ShipperDashboard() {
                                         onChange={(e) => setStatusFilter(e.target.value)}
                                         className="border-none bg-transparent text-sm font-medium text-gray-700 cursor-pointer focus:ring-0 outline-none hover:text-orange-600 transition"
                                     >
-                                        <option value="ALL">Tất cả trạng thái</option>
-                                        <option value="CREATED">Chờ lấy hàng (Created)</option>
-                                        <option value="SHIPPED">Đang giao (Shipped)</option>
-                                        <option value="DELIVERED">Đã giao (Delivered)</option>
-                                        <option value="RETURN_REQUESTED">Yêu cầu hoàn trả</option>
-                                        <option value="RETURN_IN_TRANSIT">Đang hoàn trả</option>
+                                        <option value="ALL">All statuses</option>
+                                        <option value="CREATED">Created</option>
+                                        <option value="PAID">Paid</option>
+                                        <option value="SHIPPED">Shipped</option>
+                                        <option value="DELIVERED">Delivered</option>
+                                        <option value="RETURN_REQUESTED">Return Requested</option>
+                                        <option value="RETURN_IN_TRANSIT">Return In Transit)</option>
+                                        <option value="DELIVERED_COD_PENDING">Delivered (COD Pending)</option>
+                                        <option value="COD_REMITTED">COD Remitted</option>
+                                        <option value="SETTLED">Settled</option>
+                                        <option value="CANCELLED">Cancelled</option>
                                     </select>
                                 </div>
                             </div>
@@ -732,15 +731,15 @@ export default function ShipperDashboard() {
                                     onClick={() => setShowSortMenu(!showSortMenu)}
                                     className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 gap-2 shadow-sm transition"
                                 >
-                                    <Icons.Sort /> Sắp xếp
+                                    <Icons.Sort /> Sort By
                                 </button>
                                 {showSortMenu && (
                                     <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 animate-in fade-in zoom-in duration-100">
-                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b">Tiêu chí</div>
+                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b"></div>
                                         {[
-                                            { label: 'Ngày tạo', key: 'created_at' },
-                                            { label: 'Mã đơn', key: 'display_id' },
-                                            { label: 'Cập nhật cuối', key: 'updated_at' }
+                                            { label: 'Created date', key: 'created_at' },
+                                            // { label: 'Order ID', key: 'display_id' },
+                                            { label: 'Last updated', key: 'updated_at' }
                                         ].map((item) => (
                                             <div
                                                 key={item.key}
@@ -751,7 +750,7 @@ export default function ShipperDashboard() {
                                             </div>
                                         ))}
                                         <div className="h-px bg-gray-100 my-1"></div>
-                                        {[ { label: 'Mới nhất / Giảm dần', dir: 'desc' }, { label: 'Cũ nhất / Tăng dần', dir: 'asc' } ].map((item) => (
+                                        {[ { label: 'Newest / Descending', dir: 'desc' }, { label: 'Oldest / Ascending', dir: 'asc' } ].map((item) => (
                                             <div
                                                 key={item.dir}
                                                 onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }}
@@ -770,11 +769,11 @@ export default function ShipperDashboard() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        <th className="px-6 py-4">Mã đơn</th>
-                                        <th className="px-6 py-4">Ngày tạo</th>
-                                        <th className="px-6 py-4">Khách hàng</th>
-                                        <th className="px-6 py-4">Trạng thái</th>
-                                        <th className="px-6 py-4 text-right">Phí Ship / COD</th>
+                                        <th className="px-6 py-4">Order ID</th>
+                                        <th className="px-6 py-4">Created date</th>
+                                        <th className="px-6 py-4">Customer</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Shipping / COD Fee</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -817,8 +816,8 @@ export default function ShipperDashboard() {
                 {/* TAB SETTINGS */}
                 {activeTab === 'settings' && (
                     <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Cấu hình Đơn vị Vận chuyển</h2>
-                        <p className="text-gray-500 mb-8">Thông tin này sẽ được hiển thị cho khách hàng khi chọn phương thức vận chuyển.</p>
+                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Carrier setting</h2>
+                        <p className="text-gray-500 mb-8">This information will be displayed to customers when selecting a shipping method.</p>
 
                         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
                             <form onSubmit={handleSaveSettings} className="space-y-6">
@@ -829,24 +828,24 @@ export default function ShipperDashboard() {
                                         value={settingsForm.carrier_name}
                                         onChange={(e) => setSettingsForm({ ...settingsForm, carrier_name: e.target.value })}
                                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition"
-                                        placeholder="Ví dụ: Giao Hàng Nhanh"
+                                        placeholder="Ex: FastExpress Logistics"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Số điện thoại liên hệ</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone number</label>
                                     <input
                                         type="text"
                                         value={settingsForm.phone}
                                         onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
                                         className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition"
-                                        placeholder="Hotline hỗ trợ"
+                                        placeholder="Support Phone Number"
                                     />
                                 </div>
 
                                 {/* ========= NEW: SHIPPING FEE ========= */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phí Vận Chuyển Mặc Định</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Fee</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                                             <CurrencyDollar />
@@ -859,12 +858,12 @@ export default function ShipperDashboard() {
                                             placeholder="10"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">Phí này sẽ được áp dụng cho tất cả đơn hàng sử dụng dịch vụ của bạn.</p>
+                                    <p className="text-xs text-gray-500 mt-1">This fee will be applied to all orders using your shipping service.</p>
                                 </div>
                                 {/* ===================================== */}
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email (Không thể sửa)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email (Cannot be edited)</label>
                                     <input
                                         type="email"
                                         value={settingsForm.email}
@@ -879,7 +878,7 @@ export default function ShipperDashboard() {
                                         disabled={isSavingSettings}
                                         className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg shadow-sm transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                                     >
-                                        {isSavingSettings ? <><Spinner className="animate-spin w-4 h-4"/> Đang lưu...</> : "Lưu thay đổi"}
+                                        {isSavingSettings ? <><Spinner className="animate-spin w-4 h-4"/> Saving...</> : "Save changes"}
                                     </button>
                                 </div>
                             </form>
@@ -896,7 +895,7 @@ export default function ShipperDashboard() {
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
                         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                             <div>
-                                <h3 className="font-bold text-lg text-gray-900">Đơn hàng {selectedOrder.display_id}</h3>
+                                <h3 className="font-bold text-lg text-gray-900">Order {selectedOrder.display_id}</h3>
                                 <p className="text-xs text-gray-500">{selectedOrder.created_at}</p>
                             </div>
                             <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-700 transition"><XMark /></button>
@@ -904,7 +903,7 @@ export default function ShipperDashboard() {
                         <div className="p-6 max-h-[70vh] overflow-y-auto">
                             {/* Customer */}
                             <div className="mb-6 bg-orange-50 p-4 rounded-lg border border-orange-100">
-                                <p className="text-sm font-bold text-black-900 mb-1">Khách hàng</p>
+                                <p className="text-sm font-bold text-black-900 mb-1">Customer</p>
                                 <p className="text-sm text-black-800">{selectedOrder.decryptedData?.customerName}</p>
                                 {/* Display Phone Number */}
                                     {selectedOrder.decryptedData?.shipping_phone && (
@@ -919,12 +918,20 @@ export default function ShipperDashboard() {
                             {/* Totals */}
                             <div className="border-t border-gray-200 pt-4 space-y-1 text-sm">
                                 <div className="flex justify-between text-gray-600">
-                                    <span>Phí vận chuyển</span>
+                                    <span>Shipping Fee</span>
                                     <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
                                 </div>
                                 <div className="flex justify-between text-gray-600">
-                                    <span>Thu hộ (COD)</span>
-                                    <span>{formatPrice(selectedOrder.decryptedData?.cod_amount, selectedOrder.publicData.currency_code)}</span>
+                                    <span>Cash on Delivery (COD)</span>
+                                    <span>
+                                    {formatPrice(
+                                        selectedOrder.decryptedData?.paymentMethod === "COD"
+                                        ? (selectedOrder.decryptedData?.cod_amount || 0) -
+                                            (selectedOrder.decryptedData?.shipping_fee || 0)
+                                        : 0,
+                                        selectedOrder.publicData.currency_code
+                                    )}
+                                    </span>
                                 </div>
                             </div>
 
@@ -946,7 +953,7 @@ export default function ShipperDashboard() {
                                         {isShipping === selectedOrder.id ? (
                                             <Spinner className="animate-spin" />
                                         ) : (
-                                            <><Icons.Truck/> Xác nhận đã lấy hàng (Ship)</>
+                                            <><Icons.Truck/> Confirm pickup (Ship)</>
                                         )}
                                     </button>
                                 )}
@@ -954,14 +961,14 @@ export default function ShipperDashboard() {
                                 {/* BUTTON 2: GIAO HÀNG THÀNH CÔNG (PREPAID) */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' && (
                                     <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Xác nhận giao hàng</>}
+                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Confirm delivery</>}
                                     </button>
                                 )}
                                 
                                 {/* BUTTON 3: GIAO HÀNG & THU TIỀN (COD) */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'SHIPPED' && (
                                     <button onClick={() => handleConfirmDelivery(selectedOrder.id, true)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CurrencyDollar/> Xác nhận giao & Thu tiền</>}
+                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CurrencyDollar/> Confirm delivery & Collect payment</>}
                                     </button>
                                 )}
 
@@ -976,7 +983,7 @@ export default function ShipperDashboard() {
                                         {isReturning === selectedOrder.id ? (
                                             <Spinner className="animate-spin" />
                                         ) : (
-                                            <><Icons.Truck/> Xác nhận đã lấy hàng hoàn (Return Pickup)</>
+                                            <><Icons.Truck/> Confirm pickup (Return Pickup)</>
                                         )}
                                     </button>
                                 )}
@@ -984,7 +991,7 @@ export default function ShipperDashboard() {
                                 {/* Trạng thái đang hoàn trả (chỉ hiển thị thông báo) */}
                                 {selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
                                     <div className="p-3 bg-indigo-50 text-indigo-700 rounded text-center text-sm font-medium border border-indigo-200">
-                                        Đang vận chuyển hàng hoàn về Shop
+                                        Return pickup is in transit...
                                     </div>
                                 )}
                             </div>

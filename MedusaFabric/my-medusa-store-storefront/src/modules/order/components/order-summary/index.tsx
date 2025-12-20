@@ -23,7 +23,7 @@ const OrderSummary = ({ order }: OrderSummaryProps) => {
       <div className="text-small-regular text-ui-fg-base my-2">
         <div className="flex items-center justify-between text-base-regular text-ui-fg-base mb-2">
           <span>Subtotal</span>
-          <span>{getAmount(order.subtotal)}</span>
+          <span>{getAmount(order.subtotal - order.shipping_total)}</span>
         </div>
         <div className="flex flex-col gap-y-1">
           {order.discount_total > 0 && (

@@ -1,13 +1,16 @@
 // src/admin/widgets/blockchain-order-list.tsx
 
 import { defineWidgetConfig } from "@medusajs/admin-sdk";
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo, useRef, useLayoutEffect } from "react";
 import React from "react";
 import { 
     Heading, StatusBadge, Badge, Text, Drawer, 
-    Button, toast 
+    Button, toast, Container, Toaster
 } from "@medusajs/ui";
-import { Spinner, Photo, Envelope, CurrencyDollar } from "@medusajs/icons"; 
+import { 
+    Spinner, Photo, Envelope, CurrencyDollar, 
+    MagnifyingGlass, Funnel, Clock 
+} from "@medusajs/icons"; 
 
 // --- 1. Error Boundary ---
 const ErrorBoundary = ({ children }: { children: React.ReactNode }) => {
@@ -30,7 +33,7 @@ const getStatusStyle = (status: string) => {
   }
 };
 
-// --- 3. Icons ---
+// --- 3. Icons Custom ---
 const Icons = {
   Sort: () => (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -48,18 +51,17 @@ const Icons = {
   )
 };
 
-// --- 4. Sub-Component: Order Drawer ---
+// --- 4. Order Drawer ---
 const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder: any, onClose: () => void, onRefresh: () => void }) => {
     const [medusaOrder, setMedusaOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const [isRemitting, setIsRemitting] = useState(false); // State loading cho nút Remit
+    const [isRemitting, setIsRemitting] = useState(false);
 
     const originalId = blockchainOrder.blockchain_id.replace(/_\d+$/, '');
 
     useEffect(() => {
         const fetchMedusaOrder = async () => {
             try {
-                // Chỉ lấy chi tiết đơn hàng gốc từ DB
                 const res = await fetch(`/admin/orders/${originalId}`, { credentials: "include" });
                 const data = await res.json();
                 setMedusaOrder(data.order);
@@ -70,16 +72,13 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
             }
         };
         fetchMedusaOrder();
-        
     }, [originalId]);
 
-    // Hàm gọi API Remit
     const handleRemitCOD = async () => {
         if (!confirm("Xác nhận đã nhận đủ tiền COD từ đơn vị vận chuyển?")) return;
         
         setIsRemitting(true);
         try {
-            // Gọi API Remit với ID blockchain
             const res = await fetch(`/admin/fabric/orders/${blockchainOrder.blockchain_id}/remit`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -92,7 +91,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                 onRefresh();
                 onClose();
             } else {
-                toast.error("ERROR: " + (result.message || "FALIED to remit COD payment."));
+                toast.error("ERROR: " + (result.message || "FAILED to remit COD payment."));
             }
         } catch (e) {
             console.error(e);
@@ -102,7 +101,6 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
         }
     };
 
-    // Lọc sản phẩm theo Seller
     const subOrderItems = useMemo(() => {
         if (!medusaOrder || !medusaOrder.items) return [];
         return medusaOrder.items.filter((item: any) => {
@@ -111,14 +109,8 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
         });
     }, [medusaOrder, blockchainOrder.seller_id]);
 
-    // --- LOGIC TÍNH TOÁN ---
-    
-    // 1. Tiền hàng (Subtotal)
     const subTotalItems = subOrderItems.reduce((sum: number, item: any) => sum + (item.unit_price * item.quantity), 0);
-    
-    // 2. Phí ship gốc từ DB (Original Total Shipping)
     const originalShippingFee = medusaOrder?.shipping_total || 0;
-
     const currencyCode = medusaOrder?.currency_code?.toUpperCase() || "USD";
 
     const formatMoney = (amount: number) => {
@@ -145,30 +137,26 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                     <Text size="small" className="font-mono text">{blockchainOrder.blockchain_id}</Text>
                                 </div>
                                 
-                                {/* SELLER INFO */}
                                 <div className="flex justify-between items-start pt-2 border-t border-ui-border-base">
                                     <Text size="small" className="text-ui-fg-subtle">Shop (Seller)</Text>
                                     <div className="flex flex-col items-end">
-                                    <Text size="small" className="font-medium">{blockchainOrder.seller_id}</Text>
+                                        <Text size="small" className="font-medium">{blockchainOrder.seller_id}</Text>
                                         <div className="flex items-center gap-1 text-[10px] text-ui-fg-muted">
                                             <Envelope className="w-3 h-3"/> 
-                                            {/* 🔥 HIỂN THỊ TRỰC TIẾP TỪ PROP 🔥 */}
                                             {blockchainOrder.seller_email || "No Email"}
                                         </div>
                                     </div>
                                 </div>
                                 
-                                {/* SHIPPER INFO */}
                                 <div className="flex justify-between items-start pt-2 border-t border-ui-border-base">
                                     <Text size="small" className="text-ui-fg-subtle">Shipper (Carrier)</Text>
                                     <div className="flex flex-col items-end">
-                                    <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1">
                                             <span className="h-2 w-2 rounded-full"></span>
                                             <Text size="small" className="font-medium">{blockchainOrder.shipper_id || "Unknown"}</Text>
                                         </div>
                                         <div className="flex items-center gap-1 text-[10px] text-ui-fg-muted">
                                             <Envelope className="w-3 h-3"/> 
-                                            {/* 🔥 HIỂN THỊ TRỰC TIẾP TỪ PROP 🔥 */}
                                             {blockchainOrder.shipper_email || "No Email"}
                                         </div>
                                     </div>
@@ -180,7 +168,15 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                         {blockchainOrder.status}
                                     </StatusBadge>
                                 </div>
-                                <div className="flex justify-between items-center">
+                                <div className="flex justify-between items-center pt-2 border-t border-ui-border-base">
+                                    <Text size="small" className="text-ui-fg-subtle">Last Updated</Text>
+                                    <Text size="small" className="font-medium font-mono">
+                                        {blockchainOrder.updated_at 
+                                            ? new Date(blockchainOrder.updated_at).toLocaleString('en-GB') 
+                                            : new Date(blockchainOrder.created_at).toLocaleString('en-GB')}
+                                    </Text>
+                                </div>
+                                <div className="flex justify-between items-center pt-2 border-t border-ui-border-base">
                                     <Text size="small" className="text-ui-fg-subtle">Payment</Text>
                                     <div className="flex gap-1">
                                         <Badge size="small" color={blockchainOrder.payment_method === 'COD' ? 'orange' : 'blue'}>
@@ -245,23 +241,23 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                 </Drawer.Body>
                 <Drawer.Footer className="flex justify-between items-center">
                     <div className="flex gap-2">
-                    <Drawer.Close asChild>
-                        <Button variant="secondary">Close</Button>
-                    </Drawer.Close>
-                    <Button onClick={() => window.open(`/app/orders/${originalId}`, '_blank')}>
+                        <Drawer.Close asChild>
+                            <Button variant="secondary">Close</Button>
+                        </Drawer.Close>
+                        <Button onClick={() => window.open(`/app/orders/${originalId}`, '_blank')}>
                             Original Order
                         </Button>
                     </div>
 
-                    {/* 🔥 NÚT REMIT COD DÀNH CHO ADMIN 🔥 */}
                     {blockchainOrder.payment_method === 'COD' && blockchainOrder.cod_status === 'PENDING_REMITTANCE' && (
                         <Button 
                             variant="primary" 
                             onClick={handleRemitCOD} 
                             isLoading={isRemitting}
+                            className="bg-green-600 hover:bg-green-700 text-white"
                         >
                             <CurrencyDollar /> Confirm COD Payment
-                    </Button>
+                        </Button>
                     )}
                 </Drawer.Footer>
             </Drawer.Content>
@@ -269,7 +265,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
     );
 };
 
-// --- MAIN COMPONENT ---
+// --- MAIN WIDGET COMPONENT ---
 type SortKey = 'blockchain_id' | 'created_at' | 'updated_at';
 type SortDirection = 'asc' | 'desc';
 
@@ -277,20 +273,79 @@ const BlockchainOrderList = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState("");
-  
-  // State quản lý việc mở Drawer chi tiết
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  
+  const widgetRef = useRef<HTMLDivElement>(null);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  const [sortKey, setSortKey] = useState<SortKey>('created_at');
+  
+  // 🔥 Default Sort by Updated At
+  const [sortKey, setSortKey] = useState<SortKey>('updated_at'); 
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
+  
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 10;
 
+  // 🔥🔥🔥 AGGRESSIVE DOM KILLER: ẨN GIAO DIỆN MẶC ĐỊNH 🔥🔥🔥
+  useLayoutEffect(() => {
+    const hideDefaultInterface = () => {
+        const widgetEl = widgetRef.current;
+        if (!widgetEl) return;
+
+        // Đi tìm phần tử cha "Main"
+        let container = widgetEl.parentElement;
+        let mainContainer = null;
+
+        // Traverse up to find the main layout container
+        while (container) {
+            if (container.tagName === 'MAIN' || container.getAttribute('role') === 'main' || container.classList.contains('medusa-admin-layout')) {
+                mainContainer = container;
+                break;
+            }
+            container = container.parentElement;
+        }
+
+        if (mainContainer) {
+            // Lặp qua tất cả con của Main
+            Array.from(mainContainer.children).forEach((child: any) => {
+                // Nếu child KHÔNG PHẢI là container chứa Widget -> Ẩn
+                if (!child.contains(widgetEl)) {
+                    child.style.display = 'none';
+                    child.style.visibility = 'hidden'; // Double kill
+                    child.setAttribute('data-hidden-by-custom-widget', 'true');
+                }
+            });
+        }
+    };
+
+    // 1. Chạy ngay
+    hideDefaultInterface();
+
+    // 2. Chạy liên tục trong 1 giây đầu (phòng trường hợp React re-render)
+    const interval = setInterval(hideDefaultInterface, 50);
+    const timeout = setTimeout(() => clearInterval(interval), 1000);
+
+    // 3. Dùng Observer để canh chừng thay đổi DOM vĩnh viễn
+    const observer = new MutationObserver(() => {
+        hideDefaultInterface();
+    });
+    
+    // Observe body hoặc root để bắt mọi thay đổi
+    const rootEl = document.getElementById('root') || document.body;
+    observer.observe(rootEl, { childList: true, subtree: true });
+
+    return () => {
+        clearInterval(interval);
+        clearTimeout(timeout);
+        observer.disconnect();
+    }
+  }, []);
+
+  // Click outside sort menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (sortMenuRef.current && !sortMenuRef.current.contains(event.target as Node)) {
@@ -301,7 +356,8 @@ const BlockchainOrderList = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-    const fetchData = async () => {
+  // Fetch Data
+  const fetchData = async () => {
       setIsLoading(true);
       try {
         const res = await fetch(`/admin/fabric/orders/list`, {
@@ -309,45 +365,49 @@ const BlockchainOrderList = () => {
         });
         if (res.ok) {
             const data = await res.json();
-                setOrders(data.orders || []);
+            // 🔥 MAP DỮ LIỆU ĐỂ CÓ TRƯỜNG updated_at CHUẨN 🔥
+            const mappedOrders = (data.orders || []).map((o: any) => ({
+                ...o,
+                // Ưu tiên updatedAt (từ Blockchain), fallback về createdAt
+                updated_at: o.updatedAt || o.updated_at || o.created_at
+            }));
+            setOrders(mappedOrders);
         } else {
             setErrorMsg("Lỗi tải dữ liệu Blockchain");
         }
       } catch (e) { setErrorMsg("Lỗi kết nối"); }
       finally { setIsLoading(false); }
-    };
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  // 🔥 LOGIC SORT CẬP NHẬT 🔥
   const processedOrders = useMemo(() => {
       let filtered = orders.filter(o => {
           const status = o.status || "";
           const payment = o.payment_method || "";
           const searchLower = searchQuery.toLowerCase();
-          
-          const matchSearch = 
-            (o.blockchain_id || "").toLowerCase().includes(searchLower) || 
-            (o.seller_id || "").toLowerCase().includes(searchLower);
-
+          const matchSearch = (o.blockchain_id || "").toLowerCase().includes(searchLower) || (o.seller_id || "").toLowerCase().includes(searchLower);
           const matchStatus = statusFilter === "ALL" || status === statusFilter;
           const matchPayment = paymentFilter === "ALL" || payment === paymentFilter;
-
           return matchSearch && matchStatus && matchPayment;
       });
 
       return filtered.sort((a, b) => {
-          let aVal: any;
-          let bVal: any;
+          let aVal: any = 0;
+          let bVal: any = 0;
 
           if (sortKey === 'blockchain_id') {
               aVal = a.blockchain_id;
               bVal = b.blockchain_id;
           } else if (sortKey === 'updated_at') {
-              aVal = a.updated_at ? new Date(a.updated_at).getTime() : new Date(a.created_at).getTime();
-              bVal = b.updated_at ? new Date(b.updated_at).getTime() : new Date(b.created_at).getTime();
+              // Parse ngày tháng an toàn
+              aVal = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+              bVal = b.updated_at ? new Date(b.updated_at).getTime() : 0;
           } else {
+              // created_at
               aVal = new Date(a.created_at).getTime();
               bVal = new Date(b.created_at).getTime();
           }
@@ -359,187 +419,112 @@ const BlockchainOrderList = () => {
   }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
 
   const totalPages = Math.ceil(processedOrders.length / ITEMS_PER_PAGE);
-  const paginatedOrders = processedOrders.slice(
-      (currentPage - 1) * ITEMS_PER_PAGE, 
-      currentPage * ITEMS_PER_PAGE
-  );
-
-  const formatDate = (dateString: string) => {
-      if (!dateString) return "-";
-      return new Date(dateString).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' });
-  };
-
-  if (isLoading) return <div style={{ padding: 40, textAlign: 'center', color: '#6B7280' }}>Loading Blockchain Ledger...</div>;
-  if (errorMsg) return <div style={{ padding: 20, color: 'red' }}>{errorMsg}</div>;
+  const paginatedOrders = processedOrders.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' }) : "-";
 
   return (
     <ErrorBoundary>
-        <div style={{ width: '100%', fontFamily: 'Inter, sans-serif', marginBottom: 50, color: '#111827' }}>
+        <Toaster />
         
-        <style dangerouslySetInnerHTML={{__html: `
-            main h1 { display: none !important; }
-            .medusa-widget-zone ~ div { display: none !important; }
-            main > div > div:nth-child(2) { display: none !important; }
-        `}} />
+        {/* CSS Ẩn Header mặc định (Backup) */}
+        <style>{`
+            h1.inter-xlarge-semibold.text-grey-90 { display: none !important; }
+            .medusa-widget-zone + div { display: none !important; }
+        `}</style>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, marginTop: 8 }}>
-            <div>
-                <h1 style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>Blockchain Ledger</h1>
-                <p style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>Live tracking of split orders from Hyperledger Fabric</p>
-            </div>
-            <Button onClick={fetchData} variant="secondary">Refresh</Button>
-        </div>
+        {/* Gắn ref vào đây để JS tìm cha của nó */}
+        <div ref={widgetRef} className="w-full h-full">
+            <Container className="p-0 overflow-hidden min-h-[600px] border-0 shadow-none">
+                {/* Header Custom */}
+                <div className="p-6 border-b border-ui-border-base flex flex-col md:flex-row md:justify-between md:items-center gap-4 bg-ui-bg-base">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-ui-fg-base m-0">Blockchain Ledger</h1>
+                        <p className="text-sm text-ui-fg-subtle mt-1">Live tracking of split orders from Hyperledger Fabric</p>
+                    </div>
+                    <Button onClick={fetchData} variant="secondary">Refresh</Button>
+                </div>
 
-        <div style={{ background: 'white', border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden', boxShadow: '0 1px 2px 0 rgba(0,0,0,0.05)' }}>
-            
-            {/* TOOLBAR */}
-            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e5e7eb', display: 'flex', gap: 10, alignItems: 'center', background: '#fff' }}>
-                <input 
-                    placeholder="Search ID / Seller..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, width: 220, outline: 'none' }} 
-                />
-                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#f9fafb', cursor: 'pointer' }}>
-                    <option value="ALL">All Status</option>
-                    <option value="CREATED">Created</option>
-                    <option value="PAID">Paid</option>
-                    <option value="SHIPPED">Shipped</option>
-                    <option value="DELIVERED">Delivered</option>
-                    <option value="SETTLED">Settled</option>
-                    <option value="CANCELLED">Cancelled</option>
-                    <option value="RETURNED">Returned</option>
-                </select>
-                <select value={paymentFilter} onChange={(e) => setPaymentFilter(e.target.value)} style={{ padding: '6px 10px', border: '1px solid #e5e7eb', borderRadius: 6, fontSize: 13, background: '#f9fafb', cursor: 'pointer' }}>
-                    <option value="ALL">All Payment</option>
-                    <option value="PREPAID">Prepaid</option>
-                    <option value="COD">COD</option>
-                </select>
-
-                <div style={{ flex: 1 }}></div>
-
-                <div style={{ position: 'relative' }} ref={sortMenuRef}>
-                    <button onClick={() => setShowSortMenu(!showSortMenu)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 32, height: 32, border: '1px solid #e5e7eb', borderRadius: 6, background: 'white', cursor: 'pointer' }}>
-                        <Icons.Sort />
-                    </button>
-                    {showSortMenu && (
-                        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, width: 180, background: 'white', border: '1px solid #e5e7eb', borderRadius: 6, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', zIndex: 50, padding: '4px 0' }}>
-                            <div style={{ padding: '4px 12px', fontSize: 10, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase' }}>Sort By</div>
-                            {[
-                                { label: 'Blockchain ID', key: 'blockchain_id' },
-                                { label: 'Created Date', key: 'created_at' },
-                                { label: 'Updated Date', key: 'updated_at' },
-                            ].map((item) => (
-                                <div key={item.key} onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }} style={{ padding: '6px 12px', fontSize: 13, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: sortKey === item.key ? '#f3f4f6' : 'transparent', color: sortKey === item.key ? '#111827' : '#4B5563' }} onMouseOver={(e) => e.currentTarget.style.background = '#f9fafb'} onMouseOut={(e) => e.currentTarget.style.background = sortKey === item.key ? '#f3f4f6' : 'transparent'}>
-                                    {item.label}
-                                    {sortKey === item.key && <Icons.Check />}
+                {/* Toolbar */}
+                <div className="px-6 py-3 border-b border-ui-border-base flex gap-4 items-center bg-ui-bg-subtle/30">
+                    <div className="relative">
+                        <span className="absolute left-2.5 top-2.5 text-ui-fg-muted"><MagnifyingGlass /></span>
+                        <input placeholder="Search ID / Seller..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-3 py-1.5 text-sm border border-ui-border-base rounded-md focus:outline-none focus:border-ui-fg-interactive w-64"/>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Funnel className="text-ui-fg-muted" />
+                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-sm bg-transparent border border-ui-border-base rounded-md px-2 py-1.5 cursor-pointer">
+                            <option value="ALL">All Status</option><option value="CREATED">Created</option><option value="PAID">Paid</option><option value="SHIPPED">Shipped</option><option value="DELIVERED">Delivered</option><option value="SETTLED">Settled</option><option value="RETURNED">Returned</option>
+                        </select>
+                    </div>
+                    <div className="flex-1"></div>
+                    <div className="relative" ref={sortMenuRef}>
+                        <button onClick={() => setShowSortMenu(!showSortMenu)} className="flex items-center gap-2 px-3 py-1.5 border border-ui-border-base rounded-md bg-ui-bg-base hover:bg-ui-bg-subtle cursor-pointer text-sm">
+                            <Icons.Sort /> Sort
+                        </button>
+                        {showSortMenu && (
+                            <div className="absolute top-full right-0 mt-2 w-48 bg-ui-bg-base border border-ui-border-base rounded-md shadow-lg z-50 py-1">
+                                <div className="px-3 py-2 text-xs font-semibold text-ui-fg-muted bg-ui-bg-subtle border-b border-ui-border-base">Sort By</div>
+                                {/* NÚT CHỌN UPDATED AT */}
+                                <div onClick={() => { setSortKey('updated_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='updated_at' ? 'font-bold' : ''}`}>
+                                    Last Updated {sortKey==='updated_at' && <Icons.Check/>}
                                 </div>
+                                <div onClick={() => { setSortKey('created_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='created_at' ? 'font-bold' : ''}`}>
+                                    Created Date {sortKey==='created_at' && <Icons.Check/>}
+                                </div>
+                                <div className="h-px bg-ui-border-base my-1"></div>
+                                <div onClick={() => { setSortDir('desc'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortDir==='desc' ? 'font-bold' : ''}`}>Newest First {sortDir==='desc' && <Icons.Check/>}</div>
+                                <div onClick={() => { setSortDir('asc'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortDir==='asc' ? 'font-bold' : ''}`}>Oldest First {sortDir==='asc' && <Icons.Check/>}</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-sm">
+                        <thead className="bg-ui-bg-subtle border-b border-ui-border-base">
+                            <tr>
+                                {['Blockchain ID', 'Last Updated', 'Seller', 'Status', 'Payment', 'Info'].map(h => <th key={h} className="px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase">{h}</th>)}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {paginatedOrders.map((o) => (
+                                <tr key={o.blockchain_id} className="border-b border-ui-border-base hover:bg-ui-bg-subtle/50 cursor-pointer" onClick={() => setSelectedOrder(o)}>
+                                    <td className="px-6 py-4 font-mono font-medium">{o.blockchain_id}</td>
+                                    
+                                    {/* CỘT UPDATED AT */}
+                                    <td className="px-6 py-4 text-ui-fg-subtle">
+                                        <div className="flex flex-col">
+                                            <span className="font-medium text-ui-fg-base">{o.updated_at ? new Date(o.updated_at).toLocaleDateString('en-GB') : formatDate(o.created_at)}</span>
+                                            <span className="text-[10px] text-ui-fg-muted">{o.updated_at ? new Date(o.updated_at).toLocaleTimeString('en-GB') : ''}</span>
+                                        </div>
+                                    </td>
+
+                                    <td className="px-6 py-4">{o.seller_id}</td>
+                                    <td className="px-6 py-4"><span className="px-2 py-1 rounded text-xs font-semibold border" style={getStatusStyle(o.status) as any}>{o.status}</span></td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col"><span className="text-xs font-mono">{o.payment_method}</span>{o.payment_method==='COD' && <span className="text-[10px] text-gray-500">{o.cod_status}</span>}</div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right italic text-xs text-ui-fg-muted">View</td>
+                                </tr>
                             ))}
-                            <div style={{ height: 1, background: '#e5e7eb', margin: '4px 0' }}></div>
-                            <div style={{ padding: '4px 12px', fontSize: 10, fontWeight: 600, color: '#9CA3AF', textTransform: 'uppercase' }}>Order</div>
-                            {[
-                                { label: 'Ascending', dir: 'asc' },
-                                { label: 'Descending', dir: 'desc' },
-                            ].map((item) => (
-                                <div key={item.dir} onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }} style={{ padding: '6px 12px', fontSize: 13, cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: sortDir === item.dir ? '#f3f4f6' : 'transparent', color: sortDir === item.dir ? '#111827' : '#4B5563' }} onMouseOver={(e) => e.currentTarget.style.background = '#f9fafb'} onMouseOut={(e) => e.currentTarget.style.background = sortDir === item.dir ? '#f3f4f6' : 'transparent'}>
-                                    {item.label}
-                                    {sortDir === item.dir && <Icons.Check />}
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                            {!isLoading && paginatedOrders.length === 0 && <tr><td colSpan={6} className="px-6 py-12 text-center text-ui-fg-muted">No orders found.</td></tr>}
+                        </tbody>
+                    </table>
                 </div>
-            </div>
 
-            {/* --- TABLE --- */}
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, textAlign: 'left' }}>
-            <thead style={{ background: '#F9FAFB', borderBottom: '1px solid #e5e7eb' }}>
-                <tr>
-                    {['Blockchain ID', 'Date', 'Seller (Shop)', 'Status', 'Payment', 'Info'].map(h => (
-                        <th key={h} style={{ padding: '12px 24px', color: '#6b7280', fontSize: 11, fontWeight: 500, textTransform: 'uppercase' }}>{h}</th>
-                    ))}
-                </tr>
-            </thead>
-            <tbody>
-                {paginatedOrders.map((o) => {
-                    const bStyle = getStatusStyle(o.status);
-                    
-                    return (
-                        <tr key={o.blockchain_id} 
-                            style={{ borderBottom: '1px solid #f3f4f6', cursor: 'pointer', transition: 'background 0.1s' }}
-                            onClick={() => setSelectedOrder(o)}
-                            onMouseOver={(e) => e.currentTarget.style.background = '#F9FAFB'}
-                            onMouseOut={(e) => e.currentTarget.style.background = 'white'}
-                        >
-                            <td style={{ padding: '14px 24px', color: '#374151', fontWeight: 500, fontFamily: 'monospace' }}>{o.blockchain_id}</td>
-                            <td style={{ padding: '14px 24px', color: '#6b7280' }}>{formatDate(o.created_at)}</td>
-                            <td style={{ padding: '14px 24px', color: '#374151' }}>{o.seller_id}</td>
-                            
-                            <td style={{ padding: '14px 24px' }}>
-                                <span style={{ 
-                                    padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600,
-                                    background: bStyle.bg, color: bStyle.color,
-                                    border: `1px solid ${bStyle.border || 'transparent'}`,
-                                    whiteSpace: 'nowrap'
-                                }}>
-                                    {o.status.replace(/_/g, ' ')}
-                                </span>
-                            </td>
-
-                            <td style={{ padding: '14px 24px' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                                    <span style={{ 
-                                        fontFamily: 'monospace', fontSize: 11, border: '1px solid #e5e7eb', 
-                                        padding: '2px 6px', borderRadius: 4, 
-                                        color: o.payment_method === 'COD' ? '#C2410C' : '#1E40AF',
-                                        background: o.payment_method === 'COD' ? '#FFF7ED' : '#EFF6FF'
-                                    }}>
-                                        {o.payment_method || '-'}
-                                    </span>
-                                    {o.payment_method === 'COD' && (
-                                        <span style={{ 
-                                            fontSize: 10, fontWeight: 600, padding: '1px 4px', borderRadius: 3,
-                                            background: '#fff', border: '1px solid #e5e7eb', color: '#6b7280'
-                                        }}>
-                                            {o.cod_status || 'PENDING'}
-                                        </span>
-                                    )}
-                                </div>
-                            </td>
-
-                            <td style={{ padding: '14px 24px', textAlign: 'right', color: '#9CA3AF', fontStyle: 'italic', fontSize: 12 }}>
-                                Click to view
-                            </td>
-                        </tr>
-                    )
-                })}
-                {paginatedOrders.length === 0 && (
-                    <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>No orders found on Ledger.</td></tr>
-                )}
-            </tbody>
-            </table>
-
-            {/* PAGINATION */}
-            <div style={{ padding: '12px 16px', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ fontSize: 12, color: '#6b7280' }}>
-                    Showing {paginatedOrders.length} of {processedOrders.length} results
+                {/* Pagination */}
+                <div className="px-6 py-4 border-t border-ui-border-base flex justify-between items-center bg-ui-bg-subtle/20">
+                    <div className="text-xs text-ui-fg-muted">Showing {paginatedOrders.length} results</div>
+                    <div className="flex gap-2">
+                        <Button variant="secondary" size="small" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>Prev</Button>
+                        <span className="text-xs flex items-center px-2">Page {currentPage}</span>
+                        <Button variant="secondary" size="small" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages}>Next</Button>
+                    </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 4, background: currentPage === 1 ? '#f3f4f6' : 'white', color: currentPage === 1 ? '#9ca3af' : '#374151', cursor: currentPage === 1 ? 'not-allowed' : 'pointer', fontSize: 12 }}>Prev</button>
-                    <span style={{ fontSize: 12, color: '#374151' }}>Page {currentPage} of {totalPages || 1}</span>
-                    <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage >= totalPages} style={{ padding: '4px 10px', border: '1px solid #e5e7eb', borderRadius: 4, background: currentPage >= totalPages ? '#f3f4f6' : 'white', color: currentPage >= totalPages ? '#9ca3af' : '#374151', cursor: currentPage >= totalPages ? 'not-allowed' : 'pointer', fontSize: 12 }}>Next</button>
-                </div>
-            </div>
 
-            {/* 🔥 DRAWER: HIỂN THỊ CHI TIẾT SUB-ORDER 🔥 */}
-            {selectedOrder && (
-                <OrderDrawer 
-                    blockchainOrder={selectedOrder} 
-                    onClose={() => setSelectedOrder(null)}
-                    onRefresh={fetchData} 
-                />
-            )}
-        </div>
+                {selectedOrder && <OrderDrawer blockchainOrder={selectedOrder} onClose={() => setSelectedOrder(null)} onRefresh={fetchData} />}
+            </Container>
         </div>
     </ErrorBoundary>
   );
