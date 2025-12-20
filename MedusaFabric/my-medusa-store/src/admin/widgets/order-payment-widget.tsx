@@ -28,14 +28,14 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
         if (res.status === 404) {
              setFabricStatus(null); 
         } else if (res.status === 401) {
-             setErrorMsg("Lỗi 401: Hết phiên đăng nhập");
+             setErrorMsg("ERROR 401: Unauthorized access to Fabric service.");
         } else {
-             setErrorMsg(`Lỗi: ${res.status}`);
+             setErrorMsg(`ERROR ${res.status}: ${res.statusText}`);
         }
       }
     } catch (e) {
       console.error(e);
-      setErrorMsg("Lỗi kết nối");
+      setErrorMsg("Connection error");
     }
   };
 
@@ -61,7 +61,7 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
         toast.error("Error", { description: result.error || "Failed." });
       }
     } catch (err) {
-      toast.error("Lỗi kết nối");
+      toast.error("Connection error");
     } finally {
       setIsLoading(false);
     }
@@ -71,18 +71,24 @@ const OrderPaymentWidget = ({ data }: DetailWidgetProps<AdminOrder>) => {
   if (!fabricStatus && !errorMsg) return null;
 
   return (
-    <Container className="divide-y p-0 border border-blue-200 shadow-sm mb-4">
-      <div className="px-6 py-4 flex items-center justify-between bg-gray-50">
+    <Container className="divide-y p-0 border border-white-200 shadow-sm mb-4">
+      <div className="px-6 py-4 flex items-center justify-between bg-white-50">
         <div>
-          <Heading level="h2" className="text-blue-600">Blockchain Status</Heading>
+          <Heading level="h2" className="text-black-600">Blockchain Status</Heading>
           
           {/* FIX: Hiển thị errorMsg bằng component Text (đã khai báo) */}
           {errorMsg ? (
             <Text className="text-red-500 text-xs font-mono mt-1">{errorMsg}</Text>
           ) : (
             <div className="flex gap-2 mt-1">
-                <Badge color={fabricStatus.status === 'PAID' ? 'green' : 'orange'}>
-                    {fabricStatus.status}
+                <Badge
+                  className={
+                    fabricStatus.status === "PAID"
+                      ? "bg-black text-white"
+                      : "bg-white text-black border"
+                  }
+                >
+                  {fabricStatus.status}
                 </Badge>
                 <Badge>{fabricStatus.paymentMethod}</Badge>
             </div>

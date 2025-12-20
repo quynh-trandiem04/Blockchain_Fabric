@@ -570,7 +570,7 @@ export default function ShipperDashboard() {
 
     // ================= UI RENDERING =================
 
-    if (isCheckingRole) return <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div><p className="text-gray-600 font-medium">Đang xác thực...</p></div>
+    if (isCheckingRole) return <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mb-4"></div><p className="text-gray-600 font-medium">Authenticating...</p></div>
 
   if (isLoggedIn && !isAuthorized) {
       return (
@@ -822,7 +822,7 @@ export default function ShipperDashboard() {
                         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
                             <form onSubmit={handleSaveSettings} className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Tên hiển thị (Carrier Name)</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Carrier Name</label>
                                     <input
                                         type="text"
                                         value={settingsForm.carrier_name}

@@ -224,13 +224,13 @@ export default function SellerDashboard() {
           const status = user.metadata?.approver_status;
 
           if (role !== 'sellerorgmsp') {
-              alert("Tài khoản không phải là Seller.");
+              alert("This account is not authorized as a Seller.");
               setIsAuthorized(false);
           } else if (status === 'pending') {
-              alert("Tài khoản đang chờ duyệt.");
+              alert("This account is still pending approval.");
               setIsAuthorized(false);
           } else if (status === 'rejected') {
-              alert("Tài khoản đã bị từ chối.");
+              alert("This account has been rejected.");
               setIsAuthorized(false);
           } else {
               setIsAuthorized(true)
@@ -373,7 +373,7 @@ export default function SellerDashboard() {
 
   const handleCreateProduct = async () => {
       if (!newProduct.title || !newProduct.price) { 
-          alert("Vui lòng nhập Tên và Giá sản phẩm"); 
+          alert("Please provide at least a title and price for the product."); 
           return; 
       }
       setIsCreatingProduct(true);
@@ -442,32 +442,31 @@ export default function SellerDashboard() {
           });
           
           if (res.ok) {
-              alert("✅ Đăng bán thành công!");
+              alert("Product created successfully!");
               setShowCreateModal(false); 
               loadSellerProducts(token || "");
               setNewProduct({ title: "", subtitle: "", handle: "", description: "", price: 0, inventory_quantity: 10, image_url: "" });
               setProdOptions([]);
           } else {
               const err = await res.json();
-              alert("Lỗi: " + (err.error || err.message));
+              alert("Error: " + (err.error || err.message));
           }
       } catch (e) { 
           console.error(e);
-          alert("Lỗi kết nối"); 
+          alert("Error connecting to server"); 
       } finally { 
           setIsCreatingProduct(false); 
       }
   }
 
     const handleConfirmReturn = async (orderId: string) => {
-      if(!confirm("Xác nhận đã nhận lại hàng hoàn từ Shipper?")) return;
+      if(!confirm("Confirm that you have received the returned item from the Shipper?")) return;
       
       setIsConfirmingReturn(orderId);
       const token = localStorage.getItem("medusa_token");
       const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
 
       try {
-          // 🔥 GỌI ĐÚNG API STORE MỚI TẠO
           const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/confirm-return`, {
               method: "POST",
               headers: { 
@@ -480,14 +479,14 @@ export default function SellerDashboard() {
           const result = await res.json();
 
           if (res.ok) {
-              alert("✅ Thành công! Đã xác nhận nhận hàng.");
+              alert("Success! Return confirmed.");
               loadSellerOrders(token || "");
               if (selectedOrder?.id === orderId) setSelectedOrder(null); // Đóng modal
           } else {
-              alert("❌ Lỗi: " + (result.message || "Thất bại"));
+              alert("Error: " + (result.message || "Failed"));
           }
       } catch (err) {
-          alert("Lỗi kết nối server");
+          alert("Error connecting to server");
       } finally { 
           setIsConfirmingReturn(null); 
       }
@@ -505,8 +504,8 @@ export default function SellerDashboard() {
         localStorage.setItem("medusa_token", data.token)
         setIsLoggedIn(true)
         await checkUserRole(data.token);
-      } else { setLoginError("Email hoặc mật khẩu không đúng."); }
-    } catch (err) { setLoginError("Lỗi kết nối."); } 
+      } else { setLoginError("Email or password is incorrect."); }
+    } catch (err) { setLoginError("Error connecting to server."); } 
     finally { setIsLoadingLogin(false); } 
   }
 
@@ -527,12 +526,12 @@ export default function SellerDashboard() {
            <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
              <div className="text-center mb-8">
                 <div className="w-12 h-12 bg-blue-600 rounded-lg text-white font-bold text-xl flex items-center justify-center mx-auto mb-4">S</div>
-                <h2 className="text-2xl font-bold text-gray-900">Cổng Seller</h2>
-                <p className="text-gray-500 text-sm mt-1">Đăng nhập để quản lý cửa hàng</p>
+                <h2 className="text-2xl font-bold text-gray-900">Seller Portal</h2>
+                <p className="text-gray-500 text-sm mt-1">Log in to manage your store</p>
              </div>
              {isLoggedIn && !isAuthorized && (
                  <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-center gap-2">
-                     <XMark className="w-4 h-4"/> ⛔ Không có quyền truy cập.
+                     <XMark className="w-4 h-4"/> No access rights.
                  </div>
              )}
              <form onSubmit={handleLogin} className="space-y-5">
@@ -541,14 +540,14 @@ export default function SellerDashboard() {
                   <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="shop@example.com" required />
                </div>
                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
                   <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="••••••••" required />
                </div>
                {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{loginError}</div>}
                <button type="submit" disabled={isLoadingLogin} className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-bold transition shadow-md flex justify-center items-center">
-                  {isLoadingLogin ? <Spinner className="animate-spin text-white w-5 h-5" /> : "Đăng nhập"}
+                  {isLoadingLogin ? <Spinner className="animate-spin text-white w-5 h-5" /> : "Log in"}
                </button>
-               {isLoggedIn && <button type="button" onClick={handleLogout} className="w-full text-center text-gray-500 text-sm hover:text-gray-900 mt-2">Đăng xuất</button>}
+               {isLoggedIn && <button type="button" onClick={handleLogout} className="w-full text-center text-gray-500 text-sm hover:text-gray-900 mt-2">Log out</button>}
              </form>
            </div>
         </div>
@@ -568,10 +567,10 @@ export default function SellerDashboard() {
           </div>
           <nav className="flex-1 p-4 space-y-2">
               <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <ShoppingBag className="w-5 h-5"/> Đơn hàng
+                  <ShoppingBag className="w-5 h-5"/> Orders
               </button>
               <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <TagIcon className="w-5 h-5"/> Sản phẩm
+                  <TagIcon className="w-5 h-5"/> Products
               </button>
           </nav>
           <div className="p-4 border-t border-gray-100 bg-gray-50/50">
@@ -580,7 +579,7 @@ export default function SellerDashboard() {
                   <div className="text-xs text-gray-500 truncate w-24">User Account</div>
               </div>
               <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">
-                  <ArrowRightOnRectangle /> Đăng xuất
+                  <ArrowRightOnRectangle /> Log out
               </button>
           </div>
       </aside>
@@ -593,11 +592,11 @@ export default function SellerDashboard() {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between items-end mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Đơn hàng</h1>
-                        <p className="text-sm text-gray-500 mt-1">Quản lý và theo dõi đơn hàng từ khách</p>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Orders</h1>
+                        <p className="text-sm text-gray-500 mt-1">Manage and track orders from customers</p>
                     </div>
                     <button onClick={() => loadSellerOrders()} className="px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition">
-                        <span className={isLoadingOrders ? "animate-spin" : ""}>⟳</span> Refresh
+                        <span className={isLoadingOrders ? "animate-spin" : ""}>⟳</span>
                     </button>
                 </div>
 
@@ -605,31 +604,35 @@ export default function SellerDashboard() {
                 <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-6 flex gap-3 items-center">
                     <div className="relative flex-1">
                         <span className="absolute left-3 top-2.5 text-gray-400"><MagnifyingGlass /></span>
-                        <input placeholder="Tìm kiếm đơn hàng (ID, Email, SĐT)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                        <input placeholder="Search orders (ID, Email, Phone)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                             className="w-full pl-9 pr-3 py-2 text-sm border-none focus:ring-0 outline-none h-full bg-transparent placeholder-gray-400 text-gray-900" />
                     </div>
                     <div className="w-px h-6 bg-gray-200"></div>
                     <div className="flex items-center gap-2 px-2">
                         <Funnel className="text-gray-400 w-4 h-4" />
                         <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-sm border-none focus:ring-0 outline-none bg-transparent text-gray-700 cursor-pointer font-medium hover:text-blue-600 transition">
-                            <option value="ALL">Tất cả trạng thái</option>
-                            <option value="CREATED">Mới tạo</option>
-                            <option value="PAID">Đã thanh toán</option>
-                            <option value="SHIPPED">Đang giao</option>
-                            <option value="DELIVERED">Đã giao</option>
-                            <option value="RETURN_REQUESTED">Yêu cầu trả hàng</option>
-                            <option value="RETURNED">Đã hoàn trả</option>
+                            <option value="ALL">All statuses</option>
+                            <option value="CREATED">Created</option>
+                            <option value="PAID">Paid</option>
+                            <option value="SHIPPED">Shipped</option>
+                            <option value="DELIVERED">Delivered</option>
+                            <option value="RETURN_REQUESTED">Return Requested</option>
+                            <option value="RETURN_IN_TRANSIT">Return In Transit)</option>
+                            <option value="DELIVERED_COD_PENDING">Delivered (COD Pending)</option>
+                            <option value="COD_REMITTED">COD Remitted</option>
+                            <option value="SETTLED">Settled</option>
+                            <option value="CANCELLED">Cancelled</option>
                         </select>
                     </div>
                     <div className="w-px h-6 bg-gray-200"></div>
                     <div className="relative" ref={sortMenuRef}>
                         <button onClick={() => setShowSortMenu(!showSortMenu)} className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg flex items-center gap-1 transition">
-                            {sortDir === 'desc' ? 'Mới nhất' : 'Cũ nhất'} <Icons.Sort />
+                            {sortDir === 'desc' ? 'Newest' : 'Oldest'} <Icons.Sort />
                         </button>
                         {showSortMenu && (
                             <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in duration-100">
-                                <button onClick={() => { setSortDir('desc'); setShowSortMenu(false); }} className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition">Mới nhất</button>
-                                <button onClick={() => { setSortDir('asc'); setShowSortMenu(false); }} className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition">Cũ nhất</button>
+                                <button onClick={() => { setSortDir('desc'); setShowSortMenu(false); }} className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition">Newest</button>
+                                <button onClick={() => { setSortDir('asc'); setShowSortMenu(false); }} className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition">Oldest</button>
                             </div>
                         )}
                     </div>
@@ -640,18 +643,18 @@ export default function SellerDashboard() {
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             <tr>
-                                <th className="px-6 py-3 font-medium">Mã đơn</th>
-                                <th className="px-6 py-3 font-medium">Ngày tạo</th>
-                                <th className="px-6 py-3 font-medium">Khách hàng</th>
-                                <th className="px-6 py-3 font-medium">Trạng thái</th>
-                                <th className="px-6 py-3 font-medium text-right">Tổng tiền</th>
+                                <th className="px-6 py-3 font-medium">Order ID</th>
+                                <th className="px-6 py-3 font-medium">Created Date</th>
+                                <th className="px-6 py-3 font-medium">Customer</th>
+                                <th className="px-6 py-3 font-medium">Status</th>
+                                <th className="px-6 py-3 font-medium text-right">Total Amount</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                             {processedOrders.length === 0 ? (
                                 <tr><td colSpan={5} className="px-6 py-16 text-center text-gray-500 flex flex-col items-center justify-center gap-3">
                                     <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xl">📭</div>
-                                    <p>Không tìm thấy đơn hàng nào.</p>
+                                    <p>No orders found.</p>
                                 </td></tr>
                             ) : processedOrders.map(order => (
                                 <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-blue-50/50 cursor-pointer transition-colors group">
@@ -690,7 +693,7 @@ export default function SellerDashboard() {
                         </tbody>
                     </table>
                     <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-                        <span>Hiển thị {processedOrders.length} đơn hàng</span>
+                        <span> Showing {processedOrders?.length || 0} orders </span>
                     </div>
                 </div>
             </div>
@@ -701,11 +704,11 @@ export default function SellerDashboard() {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between items-end mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Sản phẩm</h1>
-                        <p className="text-sm text-gray-500 mt-1">Danh sách sản phẩm của cửa hàng</p>
+                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Products</h1>
+                        <p className="text-sm text-gray-500 mt-1">List of products in the store</p>
                     </div>
                     <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 text-sm font-medium flex items-center gap-2 transition transform active:scale-95">
-                        <Plus className="w-4 h-4"/> Tạo sản phẩm
+                        <Plus className="w-4 h-4"/> Create Product
                     </button>
                 </div>
 
@@ -713,17 +716,17 @@ export default function SellerDashboard() {
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             <tr>
-                                <th className="px-6 py-3 w-1/2">Thông tin sản phẩm</th>
-                                <th className="px-6 py-3">Trạng thái</th>
-                                <th className="px-6 py-3">Tồn kho</th>
-                                <th className="px-6 py-3 text-right">Giá bán</th>
+                                <th className="px-6 py-3 w-1/2">Product Information</th>
+                                <th className="px-6 py-3">Status</th>
+                                <th className="px-6 py-3">Stock</th>
+                                <th className="px-6 py-3 text-right">Sale Price</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                              {products.length === 0 ? (
                                   <tr><td colSpan={4} className="px-6 py-16 text-center text-gray-500 flex flex-col items-center justify-center gap-3">
                                       <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xl"><TagIcon /></div>
-                                      <p>Chưa có sản phẩm nào.</p>
+                                      <p>No products found.</p>
                                   </td></tr>
                               ) : products.map((p: any) => (
                                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
@@ -770,8 +773,8 @@ export default function SellerDashboard() {
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in duration-200">
                 <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 sticky top-0 z-10">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900">Thêm Sản Phẩm Mới</h2>
-                        <p className="text-xs text-gray-500">Điền thông tin chi tiết để đăng bán</p>
+                        <h2 className="text-lg font-bold text-gray-900">Add new product</h2>
+                        <p className="text-xs text-gray-500">Enter detailed information to list for sale</p>
                     </div>
                     <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-700 transition p-1 rounded-md hover:bg-gray-200"><XMark/></button>
                 </div>
@@ -780,12 +783,12 @@ export default function SellerDashboard() {
                     {/* General */}
                     <div className="grid grid-cols-2 gap-6">
                         <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Tên sản phẩm <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name <span className="text-red-500">*</span></label>
                             <input className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" 
                                 value={newProduct.title} onChange={e=>setNewProduct({...newProduct, title: e.target.value})} placeholder="VD: Áo Thun Basic"/>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Giá bán (USD) <span className="text-red-500">*</span></label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Sale Price (USD) <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <span className="absolute left-3 top-2.5 text-gray-400"><CurrencyDollar /></span>
                                 <input type="number" className="w-full border border-gray-300 pl-9 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" 
@@ -821,9 +824,9 @@ export default function SellerDashboard() {
 
                     <div className="grid grid-cols-2 gap-6">
                          <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả sản phẩm</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Product Description</label>
                             <textarea className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none transition" 
-                                value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Chi tiết..."/>
+                                value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Details..."/>
                         </div>
                     </div>
 
@@ -831,11 +834,11 @@ export default function SellerDashboard() {
 
                     {/* Options & Variants */}
                     <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><TagIcon className="w-4 h-4"/> Phân loại hàng (Options)</h3>
+                        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><TagIcon className="w-4 h-4"/> Options</h3>
                         <div className="flex gap-2 mb-3">
-                            <input className="border border-gray-300 p-2 rounded-lg text-sm w-1/3 outline-none focus:border-blue-500" placeholder="Tên (VD: Size)" value={optionName} onChange={e=>setOptionName(e.target.value)} />
-                            <input className="border border-gray-300 p-2 rounded-lg text-sm flex-1 outline-none focus:border-blue-500" placeholder="Giá trị (VD: S, M, L)" value={optionValues} onChange={e=>setOptionValues(e.target.value)} />
-                            <button onClick={handleAddOption} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition shadow-sm">Thêm</button>
+                            <input className="border border-gray-300 p-2 rounded-lg text-sm w-1/3 outline-none focus:border-blue-500" placeholder="Name (VD: Size)" value={optionName} onChange={e=>setOptionName(e.target.value)} />
+                            <input className="border border-gray-300 p-2 rounded-lg text-sm flex-1 outline-none focus:border-blue-500" placeholder="Values (VD: S, M, L)" value={optionValues} onChange={e=>setOptionValues(e.target.value)} />
+                            <button onClick={handleAddOption} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition shadow-sm">Add</button>
                         </div>
                         
                         {/* List Options */}
@@ -864,9 +867,9 @@ export default function SellerDashboard() {
                 </div>
 
                 <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0">
-                    <button onClick={() => setShowCreateModal(false)} className="px-5 py-2 text-gray-600 hover:bg-white border border-transparent hover:border-gray-200 rounded-lg transition font-medium">Hủy bỏ</button>
+                    <button onClick={() => setShowCreateModal(false)} className="px-5 py-2 text-gray-600 hover:bg-white border border-transparent hover:border-gray-200 rounded-lg transition font-medium">Cancel</button>
                     <button onClick={handleCreateProduct} disabled={isCreatingProduct} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-md flex items-center">
-                        {isCreatingProduct ? <><Spinner className="animate-spin mr-2" /> Đang tạo...</> : "Đăng bán ngay"}
+                        {isCreatingProduct ? <><Spinner className="animate-spin mr-2" /> Creating...</> : "Publish Now"}
                     </button>
                 </div>
             </div>
@@ -938,7 +941,7 @@ export default function SellerDashboard() {
                                 </li>
                                 ))
                             ) : (
-                                <li className="text-xs text-gray-400 italic text-center">Đang tải chi tiết sản phẩm...</li>
+                                <li className="text-xs text-gray-400 italic text-center">Loading product details...</li>
                             )}
                         </ul>
                     </div>
@@ -946,15 +949,15 @@ export default function SellerDashboard() {
                     {/* Financials */}
                     <div className="space-y-2 pt-4 border-t border-dashed border-gray-200">
                         <div className="flex justify-between text-xs text-gray-500">
-                            <span>Tạm tính</span>
+                            <span>Subtotal</span>
                             <span>{formatPrice(selectedOrder.decryptedData?.amount_untaxed || selectedOrder.publicData.total, selectedOrder.publicData.currency_code)}</span>
                         </div>
                         <div className="flex justify-between text-xs text-gray-500">
-                            <span>Phí vận chuyển</span>
+                            <span>Shipping Fee</span>
                             <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
                         </div>
                                                  <div className="flex justify-between text-base font-bold text-blue-700 pt-2 border-t border-gray-100 mt-2">
-                            <span>Thành tiền</span>
+                            <span>Total</span>
                             <span>
                                 {formatPrice(
                                     (selectedOrder.decryptedData?.amount_untaxed || selectedOrder.publicData.total) + 
@@ -977,9 +980,9 @@ export default function SellerDashboard() {
                                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition text-sm flex justify-center gap-2 items-center transform active:scale-95 disabled:opacity-70 disabled:scale-100"
                             >
                                 {isConfirmingReturn === selectedOrder.id ? (
-                                    <><Spinner className="animate-spin" /> Đang xử lý...</>
+                                    <><Spinner className="animate-spin" /> Processing...</>
                                 ) : (
-                                    <><CheckCircle/> XÁC NHẬN ĐÃ NHẬN HÀNG HOÀN</>
+                                    <><CheckCircle/> CONFIRM RETURN RECEIVED</>
                                 )}
                             </button>
                         )}
@@ -987,14 +990,14 @@ export default function SellerDashboard() {
                         {/* Thông báo chờ */}
                         {selectedOrder.publicData.medusa_status === 'RETURN_REQUESTED' && (
                              <div className="w-full py-3 bg-yellow-50 text-yellow-700 rounded-xl text-xs font-medium text-center border border-yellow-200">
-                                Khách đã yêu cầu trả hàng. Chờ Shipper lấy hàng.
+                                Customer has requested a return. Awaiting Shipper pickup.
                              </div>
                         )}
 
                         {/* Thông báo hoàn tất */}
                         {selectedOrder.publicData.medusa_status === 'RETURNED' && (
                              <div className="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold text-center border border-green-200 flex items-center justify-center gap-2">
-                                <CheckCircle className="text-blue-600" /> Đơn hàng đã hoàn tất trả hàng
+                                <CheckCircle className="text-blue-600" /> Order has been successfully returned
                              </div>
                         )}
                     </div>

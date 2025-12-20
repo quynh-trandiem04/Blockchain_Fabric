@@ -169,10 +169,10 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                     </StatusBadge>
                                 </div>
                                 <div className="flex justify-between items-center pt-2 border-t border-ui-border-base">
-                                    <Text size="small" className="text-ui-fg-subtle">Last Updated</Text>
+                                    <Text size="small" className="text-ui-fg-subtle">Created date</Text>
                                     <Text size="small" className="font-medium font-mono">
-                                        {blockchainOrder.updated_at 
-                                            ? new Date(blockchainOrder.updated_at).toLocaleString('en-GB') 
+                                        {blockchainOrder.created_at 
+                                            ? new Date(blockchainOrder.created_at).toLocaleString('en-GB') 
                                             : new Date(blockchainOrder.created_at).toLocaleString('en-GB')}
                                     </Text>
                                 </div>
@@ -266,7 +266,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
 };
 
 // --- MAIN WIDGET COMPONENT ---
-type SortKey = 'blockchain_id' | 'created_at' | 'updated_at';
+type SortKey = 'blockchain_id' | 'created_at';
 type SortDirection = 'asc' | 'desc';
 
 const BlockchainOrderList = () => {
@@ -281,9 +281,9 @@ const BlockchainOrderList = () => {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-  
-  // 🔥 Default Sort by Updated At
-  const [sortKey, setSortKey] = useState<SortKey>('updated_at'); 
+
+  // 🔥 Default Sort by Created At
+  const [sortKey, setSortKey] = useState<SortKey>('created_at'); 
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
   
@@ -402,10 +402,10 @@ const BlockchainOrderList = () => {
           if (sortKey === 'blockchain_id') {
               aVal = a.blockchain_id;
               bVal = b.blockchain_id;
-          } else if (sortKey === 'updated_at') {
-              // Parse ngày tháng an toàn
-              aVal = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-              bVal = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+        //   } else if (sortKey === 'updated_at') {
+        //       // Parse ngày tháng an toàn
+        //       aVal = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+        //       bVal = b.updated_at ? new Date(b.updated_at).getTime() : 0;
           } else {
               // created_at
               aVal = new Date(a.created_at).getTime();
@@ -465,9 +465,9 @@ const BlockchainOrderList = () => {
                             <div className="absolute top-full right-0 mt-2 w-48 bg-ui-bg-base border border-ui-border-base rounded-md shadow-lg z-50 py-1">
                                 <div className="px-3 py-2 text-xs font-semibold text-ui-fg-muted bg-ui-bg-subtle border-b border-ui-border-base">Sort By</div>
                                 {/* NÚT CHỌN UPDATED AT */}
-                                <div onClick={() => { setSortKey('updated_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='updated_at' ? 'font-bold' : ''}`}>
-                                    Last Updated {sortKey==='updated_at' && <Icons.Check/>}
-                                </div>
+                                {/* <div onClick={() => { setSortKey('updated_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='updated_at' ? 'font-bold' : ''}`}>
+                                    Last Updated {sortKey==='updated_at' && <Icons.Check/>} */}
+                                {/* </div> */}
                                 <div onClick={() => { setSortKey('created_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='created_at' ? 'font-bold' : ''}`}>
                                     Created Date {sortKey==='created_at' && <Icons.Check/>}
                                 </div>
@@ -484,7 +484,7 @@ const BlockchainOrderList = () => {
                     <table className="w-full text-left border-collapse text-sm">
                         <thead className="bg-ui-bg-subtle border-b border-ui-border-base">
                             <tr>
-                                {['Blockchain ID', 'Last Updated', 'Seller', 'Status', 'Payment', 'Info'].map(h => <th key={h} className="px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase">{h}</th>)}
+                                {['Blockchain ID', 'Created at', 'Seller', 'Status', 'Payment', 'Info'].map(h => <th key={h} className="px-6 py-3 text-xs font-medium text-ui-fg-muted uppercase">{h}</th>)}
                             </tr>
                         </thead>
                         <tbody>
@@ -495,8 +495,8 @@ const BlockchainOrderList = () => {
                                     {/* CỘT UPDATED AT */}
                                     <td className="px-6 py-4 text-ui-fg-subtle">
                                         <div className="flex flex-col">
-                                            <span className="font-medium text-ui-fg-base">{o.updated_at ? new Date(o.updated_at).toLocaleDateString('en-GB') : formatDate(o.created_at)}</span>
-                                            <span className="text-[10px] text-ui-fg-muted">{o.updated_at ? new Date(o.updated_at).toLocaleTimeString('en-GB') : ''}</span>
+                                            <span className="font-medium text-ui-fg-base">{o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB') : formatDate(o.created_at)}</span>
+                                            <span className="text-[10px] text-ui-fg-muted">{o.created_at ? new Date(o.created_at).toLocaleTimeString('en-GB') : ''}</span>
                                         </div>
                                     </td>
 
