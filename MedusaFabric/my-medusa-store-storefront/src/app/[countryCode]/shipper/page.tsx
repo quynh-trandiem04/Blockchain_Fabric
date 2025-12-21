@@ -78,7 +78,7 @@ interface OrderRow {
   error?: string;
 }
 
-type SortKey = 'display_id' | 'created_at' | 'updated_at';
+type SortKey = 'created_at'; // Chỉ giữ sort theo created_at
 type SortDirection = 'asc' | 'desc';
 
 export default function ShipperDashboard() {
@@ -105,7 +105,7 @@ export default function ShipperDashboard() {
   const [loginError, setLoginError] = useState("")
   
   // --- STATE ACTION BUTTONS ---
-  const [isShipping, setIsShipping] = useState<string | null>(null); // State cho nút lấy hàng
+  const [isShipping, setIsShipping] = useState<string | null>(null);
   const [isDelivering, setIsDelivering] = useState<string | null>(null);
   const [isReturning, setIsReturning] = useState<string | null>(null);
   
@@ -157,24 +157,12 @@ export default function ShipperDashboard() {
       });
 
       return filtered.sort((a, b) => {
-          let aVal: any;
-          let bVal: any;
+          // Chỉ sort theo created_at
+          const timeA = new Date(a.created_at).getTime();
+          const timeB = new Date(b.created_at).getTime();
 
-          if (sortKey === 'display_id') {
-              aVal = parseInt(a.display_id.replace(/\D/g, ''), 10);
-              bVal = parseInt(b.display_id.replace(/\D/g, ''), 10);
-          } else if (sortKey === 'updated_at') {
-              // Ưu tiên lấy updated từ blockchain, nếu không có thì lấy created_at
-              aVal = new Date(a.decryptedData?.updatedAt || a.created_at).getTime();
-              bVal = new Date(b.decryptedData?.updatedAt || b.created_at).getTime();
-          } else {
-              // created_at
-              aVal = new Date(a.created_at).getTime();
-              bVal = new Date(b.created_at).getTime();
-          }
-
-          if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-          if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+          if (timeA < timeB) return sortDir === 'asc' ? -1 : 1;
+          if (timeA > timeB) return sortDir === 'asc' ? 1 : -1;
           return 0;
       });
     }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
@@ -192,14 +180,14 @@ export default function ShipperDashboard() {
       if (!status) return <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 border border-gray-200 uppercase font-medium">Syncing...</span>;
 
       const s = status.toUpperCase();
-      let styleClass = "bg-gray-50 text-gray-500 border-gray-200"; // Default (Pending)
+      let styleClass = "bg-gray-50 text-gray-500 border-gray-200"; // Default
 
-      if (['DELIVERED', 'SETTLED', 'RETURNED', 'COD_REMITTED'].includes(s)) {
+      if (['DELIVERED', 'SETTLED', 'RETURNED'].includes(s)) {
           styleClass = "bg-gray-900 text-white border-gray-900"; // Completed (Dark)
-      } else if (['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'CANCELLED', 'DELIVERED_COD_PENDING'].includes(s)) {
-          styleClass = "bg-gray-100 text-gray-900 border-gray-300 font-bold"; // Alert/Action (High contrast grey)
+      } else if (['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'CANCELLED', 'COD_PENDING'].includes(s)) {
+          styleClass = "bg-gray-100 text-gray-900 border-gray-300 font-bold"; // Alert
       } else if (['PAID', 'SHIPPED', 'CREATED'].includes(s)) {
-          styleClass = "bg-white text-gray-900 border-gray-300 font-medium"; // Active (White)
+          styleClass = "bg-white text-gray-900 border-gray-300 font-medium"; // Active
       }
 
       return (
@@ -212,7 +200,6 @@ export default function ShipperDashboard() {
 
   // --- 1. HÀM KIỂM TRA ROLE ---
   const checkUserRole = async (token: string) => {
-      console.log("🔍 [FE CHECK] Shipper Auth...");
       setIsCheckingRole(true);
       
       const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
@@ -227,10 +214,9 @@ export default function ShipperDashboard() {
           })
 
           if (!res.ok) {
-              console.warn("Token invalid or expired.");
+              console.warn("Token invalid");
               localStorage.removeItem("medusa_token");
-              setIsLoggedIn(false);
-              setIsAuthorized(false);
+              setIsLoggedIn(false); setIsAuthorized(false);
               return;
           }
           
@@ -481,7 +467,7 @@ export default function ShipperDashboard() {
             const row: OrderRow = {
                 id: order.blockchain_id,
                 display_id: order.blockchain_id, 
-                created_at: new Date(order.created_at).toLocaleDateString('vi-VN'),
+                created_at: order.created_at, // Keep raw ISO for sort
                 publicData: {
                     email: "Loading...",
                     currency_code: "USD",
@@ -523,7 +509,8 @@ export default function ShipperDashboard() {
                         status: data.status,
                         paymentMethod: data.paymentMethod,
                         amount_untaxed: data.amount_untaxed || 0,
-                        sellerCompanyID: data.sellerCompanyID
+                        sellerCompanyID: data.sellerCompanyID,
+                        updatedAt: data.updatedAt // For potential future use
                     };
 
                     row.publicData.email = data.customerName; 
@@ -537,7 +524,8 @@ export default function ShipperDashboard() {
             loadedOrders.push(row)
           })
         )
-        const sortedOrders = loadedOrders.sort((a, b) => b.id.localeCompare(a.id));
+        // Default sort by created_at DESC
+        const sortedOrders = loadedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setOrders(sortedOrders)
         
         // Refresh selected order nếu đang mở
@@ -730,29 +718,10 @@ export default function ShipperDashboard() {
                                 {showSortMenu && (
                                     <div className="absolute top-full right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 animate-in fade-in zoom-in duration-100 overflow-hidden">
                                         <div className="px-3 py-2 text-[10px] text-gray-400 font-bold uppercase border-b border-gray-100">Sort By</div>
-                                        {[
-                                            { label: 'Created Date', key: 'created_at' },
-                                            { label: 'Order ID', key: 'display_id' },
-                                            { label: 'Updated', key: 'updated_at' }
-                                        ].map((item) => (
-                                            <div
-                                                key={item.key}
-                                                onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }}
-                                                className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortKey === item.key ? 'text-black font-bold' : 'text-gray-600'}`}
-                                            >
-                                                {item.label} {sortKey === item.key && <Icons.Check />}
-                                            </div>
-                                        ))}
+                                        <div onClick={() => { setSortKey('created_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortKey === 'created_at' ? 'text-black font-bold' : 'text-gray-600'}`}>Created Date {sortKey === 'created_at' && <Icons.Check />}</div>
                                         <div className="h-px bg-gray-100 my-1"></div>
-                                        {[ { label: 'Newest', dir: 'desc' }, { label: 'Oldest', dir: 'asc' } ].map((item) => (
-                                            <div
-                                                key={item.dir}
-                                                onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }}
-                                                className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortDir === item.dir ? 'text-black font-bold' : 'text-gray-600'}`}
-                                            >
-                                                {item.label} {sortDir === item.dir && <Icons.Check />}
-                                            </div>
-                                        ))}
+                                        <div onClick={() => { setSortDir('desc'); setShowSortMenu(false); }} className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortDir === 'desc' ? 'text-black font-bold' : 'text-gray-600'}`}>Newest {sortDir === 'desc' && <Icons.Check />}</div>
+                                        <div onClick={() => { setSortDir('asc'); setShowSortMenu(false); }} className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortDir === 'asc' ? 'text-black font-bold' : 'text-gray-600'}`}>Oldest {sortDir === 'asc' && <Icons.Check />}</div>
                                     </div>
                                 )}
                             </div>
@@ -763,11 +732,11 @@ export default function ShipperDashboard() {
                             <table className="w-full text-left border-collapse">
                                 <thead>
                                     <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        <th className="px-6 py-3 font-medium">ID</th>
-                                        <th className="px-6 py-3 font-medium">Date</th>
-                                        <th className="px-6 py-3 font-medium">Customer</th>
-                                        <th className="px-6 py-3 font-medium">Status</th>
-                                        <th className="px-6 py-3 font-medium text-right">Fee / COD</th>
+                                        <th className="px-6 py-4">Order ID</th>
+                                        <th className="px-6 py-4">Created Date</th>
+                                        <th className="px-6 py-4">Customer</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4 text-right">Fee / COD</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -777,7 +746,7 @@ export default function ShipperDashboard() {
                                         processedOrders.map((order) => (
                                             <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-gray-50 cursor-pointer transition-colors group">
                                                 <td className="px-6 py-4 text-xs font-bold text-black font-mono">{order.display_id}</td>
-                                                <td className="px-6 py-4 text-xs text-gray-500">{order.created_at}</td>
+                                                <td className="px-6 py-4 text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
                                                 <td className="px-6 py-4 text-xs text-gray-900">
                                                     <div className="flex flex-col">
                                                         <span className="font-medium">{order.decryptedData?.customerName || "Hidden"}</span>
