@@ -8,7 +8,7 @@ import { useRouter, useParams } from "next/navigation"
 import { 
     Photo, Tag, CurrencyDollar, ArchiveBox, XMark, CheckCircle, 
     ArrowRightOnRectangle, Spinner, MagnifyingGlass, Funnel,
-    ShoppingBag, Tag as TagIcon, Plus, Trash, User, RocketLaunch
+    ShoppingBag, Tag as TagIcon, Plus, Trash, User
 } from "@medusajs/icons"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -16,12 +16,8 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localh
 // --- ICONS ---
 const Icons = {
   Sort: () => (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3.125 6.875H10.625" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M3.125 13.125H7.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M13.75 14.375L16.875 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M16.875 14.375L13.75 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M15.3125 5.625V14.375" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M6 12h12m-9 6h6" />
     </svg>
   ),
   Check: () => (
@@ -47,7 +43,7 @@ interface OrderRow {
     total: number; 
     medusa_status: string;
     medusa_payment: string;
-    cod_status?: string; // Thêm trường này cho UI List
+    cod_status?: string; 
   };
   status: "Pending" | "Success" | "Error";
   decryptedData: {
@@ -66,7 +62,7 @@ interface OrderRow {
   error?: string;
 }
 
-type SortKey = 'display_id' | 'created_at' | 'updated_at';
+type SortKey = 'created_at'; 
 type SortDirection = 'asc' | 'desc';
 
 export default function SellerDashboard() {
@@ -125,41 +121,39 @@ export default function SellerDashboard() {
     if (amount === undefined || amount === null) return "0";
     const code = (currency || "USD").toUpperCase();
     try {
-      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: code }).format(amount); 
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount); 
     } catch (e) { return `${amount} ${code}`; }
   }
 
+  // --- MONOCHROME STATUS BADGES ---
   const getBlockchainStatusBadge = (status: string) => {
-      const colorMap: Record<string, string> = {
-          CREATED: "bg-gray-100 text-gray-700 border-gray-200",
-          PAID: "bg-blue-50 text-blue-700 border-blue-200",
-          SHIPPED: "bg-indigo-50 text-indigo-700 border-indigo-200",
-          DELIVERED: "bg-green-50 text-green-700 border-green-200",
-          DELIVERED_COD_PENDING: "bg-orange-50 text-orange-700 border-orange-200",
-          COD_REMITTED: "bg-green-50 text-green-700 border-green-200",
-          SETTLED: "bg-purple-50 text-purple-700 border-purple-200",
-          CANCELLED: "bg-red-50 text-red-700 border-red-200",
-          RETURN_REQUESTED: "bg-yellow-50 text-yellow-700 border-yellow-200",
-          RETURN_IN_TRANSIT: "bg-amber-50 text-amber-700 border-amber-200",
-          RETURNED: "bg-pink-50 text-pink-700 border-pink-200"
-      };
+      if (!status) return <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 border border-gray-200 uppercase font-medium">Syncing...</span>;
 
-      if (!status) return <span className="text-xs bg-gray-50 text-gray-400 px-2 py-1 rounded border border-gray-200">Syncing...</span>;
+      const s = status.toUpperCase();
+      let styleClass = "bg-gray-50 text-gray-500 border-gray-200"; // Default
+
+      if (['DELIVERED', 'SETTLED', 'RETURNED'].includes(s)) {
+          styleClass = "bg-gray-900 text-white border-gray-900"; // Completed (Dark)
+      } else if (['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'CANCELLED'].includes(s)) {
+          styleClass = "bg-gray-100 text-gray-900 border-gray-300 font-bold"; // Alert/Action
+      } else if (['PAID', 'SHIPPED'].includes(s)) {
+          styleClass = "bg-white text-gray-900 border-gray-300"; // Active
+      }
 
       return (
-          <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border ${colorMap[status] || "bg-gray-100"} uppercase tracking-wide`}>
+          <span className={`text-[10px] px-2 py-0.5 border ${styleClass} uppercase tracking-wide font-medium`}>
               {status.replace(/_/g, " ")}
           </span>
       );
   }
 
   const getPaymentMethodBadge = (method: string) => {
-      if (method === 'COD') return <span className="text-[10px] font-bold px-2 py-1 rounded bg-orange-50 text-orange-700 border border-orange-200">COD</span>;
-      if (method === 'PREPAID') return <span className="text-[10px] font-bold px-2 py-1 rounded bg-blue-50 text-blue-700 border border-blue-200">PREPAID</span>;
-      return <span className="text-[10px] text-gray-400">{method}</span>;
+      if (method === 'COD') return <span className="text-[10px] font-bold px-1.5 py-0.5 bg-gray-100 text-gray-900 border border-gray-300 uppercase">COD</span>;
+      if (method === 'PREPAID') return <span className="text-[10px] font-bold px-1.5 py-0.5 bg-white text-gray-900 border border-gray-300 uppercase">PREPAID</span>;
+      return <span className="text-[10px] text-gray-400 uppercase">{method}</span>;
   }
 
-  // --- LOGIC FILTER & SORT ---
+  // --- LOGIC FILTER & SORT (ONLY CREATED_AT) ---
   const processedOrders = useMemo(() => {
       let filtered = orders.filter(o => {
           const status = o.decryptedData?.status || "";
@@ -176,28 +170,18 @@ export default function SellerDashboard() {
       });
 
       return filtered.sort((a, b) => {
-          let aVal: any;
-          let bVal: any;
-          if (sortKey === 'display_id') {
-              aVal = parseInt(a.display_id.replace('#', ''));
-              bVal = parseInt(b.display_id.replace('#', ''));
-          } else if (sortKey === 'updated_at') {
-              const timeA = a.decryptedData?.updatedAt ? new Date(a.decryptedData.updatedAt).getTime() : new Date(a.created_at).getTime();
-              const timeB = b.decryptedData?.updatedAt ? new Date(b.decryptedData.updatedAt).getTime() : new Date(b.created_at).getTime();
-              aVal = timeA; bVal = timeB;
-          } else {
-              aVal = new Date(a.created_at).getTime();
-              bVal = new Date(b.created_at).getTime();
-          }
-          if (aVal < bVal) return sortDir === 'asc' ? -1 : 1;
-          if (aVal > bVal) return sortDir === 'asc' ? 1 : -1;
+          // Only sort by created_at
+          const timeA = new Date(a.created_at).getTime();
+          const timeB = new Date(b.created_at).getTime();
+          
+          if (timeA < timeB) return sortDir === 'asc' ? -1 : 1;
+          if (timeA > timeB) return sortDir === 'asc' ? 1 : -1;
           return 0;
       });
   }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
 
   // --- ACTIONS ---
   const checkUserRole = async (token: string) => {
-      console.log("🔍 Checking Role...");
       setIsCheckingRole(true);
       const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
 
@@ -273,14 +257,13 @@ export default function SellerDashboard() {
             console.log(`[Frontend Debug] Orders received count (Fabric): ${rawOrders.length}`);
             
             const mappedOrders: OrderRow[] = []
-            console.log(`[Frontend Debug] Orders received count: ${rawOrders.length}`);
 
             await Promise.all(
               rawOrders.map(async (order: any) => {
                 const row: OrderRow = {
                     id: order.id,
                     display_id: `#${order.display_id}`,
-                    created_at: new Date(order.created_at).toLocaleDateString('vi-VN'),
+                    created_at: order.created_at, 
                     publicData: {
                         email: order.publicData.email || "Loading...",
                         total: order.publicData.total || 0,
@@ -319,7 +302,7 @@ export default function SellerDashboard() {
                     }
                   } else {
                         const errorData = await resDecrypt.json();
-                        console.warn(`[Frontend] ❌ Decrypt FAILED for ${order.id}. Status: ${resDecrypt.status}. Error: ${errorData.error || 'Unknown'}`);
+                        console.warn(`[Frontend] ❌ Decrypt FAILED for ${order.id}.`);
                     row.status = "Error"
                     row.error = errorData.error || "Syncing...";
                   }
@@ -330,7 +313,8 @@ export default function SellerDashboard() {
                 mappedOrders.push(row)
               })
             )
-            const sorted = mappedOrders.sort((a, b) => b.id.localeCompare(a.id));
+            // Default sort desc by created_at
+            const sorted = mappedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
             setOrders(sorted);
             
             if (selectedOrder) {
@@ -393,7 +377,7 @@ export default function SellerDashboard() {
                     const r: any[] = [], max = args.length - 1;
                     function helper(arr: any[], i: number) {
                         for (let j = 0, l = args[i].length; j < l; j++) {
-                            const a = arr.slice(0); // clone
+                            const a = arr.slice(0); 
                             a.push(args[i][j]);
                             if (i === max) r.push(a);
                             else helper(a, i + 1);
@@ -517,69 +501,67 @@ export default function SellerDashboard() {
     else { setIsCheckingRole(false); setIsLoggedIn(false); }
   }, [])
 
-  // ================= UI RENDERING =================
-
-  if (isCheckingRole) return <div className="h-screen flex flex-col items-center justify-center gap-2"><Spinner className="animate-spin text-blue-600 w-8 h-8" /><span className="text-gray-500 text-sm">Đang tải...</span></div>
+  if (isCheckingRole) return <div className="h-screen flex items-center justify-center"><Spinner className="animate-spin text-gray-800 w-8 h-8" /></div>
   
   if (!isLoggedIn || !isAuthorized) return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-           <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
+           <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-sm border border-gray-200">
              <div className="text-center mb-8">
-                <div className="w-12 h-12 bg-blue-600 rounded-lg text-white font-bold text-xl flex items-center justify-center mx-auto mb-4">S</div>
-                <h2 className="text-2xl font-bold text-gray-900">Seller Portal</h2>
+                <div className="w-10 h-10 bg-gray-900 rounded-md text-white font-bold text-lg flex items-center justify-center mx-auto mb-4">S</div>
+                <h2 className="text-xl font-semibold text-gray-900">Seller Portal</h2>
                 <p className="text-gray-500 text-sm mt-1">Log in to manage your store</p>
              </div>
              {isLoggedIn && !isAuthorized && (
-                 <div className="mb-6 p-4 bg-red-50 text-red-600 text-sm rounded-lg border border-red-100 flex items-center gap-2">
+                 <div className="mb-6 p-3 bg-gray-50 text-gray-600 text-sm border border-gray-200 flex items-center gap-2">
                      <XMark className="w-4 h-4"/> No access rights.
                  </div>
              )}
-             <form onSubmit={handleLogin} className="space-y-5">
+             <form onSubmit={handleLogin} className="space-y-4">
                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="shop@example.com" required />
+                  <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Email</label>
+                  <input type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-gray-300 p-2.5 rounded-md text-sm focus:border-gray-500 focus:ring-0 outline-none transition" placeholder="shop@example.com" required />
                </div>
                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-                  <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" placeholder="••••••••" required />
+                  <label className="block text-xs font-medium text-gray-700 mb-1 uppercase tracking-wide">Password</label>
+                  <input type="password" value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-gray-300 p-2.5 rounded-md text-sm focus:border-gray-500 focus:ring-0 outline-none transition" placeholder="••••••••" required />
                </div>
-               {loginError && <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-100">{loginError}</div>}
-               <button type="submit" disabled={isLoadingLogin} className="w-full bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 font-bold transition shadow-md flex justify-center items-center">
-                  {isLoadingLogin ? <Spinner className="animate-spin text-white w-5 h-5" /> : "Log in"}
+               {loginError && <div className="text-red-600 text-sm">{loginError}</div>}
+               <button type="submit" disabled={isLoadingLogin} className="w-full bg-gray-900 text-white p-2.5 rounded-md hover:bg-black font-medium transition shadow-sm text-sm">
+                  {isLoadingLogin ? <Spinner className="animate-spin text-white w-4 h-4 mx-auto" /> : "Log in"}
                </button>
-               {isLoggedIn && <button type="button" onClick={handleLogout} className="w-full text-center text-gray-500 text-sm hover:text-gray-900 mt-2">Log out</button>}
+               {isLoggedIn && <button type="button" onClick={handleLogout} className="w-full text-center text-gray-500 text-xs hover:text-gray-900 mt-2 uppercase tracking-wide font-medium">Log out</button>}
              </form>
            </div>
         </div>
       )
 
   return (
-    <div className="min-h-screen bg-gray-50 flex font-sans text-gray-900">
+    <div className="min-h-screen bg-gray-50 flex font-sans text-gray-900 text-sm">
       
-      {/* SIDEBAR */}
+      {/* SIDEBAR (Monochrome & Inter Font Style) */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full z-20">
           <div className="p-6 border-b border-gray-100 flex items-center gap-3">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg text-white flex items-center justify-center font-bold text-lg shadow-sm">S</div>
+              <div className="w-8 h-8 bg-gray-900 rounded-md text-white flex items-center justify-center font-bold text-lg shadow-sm">S</div>
               <div>
-                  <h1 className="text-sm font-bold text-gray-900 leading-tight">Seller Portal</h1>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">Dashboard</p>
+                  <h1 className="text-sm font-semibold text-gray-900">Seller Portal</h1>
+                  <p className="text-[10px] text-gray-500 font-medium uppercase tracking-wide">Dashboard</p>
               </div>
           </div>
-          <nav className="flex-1 p-4 space-y-2">
-              <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <ShoppingBag className="w-5 h-5"/> Orders
+          <nav className="flex-1 p-4 space-y-1">
+              <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
+                  <ShoppingBag className="w-4 h-4"/> Orders
               </button>
-              <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                  <TagIcon className="w-5 h-5"/> Products
+              <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
+                  <TagIcon className="w-4 h-4"/> Products
               </button>
           </nav>
-          <div className="p-4 border-t border-gray-100 bg-gray-50/50">
-              <div className="flex items-center gap-3 px-4 py-3 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><User/></div>
-                  <div className="text-xs text-gray-500 truncate w-24">User Account</div>
+          <div className="p-4 border-t border-gray-100 bg-gray-50/30">
+              <div className="flex items-center gap-3 px-3 py-2 mb-1">
+                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><User className="w-3 h-3"/></div>
+                  <div className="text-xs text-gray-500 font-medium truncate w-32">User Account</div>
               </div>
-              <button onClick={handleLogout} className="flex items-center gap-3 w-full px-4 py-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition text-sm font-medium">
-                  <ArrowRightOnRectangle /> Log out
+              <button onClick={handleLogout} className="flex items-center gap-3 w-full px-3 py-1.5 text-gray-500 hover:text-gray-900 rounded-md transition text-xs font-medium">
+                  <ArrowRightOnRectangle className="w-3 h-3" /> Log out
               </button>
           </div>
       </aside>
@@ -592,81 +574,86 @@ export default function SellerDashboard() {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between items-end mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Orders</h1>
-                        <p className="text-sm text-gray-500 mt-1">Manage and track orders from customers</p>
+                        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Orders</h1>
+                        <p className="text-sm text-gray-500 mt-1">Manage and track your incoming orders.</p>
                     </div>
-                    <button onClick={() => loadSellerOrders()} className="px-3 py-2 bg-white border border-gray-300 rounded-lg shadow-sm text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition">
+                    <button onClick={() => loadSellerOrders()} className="px-3 py-1.5 bg-white border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition">
                         <span className={isLoadingOrders ? "animate-spin" : ""}>⟳</span>
                     </button>
                 </div>
 
-                {/* Filters */}
-                <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-6 flex gap-3 items-center">
+                {/* Filters & Sort */}
+                <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-6 flex items-center p-1">
                     <div className="relative flex-1">
                         <span className="absolute left-3 top-2.5 text-gray-400"><MagnifyingGlass /></span>
-                        <input placeholder="Search orders (ID, Email, Phone)..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                        <input placeholder="Search orders..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
                             className="w-full pl-9 pr-3 py-2 text-sm border-none focus:ring-0 outline-none h-full bg-transparent placeholder-gray-400 text-gray-900" />
                     </div>
-                    <div className="w-px h-6 bg-gray-200"></div>
-                    <div className="flex items-center gap-2 px-2">
+                    <div className="w-px h-6 bg-gray-200 mx-2"></div>
+                    <div className="flex items-center px-2 gap-2">
                         <Funnel className="text-gray-400 w-4 h-4" />
-                        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-sm border-none focus:ring-0 outline-none bg-transparent text-gray-700 cursor-pointer font-medium hover:text-blue-600 transition">
-                            <option value="ALL">All statuses</option>
+                        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-sm border-none focus:ring-0 outline-none bg-transparent text-gray-600 cursor-pointer font-medium hover:text-gray-900 transition">
+                            <option value="ALL">All Statuses</option>
                             <option value="CREATED">Created</option>
                             <option value="PAID">Paid</option>
                             <option value="SHIPPED">Shipped</option>
                             <option value="DELIVERED">Delivered</option>
                             <option value="RETURN_REQUESTED">Return Requested</option>
                             <option value="RETURN_IN_TRANSIT">Return In Transit)</option>
+                            <option value="RETURNED">Returned )</option>
                             <option value="DELIVERED_COD_PENDING">Delivered (COD Pending)</option>
                             <option value="COD_REMITTED">COD Remitted</option>
                             <option value="SETTLED">Settled</option>
                             <option value="CANCELLED">Cancelled</option>
                         </select>
                     </div>
-                    <div className="w-px h-6 bg-gray-200"></div>
-                    <div className="relative" ref={sortMenuRef}>
-                        <button onClick={() => setShowSortMenu(!showSortMenu)} className="px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg flex items-center gap-1 transition">
-                            {sortDir === 'desc' ? 'Newest' : 'Oldest'} <Icons.Sort />
+                    <div className="w-px h-6 bg-gray-200 mx-2"></div>
+                    
+                    {/* Sort Menu */}
+                    <div className="relative mr-2" ref={sortMenuRef}>
+                        <button onClick={() => setShowSortMenu(!showSortMenu)} className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md font-medium flex items-center gap-1 transition">
+                            Sort <Icons.Sort />
                         </button>
                         {showSortMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-40 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in duration-100">
-                                <button onClick={() => { setSortDir('desc'); setShowSortMenu(false); }} className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition">Newest</button>
-                                <button onClick={() => { setSortDir('asc'); setShowSortMenu(false); }} className="block w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 transition">Oldest</button>
+                            <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1 overflow-hidden animate-in fade-in zoom-in duration-100">
+                                <div className="px-3 py-2 text-[10px] text-gray-400 font-semibold uppercase tracking-wide border-b border-gray-100">Sort By</div>
+                                <button onClick={() => { setSortKey('created_at'); setShowSortMenu(false); }} className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortKey==='created_at'?'font-medium text-gray-900':'text-gray-600'}`}>Created Date</button>
+                                <div className="h-px bg-gray-100 my-1"></div>
+                                <div className="px-3 py-2 text-[10px] text-gray-400 font-semibold uppercase tracking-wide border-b border-gray-100">Order</div>
+                                <button onClick={() => { setSortDir('desc'); setShowSortMenu(false); }} className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortDir==='desc'?'font-medium text-gray-900':'text-gray-600'}`}>Newest First</button>
+                                <button onClick={() => { setSortDir('asc'); setShowSortMenu(false); }} className={`block w-full text-left px-4 py-2 text-sm hover:bg-gray-50 ${sortDir==='asc'?'font-medium text-gray-900':'text-gray-600'}`}>Oldest First</button>
                             </div>
                         )}
                     </div>
                 </div>
 
                 {/* Table */}
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                     <table className="w-full text-left">
-                        <thead className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        <thead className="bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500">
                             <tr>
                                 <th className="px-6 py-3 font-medium">Order ID</th>
                                 <th className="px-6 py-3 font-medium">Created Date</th>
                                 <th className="px-6 py-3 font-medium">Customer</th>
                                 <th className="px-6 py-3 font-medium">Status</th>
-                                <th className="px-6 py-3 font-medium text-right">Total Amount</th>
+                                <th className="px-6 py-3 font-medium text-right">Total</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-gray-100 text-sm">
                             {processedOrders.length === 0 ? (
-                                <tr><td colSpan={5} className="px-6 py-16 text-center text-gray-500 flex flex-col items-center justify-center gap-3">
-                                    <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center text-gray-400 text-xl">📭</div>
-                                    <p>No orders found.</p>
-                                </td></tr>
+                                <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">No orders found.</td></tr>
                             ) : processedOrders.map(order => (
-                                <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-blue-50/50 cursor-pointer transition-colors group">
-                                    <td className="px-6 py-4 font-medium text-blue-600 text-sm group-hover:text-blue-700">{order.display_id}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-500">{order.created_at}</td>
-                                    <td className="px-6 py-4 text-sm text-gray-900">
+                                <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-gray-50 cursor-pointer transition-colors">
+                                    <td className="px-6 py-4 font-medium text-gray-900">{order.display_id}</td>
+                                    <td className="px-6 py-4 text-gray-500">
+                                        {new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                    </td>
+                                    <td className="px-6 py-4 text-gray-900">
                                         <div className="flex flex-col">
                                             <span className="font-medium">{order.decryptedData?.customerName || "Guest"}</span>
-                                            <span className="text-xs text-gray-400">{order.publicData.email}</span>
+                                            {/* <span className="text-xs text-gray-400">{order.publicData.email}</span> */}
                                         </div>
                                     </td>
-                                    {/* Cột Trạng thái & Thanh toán */}
                                     <td className="px-6 py-4">
                                         {/* HIỂN THỊ CẢ STATUS VÀ COD STATUS (UPDATE CHO PUBLIC DATA) */}
                                         <div className="flex flex-col gap-1 items-start">
@@ -676,24 +663,22 @@ export default function SellerDashboard() {
                                                 {getPaymentMethodBadge(order.publicData.medusa_payment)}
 
                                                 {order.publicData.medusa_payment === 'COD' && (
-                                                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                                                        order.publicData.cod_status === 'REMITTED' 
-                                                                ? 'bg-green-100 text-green-700 border-green-200' 
-                                                                : 'bg-gray-100 text-gray-500 border-gray-200'
-                                                        }`}>
+                                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${order.publicData.cod_status === 'REMITTED' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>
                                                         {order.publicData.cod_status || 'PENDING'}
                                                         </span>
                                                     )}
                                                 </div>
                                             </div>
                                     </td>
-                                    <td className="px-6 py-4 text-right font-mono text-sm font-medium text-gray-900">{order.decryptedData ? formatPrice(order.decryptedData.amount_untaxed, order.publicData.currency_code) : "-"}</td>
+                                    <td className="px-6 py-4 text-right font-medium text-gray-900">
+                                        {order.decryptedData ? formatPrice(order.decryptedData.amount_untaxed, order.publicData.currency_code) : "..."}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-                        <span> Showing {processedOrders?.length || 0} orders </span>
+                    <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
+                        <span>Showing {processedOrders.length} results</span>
                     </div>
                 </div>
             </div>
@@ -704,15 +689,15 @@ export default function SellerDashboard() {
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                 <div className="flex justify-between items-end mb-6">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Products</h1>
-                        <p className="text-sm text-gray-500 mt-1">List of products in the store</p>
+                        <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Products</h1>
+                        <p className="text-sm text-gray-500 mt-1">Manage your product inventory</p>
                     </div>
-                    <button onClick={() => setShowCreateModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 text-sm font-medium flex items-center gap-2 transition transform active:scale-95">
-                        <Plus className="w-4 h-4"/> Create Product
+                    <button onClick={() => setShowCreateModal(true)} className="px-3 py-1.5 bg-gray-900 text-white rounded-md shadow-sm text-xs font-medium hover:bg-gray-800 flex items-center gap-2 transition">
+                        <Plus className="w-3 h-3"/> Add Product
                     </button>
                 </div>
 
-                <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                     <table className="w-full text-left">
                         <thead className="bg-gray-50 border-b border-gray-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                             <tr>
@@ -878,64 +863,53 @@ export default function SellerDashboard() {
 
       {/* MODAL ORDER DETAIL (CLEAN UI) */}
       {selectedOrder && (
-        // 1. Thêm onClick vào lớp phủ (backdrop) để bấm ra ngoài là đóng
-        <div 
-            className="fixed inset-0 bg-black/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity"
-            onClick={() => setSelectedOrder(null)} 
-        >
-            {/* 2. Thêm onClick stopPropagation để bấm vào nội dung không bị đóng */}
-            <div 
-                className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-in zoom-in duration-200"
-                onClick={(e) => e.stopPropagation()} 
-            >
-                {/* HEADER - Sticky Top */}
-                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-xl z-10 shrink-0">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOrder(null)}></div>
+            <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 z-50 border border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                {/* Header */}
+                <div className="p-5 border-b border-gray-100 flex justify-between items-start bg-white z-10 shrink-0">
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900">Order {selectedOrder.display_id}</h2>
-                        <p className="text-xs text-gray-500 mt-1 font-mono">{selectedOrder.created_at}</p>
+                        <h2 className="text-lg font-semibold text-gray-900">Order {selectedOrder.display_id}</h2>
+                        <p className="text-xs text-gray-500 mt-1">{new Date(selectedOrder.created_at).toLocaleString()}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                         {/* Badge Status */}
-                            <span className="px-2.5 py-1 bg-gray-100 rounded-full text-[10px] font-bold text-gray-600 border border-gray-200 uppercase tracking-wide">
-                            {/* 🔥 ƯU TIÊN LẤY STATUS TỪ PUBLIC DATA 🔥 */}
-                            {selectedOrder.publicData.medusa_status}
-                            </span>
-                    </div>
+                    <button type="button" onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-700 bg-gray-50 p-1.5 rounded-md transition-colors">
+                        <XMark />
+                    </button>
                 </div>
                 
-                {/* BODY - Scrollable */}
-                <div className="p-6 space-y-6 overflow-y-auto">
+                {/* Body */}
+                <div className="p-6 space-y-6 overflow-y-auto text-sm">
+                    {/* Status Badge in Modal */}
+                    <div className="flex gap-2">
+                        <span className="px-2.5 py-1 bg-gray-100 rounded-md text-xs font-medium text-gray-700 border border-gray-200">
+                            {selectedOrder.publicData.medusa_status}
+                        </span>
+                </div>
                     
-                    {/* Customer Info */}
-                    <div className="flex items-center gap-4 p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-lg font-bold shrink-0">
-                            {(selectedOrder.decryptedData?.customerName || "U").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                            <p className="font-bold text-gray-900 text-sm truncate">
-                                {selectedOrder.decryptedData?.customerName || "Guest (Loading...)"}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate mt-0.5">
-                                {selectedOrder.decryptedData?.shipping_address || "..."}
-                            </p>
-                            <p className="text-xs text-blue-600 font-mono mt-0.5">
-                                {selectedOrder.decryptedData?.shipping_phone}
-                            </p>
-                        </div>
+                    {/* Customer */}
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                        <p className="text-xs font-medium text-gray-500 uppercase mb-2">Customer</p>
+                        <p className="font-medium text-gray-900">{selectedOrder.decryptedData?.customerName || "Guest"}</p>
+                        <p className="text-gray-500 text-xs mt-1">{selectedOrder.decryptedData?.shipping_address}</p>
+                        <p className="text-gray-500 text-xs">{selectedOrder.decryptedData?.shipping_phone}</p>
                     </div>
 
-                    {/* Products List */}
+                    {/* Items */}
                     <div>
-                        <h3 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-3 border-b border-gray-100 pb-2">Sản phẩm</h3>
+                        <p className="text-xs font-medium text-gray-500 uppercase mb-3 border-b border-gray-100 pb-2">Items</p>
                         <ul className="space-y-3">
                             {(selectedOrder.decryptedData?.items || []).length > 0 ? (
                                 selectedOrder.decryptedData?.items.map((p: any, i: number) => (
-                                    <li key={i} className="flex justify-between items-start text-sm">
+                                <li key={i} className="flex justify-between items-start">
                                     <div>
-                                            <span className="text-gray-800 font-medium line-clamp-1">{p.title || p.product_name}</span>
-                                            <span className="text-xs text-gray-500 font-mono bg-gray-100 px-1.5 py-0.5 rounded inline-block mt-1">x{p.quantity}</span>
+                                        <span className="text-gray-900 font-medium block">
+                                                {p.title || p.product_name}
+                                            </span>
+                                        <span className="text-xs text-gray-500">
+                                                x{p.quantity}
+                                            </span>
                                     </div>
-                                        <span className="font-mono font-medium text-gray-900 whitespace-nowrap ml-4">
+                                    <span className="font-medium text-gray-900">
                                             {formatPrice(p.subtotal || (p.unit_price * p.quantity), selectedOrder.publicData.currency_code)}
                                     </span>
                                 </li>
@@ -946,8 +920,8 @@ export default function SellerDashboard() {
                         </ul>
                     </div>
 
-                    {/* Financials */}
-                    <div className="space-y-2 pt-4 border-t border-dashed border-gray-200">
+                    {/* Totals */}
+                    <div className="border-t border-dashed border-gray-200 pt-4 space-y-2">
                         <div className="flex justify-between text-xs text-gray-500">
                             <span>Subtotal</span>
                             <span>{formatPrice(selectedOrder.decryptedData?.amount_untaxed || selectedOrder.publicData.total, selectedOrder.publicData.currency_code)}</span>
@@ -956,7 +930,7 @@ export default function SellerDashboard() {
                             <span>Shipping Fee</span>
                             <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
                         </div>
-                                                 <div className="flex justify-between text-base font-bold text-blue-700 pt-2 border-t border-gray-100 mt-2">
+                        <div className="flex justify-between font-semibold text-base text-gray-900 mt-2 pt-2 border-t border-gray-100">
                             <span>Total</span>
                             <span>
                                 {formatPrice(
@@ -969,21 +943,15 @@ export default function SellerDashboard() {
                     </div>
 
                     {/* ACTIONS */}
-                    <div className="pt-2">
-
-                        {/* 🔥 1. NÚT XÁC NHẬN NHẬN HÀNG HOÀN (Seller Confirm Return) 🔥 */}
-                        {/* Logic: Kiểm tra publicData.medusa_status là 'RETURN_IN_TRANSIT' */}
+                    <div className="pt-4">
                         {selectedOrder.publicData.medusa_status === 'RETURN_IN_TRANSIT' && (
                             <button 
                                 onClick={() => handleConfirmReturn(selectedOrder.id)} 
                                 disabled={isConfirmingReturn === selectedOrder.id}
-                                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold shadow-lg transition text-sm flex justify-center gap-2 items-center transform active:scale-95 disabled:opacity-70 disabled:scale-100"
+                                className="w-full py-2.5 bg-gray-900 hover:bg-black text-white font-medium rounded-md shadow-sm text-sm transition-colors flex justify-center gap-2 items-center"
                             >
-                                {isConfirmingReturn === selectedOrder.id ? (
-                                    <><Spinner className="animate-spin" /> Processing...</>
-                                ) : (
-                                    <><CheckCircle/> CONFIRM RETURN RECEIVED</>
-                                )}
+                                {isConfirmingReturn === selectedOrder.id ? <Spinner className="animate-spin"/> : <CheckCircle/>} 
+                                Confirm Return Received
                             </button>
                         )}
                         
@@ -996,8 +964,8 @@ export default function SellerDashboard() {
 
                         {/* Thông báo hoàn tất */}
                         {selectedOrder.publicData.medusa_status === 'RETURNED' && (
-                             <div className="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl text-xs font-bold text-center border border-green-200 flex items-center justify-center gap-2">
-                                <CheckCircle className="text-blue-600" /> Order has been successfully returned
+                             <div className="w-full py-2.5 bg-gray-50 text-gray-600 rounded-md text-xs font-medium text-center border border-gray-200 flex items-center justify-center gap-2">
+                                <CheckCircle className="text-green-600" /> Return Completed
                              </div>
                         )}
                     </div>

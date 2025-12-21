@@ -15,12 +15,8 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localh
 // --- ICONS ---
 const Icons = {
   Sort: () => (
-    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M3.125 6.875H10.625" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M3.125 13.125H7.5" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M13.75 14.375L16.875 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M16.875 14.375L13.75 11.25" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      <path d="M15.3125 5.625V14.375" stroke="#6B7280" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M6 12h12m-9 6h6" />
     </svg>
   ),
   Check: () => (
@@ -193,24 +189,21 @@ export default function ShipperDashboard() {
   }
 
   const getBlockchainStatusBadge = (status: string) => {
-      const styles: Record<string, string> = {
-          CREATED: "bg-gray-100 text-gray-700 border-gray-300",
-          PAID: "bg-green-100 text-green-700 border-green-300",
-          SHIPPED: "bg-blue-100 text-blue-700 border-blue-300",
-          DELIVERED: "bg-teal-100 text-teal-700 border-teal-300",
-          DELIVERED_COD_PENDING: "bg-orange-100 text-orange-700 border-orange-300",
-          COD_REMITTED: "bg-indigo-100 text-indigo-700 border-indigo-300",
-          SETTLED: "bg-purple-100 text-purple-700 border-purple-300",
-          CANCELLED: "bg-red-100 text-red-700 border-red-300",
-          RETURN_REQUESTED: "bg-yellow-100 text-yellow-700 border-yellow-300",
-          RETURN_IN_TRANSIT: "bg-amber-100 text-amber-700 border-amber-300",
-          RETURNED: "bg-pink-100 text-pink-700 border-pink-300"
-      };
-      
-      if (!status) return <span className="text-[10px] text-gray-400">...</span>;
+      if (!status) return <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 border border-gray-200 uppercase font-medium">Syncing...</span>;
+
+      const s = status.toUpperCase();
+      let styleClass = "bg-gray-50 text-gray-500 border-gray-200"; // Default (Pending)
+
+      if (['DELIVERED', 'SETTLED', 'RETURNED', 'COD_REMITTED'].includes(s)) {
+          styleClass = "bg-gray-900 text-white border-gray-900"; // Completed (Dark)
+      } else if (['RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'CANCELLED', 'DELIVERED_COD_PENDING'].includes(s)) {
+          styleClass = "bg-gray-100 text-gray-900 border-gray-300 font-bold"; // Alert/Action (High contrast grey)
+      } else if (['PAID', 'SHIPPED', 'CREATED'].includes(s)) {
+          styleClass = "bg-white text-gray-900 border-gray-300 font-medium"; // Active (White)
+      }
 
       return (
-          <span className={`text-[10px] font-bold px-2 py-1 rounded border border-transparent ${styles[status] || "bg-gray-100"} uppercase shadow-sm`}>
+          <span className={`text-[10px] px-2 py-0.5 border ${styleClass} uppercase tracking-wide font-medium`}>
               {status.replace(/_/g, " ")}
           </span>
       );
@@ -574,14 +567,14 @@ export default function ShipperDashboard() {
 
   if (isLoggedIn && !isAuthorized) {
       return (
-          <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
-            <div className="bg-white p-8 rounded-xl shadow-lg text-center max-w-md border border-red-100">
-                <h1 className="text-2xl font-bold text-red-600 mb-2">ACCESS DENIED</h1>
-                <p className="text-gray-600 mb-6">
-                    This account does not have access to the <b>SHIPPER</b> page.
-                    <br/>Please contact Admin or log in with another account.
+          <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 font-sans">
+            <div className="bg-white p-8 rounded-lg shadow-sm text-center max-w-md border border-gray-200">
+                <h1 className="text-xl font-bold text-gray-900 mb-2 uppercase">Access Denied</h1>
+                <p className="text-gray-500 mb-6 text-sm">
+                    This account does not have access to the <b>SHIPPER</b> portal.
+                    <br/>Please contact Admin.
                 </p>
-                <button onClick={handleLogout} className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-bold transition">
+                <button onClick={handleLogout} className="bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 font-medium transition text-sm uppercase">
                     Logout
                 </button>
             </div>
@@ -591,21 +584,21 @@ export default function ShipperDashboard() {
 
     if (!isLoggedIn) {
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 font-sans">
+        <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-sm border border-gray-200">
             <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold mt-2 text-gray-800">
+            <h2 className="text-xl font-bold mt-2 text-gray-900">
                 Shipper Portal
             </h2>
-            <p className="text-gray-500 text-sm">Login to receive orders</p>
+            <p className="text-gray-500 text-sm">Login to manage deliveries</p>
             </div>
 
-            <form onSubmit={handleLogin} className="space-y-5">
+            <form onSubmit={handleLogin} className="space-y-4">
             <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full border border-gray-300 p-3 rounded-lg"
+                className="w-full border border-gray-300 p-2.5 rounded-md text-sm focus:ring-0 focus:border-black outline-none transition"
                 placeholder="shipper@myfabric.com"
                 required
             />
@@ -614,24 +607,24 @@ export default function ShipperDashboard() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full border border-gray-300 p-3 rounded-lg"
+                className="w-full border border-gray-300 p-2.5 rounded-md text-sm focus:ring-0 focus:border-black outline-none transition"
                 placeholder="Password"
                 required
             />
-            {loginError && (<div className="text-red-600 text-sm">{loginError}</div>)}
+            {loginError && (<div className="text-red-600 text-xs">{loginError}</div>)}
             <button
                 type="submit"
                 disabled={isLoadingLogin}
-                className="w-full bg-orange-600 text-white p-3 rounded-lg hover:bg-orange-700 font-bold"
+                className="w-full bg-black text-white p-2.5 rounded-md hover:bg-gray-800 font-medium text-sm transition shadow-sm uppercase tracking-wide"
             >
-                Login
+                {isLoadingLogin ? "Logging in..." : "Login"}
             </button>
             </form>
             <div className="text-center mt-6">
-            <p className="text-sm text-gray-600">
-                Don't have a shipper account?
-                <a href="http://localhost:8000/dk/shipper/register" className="ml-1 text-orange-600 font-semibold hover:underline">
-                Register now
+            <p className="text-xs text-gray-500">
+                Don't have an account? 
+                <a href="http://localhost:8000/dk/shipper/register" className="ml-1 text-black font-bold hover:underline">
+                Register
                 </a>
             </p>
             </div>
@@ -642,31 +635,31 @@ export default function ShipperDashboard() {
 
     // 3. Dashboard Main UI
     return (
-        <div className="min-h-screen bg-gray-50 font-sans text-gray-800 flex">
+        <div className="min-h-screen bg-gray-50 font-sans text-gray-900 flex text-sm">
 
             {/* --- SIDEBAR MENU --- */}
-            <aside className="w-64 bg-white border-r border-gray-200 h-screen sticky top-0 flex flex-col shadow-sm z-30">
+            <aside className="w-64 bg-white border-r border-gray-200 h-screen sticky top-0 flex flex-col z-30">
                 <div className="p-6 border-b border-gray-100">
-                    <h1 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+                    <h1 className="text-lg font-bold text-gray-900 tracking-tight flex items-center gap-2">
                         <div className="flex items-center gap-2 text-gray-900">
                             <Icons.Truck />
                             <span>Shipper</span>
                         </div>
                     </h1>
-                    <p className="text-xs text-gray-500 mt-1 truncate" title={currentUser?.email}>{currentUser?.email}</p>
+                    <p className="text-xs text-gray-500 mt-1 truncate font-mono" title={currentUser?.email}>{currentUser?.email}</p>
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1">
-                    <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}>
+                    <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
                         <Icons.Box /> Orders
                     </button>
-                    <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-orange-50 text-orange-700' : 'text-gray-600 hover:bg-gray-50'}`}>
-                        <Icons.Settings /> Unit Configuration
+                    <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
+                        <Icons.Settings /> Settings
                     </button>
                 </nav>
 
                 <div className="p-4 border-t border-gray-100">
-                    <button onClick={handleLogout} className="w-full px-4 py-2 border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-medium transition flex items-center justify-center gap-2">
+                    <button onClick={handleLogout} className="w-full px-3 py-2 text-gray-500 hover:text-gray-900 rounded-md hover:bg-gray-50 text-xs font-medium transition flex items-center gap-2 uppercase tracking-wide">
                         <ArrowRightOnRectangle /> Logout
                     </button>
                 </div>
@@ -680,43 +673,44 @@ export default function ShipperDashboard() {
                     <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <div className="flex justify-between items-end mb-6">
                             <div>
-                                <h2 className="text-2xl font-bold text-gray-900">Order Management</h2>
-                                <p className="text-sm text-gray-500 mt-1">List of assigned orders</p>
+                                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Order Management</h2>
+                                <p className="text-sm text-gray-500 mt-1">Overview of assigned shipments</p>
                             </div>
-                            <button onClick={() => loadShipperOrders()} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium shadow-sm transition flex items-center gap-2">
-                                <span className={isLoadingData ? "animate-spin" : ""}>⟳</span>
+                            <button onClick={() => loadShipperOrders()} className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium shadow-sm transition flex items-center gap-2 uppercase">
+                                <span className={isLoadingData ? "animate-spin" : ""}>⟳</span> Refresh
                             </button>
                         </div>
 
                         {/* --- TOOLBAR (Filter, Sort, Search) --- */}
-                        <div className="flex flex-wrap gap-4 mb-6 items-center justify-between bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                            <div className="flex gap-3 items-center flex-1">
+                        <div className="flex flex-wrap gap-4 mb-6 items-center justify-between bg-white p-2 rounded-lg border border-gray-200 shadow-sm">
+                            <div className="flex gap-3 items-center flex-1 ml-2">
                                 {/* Search */}
                                 <div className="relative flex-1 max-w-md">
                                     <span className="absolute left-3 top-2.5 text-gray-400"><MagnifyingGlass /></span>
                                     <input
-                                        placeholder="Search (Order ID, Email, Phone)..."
+                                        placeholder="Search Order ID..."
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 outline-none"
+                                        className="w-full pl-9 pr-3 py-2 text-sm border-none focus:ring-0 outline-none h-full bg-transparent placeholder-gray-400 text-gray-900"
                                     />
                                 </div>
-                                <div className="h-8 w-px bg-gray-200 mx-1"></div>
+                                <div className="h-6 w-px bg-gray-200 mx-1"></div>
                                 {/* Filter Status */}
                                 <div className="flex items-center gap-2">
                                     <Funnel className="text-gray-400 w-4 h-4" />
                                     <select
                                         value={statusFilter}
                                         onChange={(e) => setStatusFilter(e.target.value)}
-                                        className="border-none bg-transparent text-sm font-medium text-gray-700 cursor-pointer focus:ring-0 outline-none hover:text-orange-600 transition"
+                                        className="border-none bg-transparent text-sm font-medium text-gray-600 cursor-pointer focus:ring-0 outline-none hover:text-gray-900 transition uppercase"
                                     >
-                                        <option value="ALL">All statuses</option>
+                                        <option value="ALL">All Statuses</option>
                                         <option value="CREATED">Created</option>
                                         <option value="PAID">Paid</option>
                                         <option value="SHIPPED">Shipped</option>
                                         <option value="DELIVERED">Delivered</option>
                                         <option value="RETURN_REQUESTED">Return Requested</option>
-                                        <option value="RETURN_IN_TRANSIT">Return In Transit)</option>
+                                        <option value="RETURN_IN_TRANSIT">Return In Transit</option>
+                                        <option value="RETURNED">Returned</option>
                                         <option value="DELIVERED_COD_PENDING">Delivered (COD Pending)</option>
                                         <option value="COD_REMITTED">COD Remitted</option>
                                         <option value="SETTLED">Settled</option>
@@ -726,35 +720,35 @@ export default function ShipperDashboard() {
                             </div>
 
                             {/* Sort */}
-                            <div className="relative" ref={sortMenuRef}>
+                            <div className="relative mr-2" ref={sortMenuRef}>
                                 <button
                                     onClick={() => setShowSortMenu(!showSortMenu)}
-                                    className="flex items-center justify-center px-3 py-2 border border-gray-300 rounded-md bg-white hover:bg-gray-50 text-sm font-medium text-gray-700 gap-2 shadow-sm transition"
+                                    className="flex items-center justify-center px-3 py-1.5 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md text-sm font-medium gap-1 transition uppercase"
                                 >
-                                    <Icons.Sort /> Sort By
+                                    Sort <Icons.Sort />
                                 </button>
                                 {showSortMenu && (
-                                    <div className="absolute top-full right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 animate-in fade-in zoom-in duration-100">
-                                        <div className="px-3 py-2 text-xs font-semibold text-gray-500 bg-gray-50 border-b"></div>
+                                    <div className="absolute top-full right-0 mt-2 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-50 py-1 animate-in fade-in zoom-in duration-100 overflow-hidden">
+                                        <div className="px-3 py-2 text-[10px] text-gray-400 font-bold uppercase border-b border-gray-100">Sort By</div>
                                         {[
-                                            { label: 'Created date', key: 'created_at' },
-                                            // { label: 'Order ID', key: 'display_id' },
-                                            { label: 'Last updated', key: 'updated_at' }
+                                            { label: 'Created Date', key: 'created_at' },
+                                            { label: 'Order ID', key: 'display_id' },
+                                            { label: 'Updated', key: 'updated_at' }
                                         ].map((item) => (
                                             <div
                                                 key={item.key}
                                                 onClick={() => { setSortKey(item.key as SortKey); setShowSortMenu(true); }}
-                                                className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortKey === item.key ? 'text-orange-600 font-medium' : 'text-gray-700'}`}
+                                                className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortKey === item.key ? 'text-black font-bold' : 'text-gray-600'}`}
                                             >
                                                 {item.label} {sortKey === item.key && <Icons.Check />}
                                             </div>
                                         ))}
                                         <div className="h-px bg-gray-100 my-1"></div>
-                                        {[ { label: 'Newest / Descending', dir: 'desc' }, { label: 'Oldest / Ascending', dir: 'asc' } ].map((item) => (
+                                        {[ { label: 'Newest', dir: 'desc' }, { label: 'Oldest', dir: 'asc' } ].map((item) => (
                                             <div
                                                 key={item.dir}
                                                 onClick={() => { setSortDir(item.dir as SortDirection); setShowSortMenu(false); }}
-                                                className={`px-4 py-2 text-sm cursor-pointer hover:bg-gray-100 flex justify-between ${sortDir === item.dir ? 'text-orange-600 font-medium' : 'text-gray-700'}`}
+                                                className={`px-4 py-2 text-xs cursor-pointer hover:bg-gray-50 flex justify-between ${sortDir === item.dir ? 'text-black font-bold' : 'text-gray-600'}`}
                                             >
                                                 {item.label} {sortDir === item.dir && <Icons.Check />}
                                             </div>
@@ -765,37 +759,37 @@ export default function ShipperDashboard() {
                         </div>
 
                         {/* Table */}
-                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                             <table className="w-full text-left border-collapse">
                                 <thead>
-                                    <tr className="border-b border-gray-200 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                                        <th className="px-6 py-4">Order ID</th>
-                                        <th className="px-6 py-4">Created date</th>
-                                        <th className="px-6 py-4">Customer</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4 text-right">Shipping / COD Fee</th>
+                                    <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        <th className="px-6 py-3 font-medium">ID</th>
+                                        <th className="px-6 py-3 font-medium">Date</th>
+                                        <th className="px-6 py-3 font-medium">Customer</th>
+                                        <th className="px-6 py-3 font-medium">Status</th>
+                                        <th className="px-6 py-3 font-medium text-right">Fee / COD</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {processedOrders.length === 0 && !isLoadingData ? (
-                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Không tìm thấy đơn hàng nào.</td></tr>
+                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic text-xs">No orders found.</td></tr>
                                     ) : (
                                         processedOrders.map((order) => (
-                                            <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-orange-50 cursor-pointer transition-colors">
-                                                <td className="px-6 py-4 text-sm font-bold text-black-600 font-mono">{order.display_id}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">{order.created_at}</td>
-                                                <td className="px-6 py-4 text-sm text-gray-700">
+                                            <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-gray-50 cursor-pointer transition-colors group">
+                                                <td className="px-6 py-4 text-xs font-bold text-black font-mono">{order.display_id}</td>
+                                                <td className="px-6 py-4 text-xs text-gray-500">{order.created_at}</td>
+                                                <td className="px-6 py-4 text-xs text-gray-900">
                                                     <div className="flex flex-col">
                                                         <span className="font-medium">{order.decryptedData?.customerName || "Hidden"}</span>
-                                                        <span className="text-xs text-gray-400">{order.decryptedData?.shipping_phone || "..."}</span>
+                                                        <span className="text-[10px] text-gray-400">{order.decryptedData?.shipping_phone}</span>
                                                     </div>
                                                 </td>
-                                                <td className="px-6 py-4">{order.decryptedData ? getBlockchainStatusBadge(order.decryptedData.status) : <span className="text-xs bg-gray-100 px-2 py-1 rounded">Syncing...</span>}</td>
-                                                <td className="px-6 py-4 text-sm text-right">
+                                                <td className="px-6 py-4">{order.decryptedData ? getBlockchainStatusBadge(order.decryptedData.status) : <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-400">Syncing...</span>}</td>
+                                                <td className="px-6 py-4 text-xs text-right">
                                                     <div className="flex flex-col items-end">
-                                                        <span className="font-medium">{order.decryptedData ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) : "-"}</span>
+                                                        <span className="font-bold text-gray-900">{order.decryptedData ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) : "-"}</span>
                                                         {order.decryptedData?.paymentMethod === 'COD' && (
-                                                            <span className="text-[10px] text-orange-600 bg-orange-50 px-1 rounded">COD: {formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}</span>
+                                                            <span className="text-[9px] text-gray-500 bg-gray-100 px-1 rounded border border-gray-200 mt-1">COD: {formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}</span>
                                                         )}
                                                     </div>
                                                 </td>
@@ -805,9 +799,8 @@ export default function ShipperDashboard() {
                                 </tbody>
                             </table>
                             {/* Pagination Placeholder */}
-                            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
-                                <span>Hiển thị {processedOrders.length} đơn hàng</span>
-                                {/* Add pagination logic if needed */}
+                            <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-[10px] text-gray-500 uppercase font-bold">
+                                <span>Total: {processedOrders.length} orders</span>
                             </div>
                         </div>
                     </div>
@@ -816,36 +809,36 @@ export default function ShipperDashboard() {
                 {/* TAB SETTINGS */}
                 {activeTab === 'settings' && (
                     <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <h2 className="text-2xl font-bold text-gray-900 mb-2">Carrier setting</h2>
-                        <p className="text-gray-500 mb-8">This information will be displayed to customers when selecting a shipping method.</p>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2">Configuration</h2>
+                        <p className="text-gray-500 mb-8 text-sm">Update your carrier information.</p>
 
-                        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+                        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
                             <form onSubmit={handleSaveSettings} className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Carrier Name</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Carrier Name</label>
                                     <input
                                         type="text"
                                         value={settingsForm.carrier_name}
                                         onChange={(e) => setSettingsForm({ ...settingsForm, carrier_name: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition"
-                                        placeholder="Ex: FastExpress Logistics"
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:border-black focus:ring-0 outline-none transition"
+                                        placeholder="Ex: FastExpress"
                                     />
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone number</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Contact Phone</label>
                                     <input
                                         type="text"
                                         value={settingsForm.phone}
                                         onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition"
-                                        placeholder="Support Phone Number"
+                                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:border-black focus:ring-0 outline-none transition"
+                                        placeholder="Hotline"
                                     />
                                 </div>
 
                                 {/* ========= NEW: SHIPPING FEE ========= */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Fee</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Base Shipping Fee</label>
                                     <div className="relative">
                                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
                                             <CurrencyDollar />
@@ -854,21 +847,21 @@ export default function ShipperDashboard() {
                                             type="number"
                                             value={settingsForm.shipping_fee}
                                             onChange={(e) => setSettingsForm({ ...settingsForm, shipping_fee: parseInt(e.target.value) || 0 })}
-                                            className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-2.5 focus:ring-2 focus:ring-orange-500 outline-none transition"
+                                            className="w-full border border-gray-300 rounded-md pl-10 pr-3 py-2 text-sm focus:border-black focus:ring-0 outline-none transition"
                                             placeholder="10"
                                         />
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">This fee will be applied to all orders using your shipping service.</p>
+                                    <p className="text-[10px] text-gray-500 mt-1">Default fee applied to all orders.</p>
                                 </div>
                                 {/* ===================================== */}
 
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Email (Cannot be edited)</label>
+                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Email (Read-only)</label>
                                     <input
                                         type="email"
                                         value={settingsForm.email}
                                         disabled
-                                        className="w-full border border-gray-200 bg-gray-100 rounded-lg px-4 py-2.5 text-gray-500 cursor-not-allowed"
+                                        className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
                                     />
                                 </div>
 
@@ -876,9 +869,9 @@ export default function ShipperDashboard() {
                                     <button
                                         type="submit"
                                         disabled={isSavingSettings}
-                                        className="px-6 py-2.5 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg shadow-sm transition disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                                        className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white font-medium rounded-md shadow-sm transition disabled:opacity-70 text-sm uppercase tracking-wide flex items-center gap-2"
                                     >
-                                        {isSavingSettings ? <><Spinner className="animate-spin w-4 h-4"/> Saving...</> : "Save changes"}
+                                        {isSavingSettings ? <><Spinner className="animate-spin w-4 h-4"/> Saving...</> : "Save Changes"}
                                     </button>
                                 </div>
                             </form>
@@ -888,41 +881,40 @@ export default function ShipperDashboard() {
 
             </main>
 
-            {/* Modal Chi Tiết */}
+            {/* Modal Chi Tiết (Monochrome) */}
             {selectedOrder && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                    {/* ... (Nội dung modal chi tiết đơn hàng giữ nguyên như cũ hoặc update theo style mới) ... */}
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in duration-200">
-                        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOrder(null)}></div>
+                    <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200 z-50 border border-gray-200">
+                        <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0">
                             <div>
                                 <h3 className="font-bold text-lg text-gray-900">Order {selectedOrder.display_id}</h3>
-                                <p className="text-xs text-gray-500">{selectedOrder.created_at}</p>
+                                <p className="text-[10px] text-gray-500 mt-1 font-mono uppercase">{selectedOrder.created_at}</p>
                             </div>
-                            <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-700 transition"><XMark /></button>
+                            <button onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-black transition p-1 rounded-md hover:bg-gray-100"><XMark /></button>
                         </div>
-                        <div className="p-6 max-h-[70vh] overflow-y-auto">
+                        <div className="p-6 overflow-y-auto">
                             {/* Customer */}
-                            <div className="mb-6 bg-orange-50 p-4 rounded-lg border border-orange-100">
-                                <p className="text-sm font-bold text-black-900 mb-1">Customer</p>
-                                <p className="text-sm text-black-800">{selectedOrder.decryptedData?.customerName}</p>
+                            <div className="mb-6 p-4 bg-gray-50 rounded-md border border-gray-200">
+                                <p className="text-xs font-bold text-gray-500 uppercase mb-2">Customer</p>
+                                <p className="text-sm font-medium text-gray-900">{selectedOrder.decryptedData?.customerName}</p>
                                 {/* Display Phone Number */}
                                     {selectedOrder.decryptedData?.shipping_phone && (
-                                        <span className="text-xs font-mono bg-white px-2 py-0.5 rounded border border-orange-200 text-orange-700">
-                                            📞 {selectedOrder.decryptedData.shipping_phone}
+                                        <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-gray-300 text-gray-600 block w-fit mt-1">
+                                            {selectedOrder.decryptedData.shipping_phone}
                                         </span>
                                     )}
-                                <p className="text-xs text-black-600 mt-1">{selectedOrder.decryptedData?.shipping_address}</p>
-                                <p className="text-xs text-black-600 font-mono">{selectedOrder.decryptedData?.shipping_phone}</p>
+                                <p className="text-xs text-gray-600 mt-2">{selectedOrder.decryptedData?.shipping_address}</p>
                             </div>
 
                             {/* Totals */}
-                            <div className="border-t border-gray-200 pt-4 space-y-1 text-sm">
-                                <div className="flex justify-between text-gray-600">
+                            <div className="border-t border-dashed border-gray-200 pt-4 space-y-2 text-sm">
+                                <div className="flex justify-between text-gray-500">
                                     <span>Shipping Fee</span>
                                     <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
                                 </div>
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Cash on Delivery (COD)</span>
+                                <div className="flex justify-between text-gray-500">
+                                    <span>COD Amount</span>
                                     <span>
                                     {formatPrice(
                                         selectedOrder.decryptedData?.paymentMethod === "COD"
@@ -936,39 +928,36 @@ export default function ShipperDashboard() {
                             </div>
 
                             {/* Actions */}
-                            <div className="mt-6 flex flex-col gap-3">
+                            <div className="mt-6 pt-6 border-t border-gray-200 flex flex-col gap-3">
                                 {/* LOGIC XÁC NHẬN GIAO HÀNG */}
 
-                                {/* BUTTON 1: SHIP ORDER (Lấy hàng từ Seller) 
-                                    - COD: Hiện khi status = CREATED (Chưa thu tiền, lấy hàng luôn)
-                                    - PREPAID: Hiện khi status = PAID (Khách đã trả tiền Sàn mới cho lấy)
-                                */}
+                                {/* BUTTON 1: SHIP ORDER (Lấy hàng từ Seller) */}
                                 {((selectedOrder.decryptedData?.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'CREATED') ||
                                   (selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'PAID')) && (
                                     <button 
                                         onClick={() => handleShipOrder(selectedOrder.id)} 
                                         disabled={isShipping === selectedOrder.id} 
-                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2"
+                                        className="w-full bg-black hover:bg-gray-800 text-white py-2.5 rounded-md font-bold shadow-sm transition flex justify-center items-center gap-2 text-xs uppercase tracking-wide"
                                     >
                                         {isShipping === selectedOrder.id ? (
                                             <Spinner className="animate-spin" />
                                         ) : (
-                                            <><Icons.Truck/> Confirm pickup (Ship)</>
+                                            <><Icons.Truck/> Confirm Pickup</>
                                         )}
                                     </button>
                                 )}
 
                                 {/* BUTTON 2: GIAO HÀNG THÀNH CÔNG (PREPAID) */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'PREPAID' && selectedOrder.decryptedData.status === 'SHIPPED' && (
-                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Confirm delivery</>}
+                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, false)} disabled={isDelivering === selectedOrder.id} className="w-full bg-black hover:bg-gray-800 text-white py-2.5 rounded-md font-bold shadow-sm transition flex justify-center items-center gap-2 text-xs uppercase tracking-wide">
+                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><Icons.Truck/> Confirm Delivery</>}
                                     </button>
                                 )}
                                 
                                 {/* BUTTON 3: GIAO HÀNG & THU TIỀN (COD) */}
                                 {selectedOrder.decryptedData?.paymentMethod === 'COD' && selectedOrder.decryptedData.status === 'SHIPPED' && (
-                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, true)} disabled={isDelivering === selectedOrder.id} className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2">
-                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CurrencyDollar/> Confirm delivery & Collect payment</>}
+                                    <button onClick={() => handleConfirmDelivery(selectedOrder.id, true)} disabled={isDelivering === selectedOrder.id} className="w-full bg-black hover:bg-gray-800 text-white py-2.5 rounded-md font-bold shadow-sm transition flex justify-center items-center gap-2 text-xs uppercase tracking-wide">
+                                        {isDelivering === selectedOrder.id ? <Spinner className="animate-spin" /> : <><CurrencyDollar/> Confirm Delivery & Collect COD</>}
                                     </button>
                                 )}
 
@@ -978,20 +967,20 @@ export default function ShipperDashboard() {
                                     <button 
                                         onClick={() => handleShipReturn(selectedOrder.id)} 
                                         disabled={isReturning === selectedOrder.id} 
-                                        className="w-full bg-orange-600 hover:bg-orange-700 text-white py-2.5 rounded-lg font-bold shadow transition flex justify-center items-center gap-2"
+                                        className="w-full bg-black hover:bg-gray-800 text-white py-2.5 rounded-md font-bold shadow-sm transition flex justify-center items-center gap-2 text-xs uppercase tracking-wide"
                                     >
                                         {isReturning === selectedOrder.id ? (
                                             <Spinner className="animate-spin" />
                                         ) : (
-                                            <><Icons.Truck/> Confirm pickup (Return Pickup)</>
+                                            <><Icons.Truck/> Confirm Return Pickup</>
                                         )}
                                     </button>
                                 )}
                                 
                                 {/* Trạng thái đang hoàn trả (chỉ hiển thị thông báo) */}
                                 {selectedOrder.decryptedData?.status === 'RETURN_IN_TRANSIT' && (
-                                    <div className="p-3 bg-indigo-50 text-indigo-700 rounded text-center text-sm font-medium border border-indigo-200">
-                                        Return pickup is in transit...
+                                    <div className="p-3 bg-gray-100 text-gray-700 rounded-md text-center text-xs font-bold border border-gray-300 uppercase">
+                                        Return in transit to seller...
                                     </div>
                                 )}
                             </div>
