@@ -9,7 +9,7 @@ import {
 } from "@medusajs/ui";
 import { 
     Spinner, Photo, Envelope, CurrencyDollar, 
-    MagnifyingGlass, Funnel, Plus, Minus
+    MagnifyingGlass, Funnel, Plus, Minus, Clock, ComputerDesktop
 } from "@medusajs/icons"; 
 
 // --- 1. Error Boundary ---
@@ -51,7 +51,83 @@ const Icons = {
   )
 };
 
-// --- 4. Order Drawer ---
+// --- 4. Audit Trail Component (NEW) ---
+const AuditTrail = ({ history, sellerId, shipperId }: { history: any[], sellerId: string, shipperId: string }) => {
+    // Debug Log: Kiểm tra xem dữ liệu có vào đến đây không
+    // console.log("AuditTrail Received:", history);
+
+    if (!history || !Array.isArray(history) || history.length === 0) {
+        return <Text className="text-ui-fg-subtle italic text-xs">No history recorded.</Text>;
+    }
+
+    // Sort history: Newest first
+    const sortedHistory = [...history].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    // Hàm map tên hiển thị thân thiện
+    const getActorName = (org: string) => {
+        if (org === 'SellerOrgMSP') return sellerId || "Seller";
+        if (org === 'ShipperOrgMSP') return shipperId || "Shipper";
+        if (org === 'ECommercePlatformOrgMSP') return "Platform Admin";
+        return org;
+    };
+
+    // Hàm format Action (Ví dụ: CreateOrder -> Create order)
+    const formatAction = (action: string) => {
+        if (!action) return "Unknown";
+        // Tách chữ hoa: CreateOrder -> Create Order
+        const spaced = action.replace(/([A-Z])/g, ' $1').trim(); 
+        // Viết hoa chữ cái đầu, còn lại thường
+        return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+    };
+
+    return (
+        <div className="flex flex-col gap-0 relative ml-2">
+            <div className="absolute left-[15px] top-4 bottom-4 w-px bg-ui-border-base -z-10"></div>
+
+            {sortedHistory.map((entry, index) => (
+                <div key={index} className="flex gap-4 pb-6 last:pb-0 relative group">
+                    <div className="h-8 w-8 rounded-full bg-ui-bg-base border border-ui-border-base flex items-center justify-center shrink-0 z-10 group-hover:border-ui-fg-interactive transition-colors">
+                        <Clock className="w-4 h-4 text-ui-fg-subtle group-hover:text-ui-fg-interactive" />
+                    </div>
+
+                    <div className="flex flex-col flex-1 pt-1">
+                        <div className="flex justify-between items-start">
+                            <div className="flex flex-col">
+                                {/* Format Action thành chữ thường đẹp mắt */}
+                                <span className="text-sm font-medium text-ui-fg-base">
+                                    {formatAction(entry.action)}
+                                </span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    {/* Hiển thị Company ID thay vì MSP */}
+                                    <span className="text-[10px] bg-ui-bg-subtle px-1.5 py-0.5 rounded text-ui-fg-muted border border-ui-border-base font-mono font-medium">
+                                        {getActorName(entry.actorOrg)}
+                                    </span>
+                                    <span className="text-xs text-ui-fg-subtle">
+                                        {new Date(entry.timestamp).toLocaleString('en-GB')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {entry.txID && (
+                            <div className="mt-1.5 p-1.5 bg-ui-bg-subtle/50 rounded border border-ui-border-transparent hover:border-ui-border-base transition-colors w-fit">
+                                <div className="flex items-center gap-1.5">
+                                    <ComputerDesktop className="w-3 h-3 text-ui-fg-muted"/>
+                                    {/* TxID hiển thị ngắn gọn */}
+                                    <Text size="xsmall" className="font-mono text-ui-fg-muted truncate max-w-[200px]" title={entry.txID}>
+                                        Tx: {entry.txID.substring(0, 15)}...
+                                    </Text>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+
+// --- 5. Order Drawer ---
 const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder: any, onClose: () => void, onRefresh: () => void }) => {
     const [medusaOrder, setMedusaOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -76,7 +152,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
             }
         };
         fetchMedusaOrder();
-    }, [originalId]);
+    }, [originalId, blockchainOrder]);
 
     const handleConfirmPayment = async () => {
         if (!confirm("Confirm payment received for this sub-order?")) return;
@@ -183,14 +259,28 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
     const visibleItems = showAllItems ? subOrderItems : subOrderItems.slice(0, DISPLAY_LIMIT);
     const hiddenCount = Math.max(0, subOrderItems.length - DISPLAY_LIMIT);
 
+    // --- Logic lấy History an toàn ---
+    const getHistoryData = () => {
+        if (blockchainOrder.history && Array.isArray(blockchainOrder.history)) return blockchainOrder.history;
+        if (blockchainOrder.Record && Array.isArray(blockchainOrder.Record.history)) return blockchainOrder.Record.history;
+        if (blockchainOrder.decryptedData && Array.isArray(blockchainOrder.decryptedData.history)) return blockchainOrder.decryptedData.history;
+        return [];
+    };
+
+    const historyData = getHistoryData();
+
     return (
         <Drawer open={true} onOpenChange={(open) => !open && onClose()}>
-            <Drawer.Content className="flex flex-col h-full max-h-screen"> 
+            {/* Fix Layout: flex-col + h-full để chiếm toàn màn hình Drawer */}
+            <Drawer.Content className="flex flex-col h-full max-h-screen outline-none">
                 <Drawer.Header>
                     <Drawer.Title>Split Order Details</Drawer.Title>
+                    {/* Fix Warning: Description ẩn */}
+                    <Drawer.Description className="hidden">Details of order fetched from Blockchain</Drawer.Description>
                 </Drawer.Header>
 
-                <Drawer.Body className="p-0 flex-1 overflow-y-auto">
+                {/* Fix Scroll: flex-1 + overflow-y-auto để chỉ cuộn phần nội dung */}
+                <Drawer.Body className="p-0 flex-1 overflow-y-auto relative">
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <Spinner className="animate-spin text-ui-fg-interactive" />
@@ -313,11 +403,21 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                     <Text className="font-medium">{formatMoney(originalShippingFee)}</Text>
                                 </div>
                             </div>
+
+                            <div className="border-t-2 border-ui-border-base pt-6 pb-4">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div className="flex items-center gap-2">
+                                        <Heading level="h3">Audit Trail</Heading>
+                                        <Badge size="small" color="grey">Immutable</Badge>
+                                    </div>
+                                </div>
+                                <AuditTrail history={historyData} />
+                            </div>
+
                         </div>
                     )}
                 </Drawer.Body>
                 
-                {/* Footer CỐ ĐỊNH Ở DƯỚI CÙNG, KHÔNG BỊ ĐẨY ĐI */}
                 <Drawer.Footer className="flex justify-between items-center border-t border-ui-border-base pt-4 bg-ui-bg-base z-10 shrink-0">
                     <div className="flex gap-2">
                         <Drawer.Close asChild>
@@ -479,7 +579,6 @@ const BlockchainOrderList = () => {
     fetchData();
   }, []);
 
-  // 🔥 LOGIC SORT CẬP NHẬT 🔥
   const processedOrders = useMemo(() => {
       let filtered = orders.filter(o => {
           const status = o.status || "";
@@ -496,12 +595,7 @@ const BlockchainOrderList = () => {
           let bVal: any = 0;
 
           if (sortKey === 'blockchain_id') {
-              aVal = a.blockchain_id;
-              bVal = b.blockchain_id;
-        //   } else if (sortKey === 'updated_at') {
-        //       // Parse ngày tháng an toàn
-        //       aVal = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-        //       bVal = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+              aVal = a.blockchain_id; bVal = b.blockchain_id;
           } else {
               // created_at
               aVal = new Date(a.created_at).getTime();
@@ -560,10 +654,6 @@ const BlockchainOrderList = () => {
                         {showSortMenu && (
                             <div className="absolute top-full right-0 mt-2 w-48 bg-ui-bg-base border border-ui-border-base rounded-md shadow-lg z-50 py-1">
                                 <div className="px-3 py-2 text-xs font-semibold text-ui-fg-muted bg-ui-bg-subtle border-b border-ui-border-base">Sort By</div>
-                                {/* NÚT CHỌN UPDATED AT */}
-                                {/* <div onClick={() => { setSortKey('updated_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='updated_at' ? 'font-bold' : ''}`}>
-                                    Last Updated {sortKey==='updated_at' && <Icons.Check/>} */}
-                                {/* </div> */}
                                 <div onClick={() => { setSortKey('created_at'); setShowSortMenu(false); }} className={`px-4 py-2 text-sm cursor-pointer hover:bg-ui-bg-subtle flex justify-between ${sortKey==='created_at' ? 'font-bold' : ''}`}>
                                     Created Date {sortKey==='created_at' && <Icons.Check/>}
                                 </div>
@@ -587,8 +677,6 @@ const BlockchainOrderList = () => {
                             {paginatedOrders.map((o) => (
                                 <tr key={o.blockchain_id} className="border-b border-ui-border-base hover:bg-ui-bg-subtle/50 cursor-pointer" onClick={() => setSelectedOrder(o)}>
                                     <td className="px-6 py-4 font-mono font-medium">{o.blockchain_id}</td>
-                                    
-                                    {/* CỘT UPDATED AT */}
                                     <td className="px-6 py-4 text-ui-fg-subtle">
                                         <div className="flex flex-col">
                                             <span className="font-medium text-ui-fg-base">{o.created_at ? new Date(o.created_at).toLocaleDateString('en-GB') : formatDate(o.created_at)}</span>

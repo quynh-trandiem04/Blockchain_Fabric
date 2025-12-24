@@ -7,7 +7,7 @@ import { useRouter, useParams } from "next/navigation"
 // Import Icons
 import {
     MagnifyingGlass, Funnel, Spinner, XMark, CheckCircle, RocketLaunch,
-    ArrowRightOnRectangle, User, CurrencyDollar
+    ArrowRightOnRectangle, User, CurrencyDollar, Clock, ComputerDesktop, BuildingStorefront
 } from "@medusajs/icons"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -47,10 +47,74 @@ const Icons = {
   )
 };
 
+// --- AUDIT TRAIL COMPONENT ---
+const AuditTrail = ({ history, sellerId }: { history: any[], sellerId?: string }) => {
+    if (!history || !Array.isArray(history) || history.length === 0) {
+        return <p className="text-gray-400 italic text-xs">No history recorded.</p>;
+    }
+
+    const sortedHistory = [...history].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    const getActorName = (org: string) => {
+        if (org === 'SellerOrgMSP') return sellerId || "Seller"; 
+        if (org === 'ShipperOrgMSP') return "You (Shipper)";
+        if (org === 'ECommercePlatformOrgMSP') return "Platform Admin";
+        return org;
+    };
+
+    const formatAction = (action: string) => {
+        if (!action) return "Unknown";
+        const spaced = action.replace(/([A-Z])/g, ' $1').trim(); 
+        return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+    };
+
+    return (
+        <div className="flex flex-col gap-0 relative ml-2 mt-4">
+            <div className="absolute left-[15px] top-4 bottom-4 w-px bg-gray-200 -z-10"></div>
+            {sortedHistory.map((entry, index) => (
+                <div key={index} className="flex gap-4 pb-6 last:pb-0 relative group">
+                    <div className="h-8 w-8 rounded-full bg-white border border-gray-200 flex items-center justify-center shrink-0 z-10">
+                        <Clock className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <div className="flex flex-col flex-1 pt-1">
+                        <div className="flex justify-between items-start">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-medium text-gray-900">
+                                    {formatAction(entry.action)}
+                                </span>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-600 border border-gray-200 font-mono font-medium">
+                                        {getActorName(entry.actorOrg)}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                        {new Date(entry.timestamp).toLocaleString('en-GB')}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {entry.txID && (
+                            <div className="mt-1.5 p-1.5 bg-gray-50 rounded border border-gray-100 hover:border-gray-300 transition-colors w-fit">
+                                <div className="flex items-center gap-1.5">
+                                    <ComputerDesktop className="w-3 h-3 text-gray-400"/>
+                                    <span className="font-mono text-[10px] text-gray-500 truncate max-w-[200px]" title={entry.txID}>
+                                        Tx: {entry.txID.substring(0, 15)}...
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
 interface OrderRow {
   id: string;
   display_id: string;
   created_at: string;
+  history?: any[];
+  seller_id?: string;
   publicData: {
     email: string;
     currency_code: string;
@@ -78,7 +142,7 @@ interface OrderRow {
   error?: string;
 }
 
-type SortKey = 'created_at'; // Chỉ giữ sort theo created_at
+type SortKey = 'created_at';
 type SortDirection = 'asc' | 'desc';
 
 export default function ShipperDashboard() {
@@ -93,7 +157,7 @@ export default function ShipperDashboard() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isCheckingRole, setIsCheckingRole] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false) 
-    const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
     // State Tab
     const [activeTab, setActiveTab] = useState<'orders' | 'settings'>('orders');
@@ -467,7 +531,9 @@ export default function ShipperDashboard() {
             const row: OrderRow = {
                 id: order.blockchain_id,
                 display_id: order.blockchain_id, 
-                created_at: order.created_at, // Keep raw ISO for sort
+                created_at: order.created_at,
+                history: order.history || [], 
+                seller_id: order.seller_id, 
                 publicData: {
                     email: "Loading...",
                     currency_code: "USD",
@@ -510,7 +576,7 @@ export default function ShipperDashboard() {
                         paymentMethod: data.paymentMethod,
                         amount_untaxed: data.amount_untaxed || 0,
                         sellerCompanyID: data.sellerCompanyID,
-                        updatedAt: data.updatedAt // For potential future use
+                        updatedAt: data.updatedAt 
                     };
 
                     row.publicData.email = data.customerName; 
@@ -999,8 +1065,9 @@ export default function ShipperDashboard() {
             {selectedOrder && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={() => setSelectedOrder(null)}></div>
-                    <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200 z-50 border border-gray-200">
-                        <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0">
+                    <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200 z-50 border border-gray-200 overflow-hidden">
+                        {/* Header */}
+                        <div className="bg-white px-6 py-4 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10 shrink-0">
                             <div>
                                 <h3 className="font-bold text-lg text-gray-900">Order {selectedOrder.display_id}</h3>
                                 <p className="text-[10px] text-gray-500 mt-1 font-mono uppercase">{selectedOrder.created_at}</p>
@@ -1039,6 +1106,19 @@ export default function ShipperDashboard() {
                                     )}
                                     </span>
                                 </div>
+                            </div>
+                            
+                            {/* 🔥 4. CHÈN AUDIT TRAIL VÀO ĐÂY 🔥 */}
+                            <div className="border-t-2 border-gray-100 pt-6 pb-4 mt-6">
+                                <div className="flex items-center gap-2 mb-4">
+                                    <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">Audit Trail</h3>
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded border border-gray-200">Immutable</span>
+                                </div>
+                                {/* Truyền sellerId từ selectedOrder.seller_id (đã map từ API) */}
+                                <AuditTrail 
+                                    history={selectedOrder.history || []} 
+                                    sellerId={selectedOrder.seller_id} 
+                                />
                             </div>
 
                             {/* Actions */}

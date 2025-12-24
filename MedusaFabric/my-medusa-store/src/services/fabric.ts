@@ -522,7 +522,9 @@ class FabricService {
                 id: record.Key,
                 display_id: cleanId,
                 created_at: record.Record.createdAt,
-                
+                seller_id: record.Record.sellerCompanyID,
+                shipper_id: record.Record.shipperCompanyID,
+                history: record.Record.history || [],
                 // PUBLIC DATA TẠM THỜI (Placeholder)
                 // Vì Chaincode chưa public các trường này, ta để mặc định.
                 // Frontend sẽ điền thông tin thật sau khi Decrypt xong.
@@ -573,6 +575,7 @@ class FabricService {
                 cod_status: record.Record.codStatus || "",
                 seller_id: record.Record.sellerCompanyID,
                 shipper_id: record.Record.shipperCompanyID,
+                history: record.Record.history || []
             };
         });
 
@@ -611,7 +614,9 @@ class FabricService {
                 created_at: r.Record.createdAt,
                 status: r.Record.status,
                 payment_method: r.Record.paymentMethod,
-                shipper_id: r.Record.shipperCompanyID
+                shipper_id: r.Record.shipperCompanyID,
+                seller_id: r.Record.sellerCompanyID,
+                history: r.Record.history || [],
             }));
         } catch (e) {
             console.error("[Fabric Shipper] List Error:", e.message);
@@ -653,7 +658,8 @@ class FabricService {
                     shipper_id: rec.shipperCompanyID,
                     seller_id: rec.sellerCompanyID,
                     updated_at: rec.updatedAt || rec.createdAt,
-                    delivery_timestamp: rec.deliveryTimestamp
+                    delivery_timestamp: rec.deliveryTimestamp,
+                    history: rec.history || []
                 };
             }).sort((a, b) => a.blockchain_id.localeCompare(b.blockchain_id)); // Sắp xếp theo ID
 
