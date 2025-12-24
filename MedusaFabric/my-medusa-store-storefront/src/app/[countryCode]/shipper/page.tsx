@@ -296,7 +296,7 @@ export default function ShipperDashboard() {
 
   // ==> A. HÀM SHIP ORDER (Lấy hàng từ Seller)
   const handleShipOrder = async (orderId: string) => {
-      if(!confirm("Confirm that the order has been successfully picked up from the seller and shipping has started?")) return;
+        if (!confirm("Confirm that the order has been successfully picked up from the seller and shipping has started?")) return;
       
       setIsShipping(orderId);
       const token = localStorage.getItem("medusa_token");
@@ -360,7 +360,7 @@ export default function ShipperDashboard() {
             loadShipperOrders(token || "");
             if (selectedOrder?.id === orderId) setSelectedOrder(null);
         } else {
-            alert("❌ Error: " + (result.error || "Failed"));
+                alert("Error: " + (result.error || "Failed"));
         }
     } catch (err) { alert("Connection error."); } 
     finally { setIsDelivering(null); }
@@ -777,73 +777,218 @@ export default function ShipperDashboard() {
 
                 {/* TAB SETTINGS */}
                 {activeTab === 'settings' && (
-                    <div className="max-w-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <h2 className="text-xl font-bold text-gray-900 mb-2">Configuration</h2>
-                        <p className="text-gray-500 mb-8 text-sm">Update your carrier information.</p>
-
-                        <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200">
-                            <form onSubmit={handleSaveSettings} className="space-y-6">
+                    <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        {/* Header Section */}
+                        <div className="mb-8">
+                            <div className="flex items-center gap-3 mb-3">
+                                <div className="p-3 bg-gradient-to-br from-gray-900 to-gray-700 rounded-xl shadow-lg">
+                                    <Icons.Settings />
+                                </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Carrier Name</label>
+                                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Carrier Configuration</h2>
+                                    <p className="text-sm text-gray-500 mt-0.5">Manage your shipping profile and preferences</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Main Settings Card */}
+                        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+                            {/* Account Info Banner */}
+                            <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-8 py-6 border-b border-gray-200">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex items-start gap-4">
+                                        <div className="w-16 h-16 bg-gradient-to-br from-gray-900 to-gray-700 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                                            {settingsForm.carrier_name?.charAt(0).toUpperCase() || <User className="w-8 h-8" />}
+                                        </div>
+                                <div>
+                                            <h3 className="text-lg font-bold text-gray-900">{settingsForm.carrier_name || "Carrier Name"}</h3>
+                                            <p className="text-sm text-gray-600 font-mono mt-0.5">{settingsForm.email}</p>
+                                            <div className="flex gap-2 mt-2">
+                                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-white border border-gray-300 rounded-full text-xs font-medium text-gray-700">
+                                                    <CheckCircle className="w-3 h-3 text-green-600" />
+                                                    Active Carrier
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-gray-500 uppercase tracking-wide font-bold mb-1">Base Fee</p>
+                                        <p className="text-2xl font-bold text-gray-900">${settingsForm.shipping_fee}</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Form Section */}
+                            <form onSubmit={handleSaveSettings} className="p-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                                    {/* Carrier Name */}
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                <Icons.Truck />
+                                            </div>
+                                            Carrier Name
+                                        </label>
                                     <input
                                         type="text"
                                         value={settingsForm.carrier_name}
                                         onChange={(e) => setSettingsForm({ ...settingsForm, carrier_name: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:border-black focus:ring-0 outline-none transition"
-                                        placeholder="Ex: FastExpress"
+                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:border-gray-900 focus:ring-0 outline-none transition-all bg-gray-50 focus:bg-white"
+                                            placeholder="e.g., FastExpress Logistics"
                                     />
+                                        <p className="text-xs text-gray-500 mt-2 ml-1">Your official carrier/company name</p>
                                 </div>
 
+                                    {/* Contact Phone */}
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Contact Phone</label>
+                                        <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                                </svg>
+                                            </div>
+                                            Contact Phone
+                                        </label>
                                     <input
                                         type="text"
                                         value={settingsForm.phone}
                                         onChange={(e) => setSettingsForm({ ...settingsForm, phone: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:border-black focus:ring-0 outline-none transition"
-                                        placeholder="Hotline"
+                                            className="w-full border-2 border-gray-200 rounded-xl px-4 py-3.5 text-sm font-medium focus:border-gray-900 focus:ring-0 outline-none transition-all bg-gray-50 focus:bg-white"
+                                            placeholder="+1 (555) 000-0000"
                                     />
+                                        <p className="text-xs text-gray-500 mt-2 ml-1">Customer support hotline</p>
                                 </div>
 
-                                {/* ========= NEW: SHIPPING FEE ========= */}
+                                    {/* Email (Read-only) */}
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Base Shipping Fee</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
-                                            <CurrencyDollar />
+                                        <label className="block text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                                </svg>
                                         </div>
+                                            Email Address
+                                            <span className="ml-auto text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full font-medium">Read-only</span>
+                                        </label>
                                         <input
-                                            type="number"
-                                            value={settingsForm.shipping_fee}
-                                            onChange={(e) => setSettingsForm({ ...settingsForm, shipping_fee: parseInt(e.target.value) || 0 })}
-                                            className="w-full border border-gray-300 rounded-md pl-10 pr-3 py-2 text-sm focus:border-black focus:ring-0 outline-none transition"
-                                            placeholder="10"
+                                            type="email"
+                                            value={settingsForm.email}
+                                            disabled
+                                            className="w-full border-2 border-gray-200 bg-gray-100 rounded-xl px-4 py-3.5 text-sm font-medium text-gray-500 cursor-not-allowed"
                                         />
+                                        <p className="text-xs text-gray-500 mt-2 ml-1">Account email (cannot be changed)</p>
                                     </div>
-                                    <p className="text-[10px] text-gray-500 mt-1">Default fee applied to all orders.</p>
-                                </div>
-                                {/* ===================================== */}
 
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Email (Read-only)</label>
+                                    {/* Shipping Fee */}
+                                    <div className="md:col-span-2 bg-gradient-to-br from-gray-50 to-white border-2 border-gray-200 rounded-xl p-6">
+                                        <label className="block text-sm font-semibold text-gray-800 mb-3">
+                                            Base Shipping Fee
+                                        </label>
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative flex-1 max-w-xs">
+                                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-500">
+                                                    <span className="text-lg font-bold">$</span>
+                                </div>
                                     <input
-                                        type="email"
-                                        value={settingsForm.email}
-                                        disabled
-                                        className="w-full border border-gray-200 bg-gray-50 rounded-md px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                                    />
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.01"
+                                                    value={settingsForm.shipping_fee}
+                                                    onChange={(e) => setSettingsForm({ ...settingsForm, shipping_fee: parseFloat(e.target.value) || 0 })}
+                                                    className="w-full border-2 border-gray-300 rounded-xl pl-10 pr-4 py-4 text-lg font-bold focus:border-green-500 focus:ring-0 outline-none transition-all bg-white"
+                                                    placeholder="10.00"
+                                                />
+                                            </div>
+                                            <div className="flex-1 bg-white rounded-lg p-4 border border-gray-200">
+                                                <p className="text-xs text-gray-600 leading-relaxed">
+                                                    <strong className="text-gray-900">Standard rate</strong> applied to all shipments. This is your default base fee before any additional charges or discounts.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="pt-4 border-t border-gray-100 flex justify-end">
+                                {/* Action Buttons */}
+                                <div className="pt-6 border-t-2 border-gray-100 flex items-center justify-between">
+                                    <p className="text-xs text-gray-500 max-w-md">
+                                        Changes will be applied immediately and affect all future orders assigned to your carrier.
+                                    </p>
+                                    <div className="flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSettingsForm({
+                                                carrier_name: currentUser?.metadata?.carrier_name || "",
+                                                phone: currentUser?.metadata?.phone || "",
+                                                email: currentUser?.email || "",
+                                                shipping_fee: currentUser?.metadata?.shipping_fee ? parseFloat(currentUser.metadata.shipping_fee) : 10
+                                            })}
+                                            className="px-6 py-3 bg-white border-2 border-gray-200 text-gray-700 font-semibold rounded-xl transition-all text-sm shadow-sm"
+                                        >
+                                            Reset
+                                        </button>
                                     <button
                                         type="submit"
                                         disabled={isSavingSettings}
-                                        className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white font-medium rounded-md shadow-sm transition disabled:opacity-70 text-sm uppercase tracking-wide flex items-center gap-2"
+                                            className="px-8 py-3 bg-gradient-to-r from-gray-900 to-gray-700 text-white font-bold rounded-xl shadow-lg transition-all disabled:opacity-70 disabled:cursor-not-allowed text-sm flex items-center gap-2"
                                     >
-                                        {isSavingSettings ? <><Spinner className="animate-spin w-4 h-4"/> Saving...</> : "Save Changes"}
+                                            {isSavingSettings ? (
+                                                <>
+                                                    <Spinner className="animate-spin w-5 h-5" />
+                                                    <span>Saving Changes...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <CheckCircle className="w-5 h-5" />
+                                                    <span>Save Changes</span>
+                                                </>
+                                            )}
                                     </button>
+                                    </div>
                                 </div>
                             </form>
+                        </div>
+
+                        {/* Info Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-900 text-sm mb-1">Profile Visibility</h4>
+                                        <p className="text-xs text-gray-600 leading-relaxed">Your carrier information is visible to customers during checkout.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-900 text-sm mb-1">Automatic Updates</h4>
+                                        <p className="text-xs text-gray-600 leading-relaxed">Settings sync instantly across all active shipments and orders.</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-semibold text-gray-900 text-sm mb-1">Secure Data</h4>
+                                        <p className="text-xs text-gray-600 leading-relaxed">All changes are encrypted and stored securely on the blockchain.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}

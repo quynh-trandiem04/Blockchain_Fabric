@@ -30,13 +30,13 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
             try {
             const decoded: any = jwt.verify(token, JWT_SECRET);
                 authId = decoded.auth_identity_id || decoded.sub;
-            } catch (err) {}
+            } catch (err) { }
         }
     }
 
     // 3. TỰ TRA CỨU DB NẾU THIẾU ACTOR ID (Logic DB Lookup)
     if (!actorId && authId && DB_URL) {
-        console.log(`[List API] 🔄 Attempting DB lookup for Auth ID: ${authId}`);
+        console.log(`[List API] Attempting DB lookup for Auth ID: ${authId}`);
         const dbClient = new Client({
             connectionString: DB_URL,
             ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
@@ -50,10 +50,10 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
             );
             if (linkRes.rows.length > 0) {
                 actorId = linkRes.rows[0].user_id; // Đã tìm thấy User ID hợp lệ
-                console.log(`[List API] ✅ DB lookup successful. Found actorId: ${actorId}`);
+                console.log(`[List API] DB lookup successful. Found actorId: ${actorId}`);
             }
         } catch (e) {
-            console.error("[List API] ❌ DB Lookup Error:", e);
+            console.error("[List API] DB Lookup Error:", e);
         } finally {
             await dbClient.end();
         }
@@ -61,7 +61,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     // 4. KIỂM TRA ACTOR ID CUỐI CÙNG
     if (!actorId) {
-        console.warn("[List API] 🚫 Final Check: UNAUTHORIZED - Actor ID not found.");
+        console.warn("[List API] Final Check: UNAUTHORIZED - Actor ID not found.");
         return res.status(401).json({ error: "UNAUTHORIZED: Missing user ID for authorization." });
     }
 
@@ -69,10 +69,10 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     try {
         const userModuleService: any = req.scope.resolve(Modules.USER);
             
-        // ❌ Bỏ qua resolve container (Dễ lỗi)
+        // Bỏ qua resolve container (Dễ lỗi)
         // const FabricServiceConstructor = req.scope.resolve("fabricService");
         
-        // ✅ KHỞI TẠO INSTANCE BẰNG CLASS ĐÃ REQUIRE
+        // KHỞI TẠO INSTANCE BẰNG CLASS ĐÃ REQUIRE
         const fabricService = new FabricServiceClass(req.scope); 
         
         // 3. (Nếu muốn kiểm tra lỗi Runtime)
@@ -92,13 +92,13 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
             return res.status(403).json({ error: "FORBIDDEN: User is not associated with a Seller company." });
         }
 
-        console.log(`[List API] 🔍 Listing Fabric orders for Seller: ${sellerCompanyID} (User ID: ${actorId})`);
+        console.log(`[List API] Listing Fabric orders for Seller: ${sellerCompanyID} (User ID: ${actorId})`);
 
         // 3. GỌI HÀM RICH QUERY TRONG SERVICE
         // Hàm này sẽ dùng QueryOrdersByString (Chaincode Go)
         const orders = await fabricService.listSellerOrders(sellerCompanyID);
 
-        console.log(`[List API] ✅ Found ${orders.length} orders on Fabric for ${sellerCompanyID}`);
+        console.log(`[List API] Found ${orders.length} orders on Fabric for ${sellerCompanyID}`);
 
         // 4. TRẢ VỀ DANH SÁCH ORDERS
         return res.json({ orders: orders });

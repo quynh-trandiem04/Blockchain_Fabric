@@ -11,15 +11,15 @@ export default async function autoPayoutJob(
 ) {
   const fabricService = new FabricService(container);
   
-  console.log("⏰ [CronJob] ------------------------------------------------");
-  console.log("⏰ [CronJob] Scanning Blockchain orders for Auto-Payout...");
+  console.log("[CronJob] ------------------------------------------------");
+  console.log("[CronJob] Scanning Blockchain orders for Auto-Payout...");
 
   try {
     // 1. Lấy danh sách tóm tắt từ Blockchain (để có ID chính xác của các sub-order)
     const allOrders = await fabricService.listAllOrdersForAdmin();
 
     if (!allOrders || allOrders.length === 0) {
-        console.log("⏰ [CronJob] No orders found on ledger.");
+      console.log("[CronJob] No orders found on ledger.");
         return;
     }
 
@@ -39,7 +39,7 @@ export default async function autoPayoutJob(
         return false;
     });
 
-    console.log(`⏰ [CronJob] Found ${candidates.length} candidate(s) for payout.`);
+    console.log(`[CronJob] Found ${candidates.length} candidate(s) for payout.`);
 
     // 3. Kiểm tra chi tiết từng đơn (Check thời gian)
     for (const cand of candidates) {
@@ -58,20 +58,20 @@ export default async function autoPayoutJob(
 
             // DEMO: 5 Phút (Thực tế có thể là 7 ngày)
             if (diffMinutes >= 5) {
-                console.log(`💰 [CronJob] >>> Executing PAYOUT for: ${cand.blockchain_id}`);
+          console.log(`>>> Executing PAYOUT for: ${cand.blockchain_id}`);
                 
                 await fabricService.payoutToSeller(cand.blockchain_id);
                 
-                console.log(`✅ [CronJob] Payout SUCCESS: ${cand.blockchain_id}`);
+          console.log(`[CronJob] Payout SUCCESS: ${cand.blockchain_id}`);
                     }
 
         } catch (err: any) {
-            console.error(`❌ [CronJob] Failed to payout ${cand.blockchain_id}: ${err.message}`);
+        console.error(`[CronJob] Failed to payout ${cand.blockchain_id}: ${err.message}`);
         }
     }
 
   } catch (error) {
-    console.error("❌ [CronJob] System Error:", error);
+    console.error("[CronJob] System Error:", error);
   }
 }
 

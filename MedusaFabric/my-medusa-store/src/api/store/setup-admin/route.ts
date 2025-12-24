@@ -75,7 +75,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         },
     ]);
 
-    console.log("✅ Admin created successfully!");
+    console.log("Admin created successfully!");
     res.json({ message: "Tạo Admin thành công", user_id: user.id });
 
   } catch (error: any) {

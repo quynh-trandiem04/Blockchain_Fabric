@@ -27,17 +27,17 @@ async function importIdentity(wallet, label, mspId, certPath, keyDir) {
 
         // 4. Lưu vào Wallet
         await wallet.put(label, identity);
-        console.log(`✅ Đã nhập thành công Identity: ${label} (${mspId})`);
+        console.log(`Đã nhập thành công Identity: ${label} (${mspId})`);
 
     } catch (error) {
-        console.error(`❌ Lỗi nhập ${label}:`, error.message);
+        console.error(`Lỗi nhập ${label}:`, error.message);
     }
 }
 
 async function main() {
     const walletPath = path.join(process.cwd(), 'wallet');
     const wallet = await Wallets.newFileSystemWallet(walletPath);
-    console.log(`📂 Wallet path: ${walletPath}\n`);
+    console.log(`Wallet path: ${walletPath}\n`);
 
     const orgsBase = path.join(process.cwd(), 'organizations', 'peerOrganizations');
 

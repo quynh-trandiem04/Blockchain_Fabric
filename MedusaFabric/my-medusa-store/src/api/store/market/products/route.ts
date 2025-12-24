@@ -1,3 +1,5 @@
+// my-medusa-store/src/api/store/market/products/route.ts
+
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
 import jwt from "jsonwebtoken";
@@ -15,6 +17,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const container = req.scope;
   const productModuleService = container.resolve(Modules.PRODUCT);
   const pricingModuleService = container.resolve(Modules.PRICING); // <--- MỚI: Gọi Pricing Module
+    const inventoryModule = container.resolve(Modules.INVENTORY);
+    const stockLocationModule = container.resolve(Modules.STOCK_LOCATION);
   const salesChannelService = container.resolve(Modules.SALES_CHANNEL);
   const remoteLink = container.resolve("remoteLink");
   const marketplaceService = container.resolve("marketplace") as any;
@@ -56,14 +60,15 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     // 3. Chuẩn bị dữ liệu cơ bản
     const uniqueSuffix = Date.now().toString().slice(-6);
     const safeHandle = `${(handle ? slugify(handle) : slugify(title))}-${uniqueSuffix}`;
-    const basePrice = parseInt(price);
+        const basePriceCents = parseInt(price); // Price in cents (e.g., 200 cents = $2)
     
     // --- CHUẨN BỊ GIÁ (Để dùng ở bước sau) ---
+        // Frontend gửi cents, lưu nguyên
     const pricesData = [
-        { currency_code: "usd", amount: basePrice },
-        { currency_code: "eur", amount: basePrice },        
-        { currency_code: "vnd", amount: basePrice * 25000 },
-        { currency_code: "dkk", amount: basePrice * 7 } // Quan trọng cho Region Đan Mạch
+            { currency_code: "usd", amount: basePriceCents },
+            { currency_code: "eur", amount: basePriceCents },
+            { currency_code: "vnd", amount: basePriceCents * 250 },  // VND conversion
+            { currency_code: "dkk", amount: basePriceCents * 0.07 } // DKK conversion
     ];
 
     // --- BƯỚC 1: CHUẨN BỊ OPTIONS & VARIANTS PAYLOAD ---
@@ -81,8 +86,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
     if (options && Array.isArray(options)) {
         options.forEach((o: any) => {
-            if(o.title && o.title.trim() !== "") {
-                if(!optionsCollector.has(o.title.trim())) optionsCollector.set(o.title.trim(), new Set());
+                if (o.title && o.title.trim() !== "") {
+                    if (!optionsCollector.has(o.title.trim())) optionsCollector.set(o.title.trim(), new Set());
                 if (Array.isArray(o.values)) o.values.forEach((v: string) => collectValue(o.title, v));
             }
         });
@@ -110,19 +115,19 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     if (!isDefaultVariant && variants && variants.length > 0) {
         variantsPayload = variants.map((v: any) => {
             const cleanOptions: Record<string, string> = {};
-            if(v.options) {
+                if (v.options) {
                 Object.entries(v.options).forEach(([key, val]) => {
-                    if(key.trim()) cleanOptions[key.trim()] = (val as string).trim();
+                        if (key.trim()) cleanOptions[key.trim()] = (val as string).trim();
                 });
             }
             return {
                 title: v.title,
-                sku: v.sku || `${companyCode}-${slugify(v.title)}-${uniqueSuffix}-${Math.random().toString(36).substr(2,4)}`,
+                    sku: v.sku || `${companyCode}-${slugify(v.title)}-${uniqueSuffix}-${Math.random().toString(36).substr(2, 4)}`,
                 options: cleanOptions, 
                 manage_inventory: false,
                 allow_backorder: true,
-                // prices: pricesData <-- XÓA DÒNG NÀY ĐỂ TRÁNH NHẦM LẪN
-                inventory_quantity: parseInt(inventory_quantity) || 10
+                    // Sử dụng inventory từ từng variant, fallback về global inventory_quantity
+                    inventory_quantity: parseInt(v.inventory_quantity) || parseInt(inventory_quantity) || 10
             };
         });
     } else {
@@ -138,27 +143,120 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
 
     // --- BƯỚC 2: TẠO SẢN PHẨM & VARIANTS ---
     console.log(">>> Creating Product & Variants...");
+
+        // Xử lý images - đảm bảo có format đúng
+        const processedImages = images && Array.isArray(images)
+            ? images.map((img: any) => {
+                if (typeof img === 'string') return { url: img };
+                if (img && typeof img === 'object' && img.url) return img;
+                return null;
+            }).filter(Boolean)
+            : [];
+
+        console.log("📸 Processed images:", JSON.stringify(processedImages));
+
+        // Get default shipping profile
+        const shippingProfileQuery = `
+            SELECT id FROM shipping_profile 
+            WHERE name = 'Default Shipping Profile' 
+            OR type = 'default'
+            LIMIT 1
+        `;
+        const shippingProfileResult = await dbClient.query(shippingProfileQuery);
+        const shippingProfileId = shippingProfileResult.rows[0]?.id;
+
+        if (!shippingProfileId) {
+            console.warn("No default shipping profile found");
+        }
+
     const product = await productModuleService.createProducts({
         title,
         subtitle,
         description,
         handle: safeHandle,
         status: "published",
-        images: images || [],
+            images: processedImages,
+            thumbnail: processedImages.length > 0 ? processedImages[0].url : undefined,
         options: optionsPayload,
         variants: variantsPayload, 
         metadata: {
             seller_company_id: companyCode,
             seller_user_id: userId,
-            custom_price: basePrice
+                custom_price: basePriceCents
         }
     });
+
+        // Link product to shipping profile if available
+        if (shippingProfileId) {
+            await dbClient.query(
+                `INSERT INTO product_shipping_profile (id, product_id, shipping_profile_id, created_at, updated_at) 
+                 VALUES (gen_random_uuid(), $1, $2, NOW(), NOW()) 
+                 ON CONFLICT (product_id, shipping_profile_id) DO NOTHING`,
+                [product.id, shippingProfileId]
+            );
+            console.log(`Linked product to shipping profile`);
+        }
 
     // --- BƯỚC 3: TẠO GIÁ (PRICING MODULE) & LINK VỚI VARIANTS ---
     console.log(">>> Creating Prices & Links...");
     
     // Lấy danh sách variants vừa tạo ra từ DB để có ID chính xác
     const createdVariants = await productModuleService.listProductVariants({ product_id: product.id });
+
+        // --- BƯỚC 3A: SETUP INVENTORY CHO TỮNG VARIANT ---
+        console.log(">>> Setting up Inventory for Variants...");
+        let totalInventory = 0;
+        for (const variant of createdVariants) {
+            try {
+                // Tìm inventory_quantity từ payload
+                const variantData = variantsPayload.find((v: any) =>
+                    v.title === variant.title ||
+                    (v.options && JSON.stringify(v.options) === JSON.stringify(variant.options))
+                );
+
+                const qtyToSet = variantData?.inventory_quantity || parseInt(inventory_quantity) || 10;
+                totalInventory += qtyToSet;
+
+                // ⭐ BƯỚC 1: TẠO INVENTORY ITEM
+                const inventoryItem = await inventoryModule.createInventoryItems({
+                    sku: variant.sku || `inv-${variant.id}`
+                });
+
+                // ⭐ BƯỚC 2: LINK VARIANT VỚI INVENTORY ITEM
+                await remoteLink.create([{
+                    [Modules.PRODUCT]: { variant_id: variant.id },
+                    [Modules.INVENTORY]: { inventory_item_id: inventoryItem.id }
+                }]);
+
+                // ⭐ BƯỚC 3: LẤY STOCK LOCATION (KHO HÀNG)
+                const stockLocations = await stockLocationModule.listStockLocations({}, { take: 1 });
+                const defaultLocation = stockLocations[0];
+
+                if (defaultLocation) {
+                    // ⭐ BƯỚC 4: TẠO INVENTORY LEVEL (SỐ LƯỢNG TỒN KHO)
+                    await inventoryModule.createInventoryLevels({
+                        inventory_item_id: inventoryItem.id,
+                        location_id: defaultLocation.id,
+                        stocked_quantity: qtyToSet  // 👈 Thêm số lượng vào đây
+                    });
+
+                    console.log(`Set inventory for variant ${variant.title}: ${qtyToSet}`);
+                }
+            } catch (invErr) {
+                console.error(`Inventory setup failed for variant ${variant.id}:`, invErr);
+            }
+        }
+
+        // AUTO UNPUBLISH NếU TOTAL INVENTORY = 0
+        if (totalInventory === 0) {
+            await productModuleService.updateProducts(product.id, {
+                status: 'draft'
+            });
+            console.log(`Product auto-set to DRAFT: Total inventory = 0`);
+        }
+
+        // --- BƯỚC 3B: TẠO GIÁ (PRICING MODULE) & LINK VỚI VARIANTS ---
+        console.log(">>> Creating Prices & Links...");
     
     const linksToCreate: any[] = [];
 
@@ -198,7 +296,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
              await remoteLink.create([{
                 [Modules.PRODUCT]: { product_id: product.id },
                 "marketplace": { seller_id: sellers[0].id }
-            }]).catch(() => {});
+                }]).catch(() => { });
         }
     } catch (e) { console.warn("Marketplace link warn:", e); }
 

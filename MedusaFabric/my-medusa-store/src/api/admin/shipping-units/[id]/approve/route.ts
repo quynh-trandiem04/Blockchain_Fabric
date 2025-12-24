@@ -16,7 +16,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const marketplaceService = container.resolve("marketplace") as any;
 
   try {
-    console.log(`✅ Approving Shipper User ID: ${id}...`);
+        console.log(`Approving Shipper User ID: ${id}...`);
 
     // 1. Lấy thông tin User hiện tại
     const user = await userModuleService.retrieveUser(id);
@@ -30,7 +30,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     }
 
     // 2. SINH CẶP KHÓA RSA RIÊNG CHO SHIPPER NÀY 
-    console.log(`🔑 Generating unique RSA keys for Shipper: ${companyCode}...`);
+        console.log(`Generating unique RSA keys for Shipper: ${companyCode}...`);
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -69,7 +69,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         ]);
         console.log("   -> Updated Carrier Profile with Public Key");
     } else {
-        console.warn("⚠️ Warning: Carrier Profile not found for code:", companyCode);
+            console.warn("Warning: Carrier Profile not found for code:", companyCode);
     }
 
     // 5. [AUTO] Tạo Wallet trên Blockchain

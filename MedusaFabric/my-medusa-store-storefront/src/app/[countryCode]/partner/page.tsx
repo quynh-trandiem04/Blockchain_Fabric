@@ -8,8 +8,10 @@ import { useRouter, useParams } from "next/navigation"
 import { 
     Photo, Tag, CurrencyDollar, ArchiveBox, XMark, CheckCircle, 
     ArrowRightOnRectangle, Spinner, MagnifyingGlass, Funnel,
-    ShoppingBag, Tag as TagIcon, Plus, Trash, User
+    ShoppingBag, Tag as TagIcon, Plus, Trash, User, PencilSquare
 } from "@medusajs/icons"
+import CreateProductModal from "./create-product-modal"
+import EditProductModal from "./edit-product-modal"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
 
@@ -87,17 +89,10 @@ export default function SellerDashboard() {
 
   const [products, setProducts] = useState<any[]>([])
   const [isLoadingProducts, setIsLoadingProducts] = useState(false)
+    const [selectedProduct, setSelectedProduct] = useState<any | null>(null);
+    const [editingProduct, setEditingProduct] = useState<any | null>(null);
   
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isCreatingProduct, setIsCreatingProduct] = useState(false);
-  
-  const [newProduct, setNewProduct] = useState({ 
-      title: "", subtitle: "", handle: "", description: "", price: 0, inventory_quantity: 10, image_url: "" 
-  });
-  
-  const [optionName, setOptionName] = useState("");
-  const [optionValues, setOptionValues] = useState("");
-  const [prodOptions, setProdOptions] = useState<{title: string, values: string[]}[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -302,12 +297,12 @@ export default function SellerDashboard() {
                     }
                   } else {
                         const errorData = await resDecrypt.json();
-                        console.warn(`[Frontend] ❌ Decrypt FAILED for ${order.id}.`);
+                                console.warn(`[Frontend] Decrypt FAILED for ${order.id}.`);
                     row.status = "Error"
                     row.error = errorData.error || "Syncing...";
                   }
                 } catch (e) { 
-                    console.error(`[Frontend] ❌ Network Error during Decrypt for ${order.id}`, e);
+                            console.error(`[Frontend] Network Error during Decrypt for ${order.id}`, e);
                     row.status = "Error" 
                 }
                 mappedOrders.push(row)
@@ -322,7 +317,7 @@ export default function SellerDashboard() {
                 if (updated) setSelectedOrder(updated);
             }
         }
-    } catch (err) {} finally { setIsLoadingOrders(false) }
+        } catch (err) { } finally { setIsLoadingOrders(false) }
   }
 
   const loadSellerProducts = async (tokenOverride?: string) => {
@@ -339,112 +334,11 @@ export default function SellerDashboard() {
             const { products } = await res.json()
             setProducts(products || []);
         }
-    } catch (err) {} finally { setIsLoadingProducts(false) }
-  }
-
-  const handleAddOption = () => {
-    if(!optionName || !optionValues) return;
-    const valuesArray = optionValues.split(",").map(v => v.trim()).filter(v => v);
-    setProdOptions([...prodOptions, { title: optionName, values: valuesArray }]);
-    setOptionName(""); setOptionValues("");
-  }
-
-  const handleRemoveOption = (index: number) => {
-      const newOpts = [...prodOptions];
-      newOpts.splice(index, 1);
-      setProdOptions(newOpts);
-  }
-
-  const handleCreateProduct = async () => {
-      if (!newProduct.title || !newProduct.price) { 
-          alert("Please provide at least a title and price for the product."); 
-          return; 
-      }
-      setIsCreatingProduct(true);
-      const token = localStorage.getItem("medusa_token");
-      const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
-
-      try {
-          let variantsPayload: any[] = [];
-
-          if (prodOptions.length > 0) {
-              let combinations: any[] = [];
-              if (prodOptions.length === 1) {
-                  combinations = prodOptions[0].values.map(v => [{ title: prodOptions[0].title, value: v }]);
-              } else {
-                  // Helper đệ quy đơn giản cho n chiều
-                  const cartesian = (args: any[]) => {
-                    const r: any[] = [], max = args.length - 1;
-                    function helper(arr: any[], i: number) {
-                        for (let j = 0, l = args[i].length; j < l; j++) {
-                            const a = arr.slice(0); 
-                            a.push(args[i][j]);
-                            if (i === max) r.push(a);
-                            else helper(a, i + 1);
-                        }
-                    }
-                    helper([], 0);
-                    return r;
-                  };
-                  
-                  const args = prodOptions.map(opt => opt.values.map(v => ({ title: opt.title, value: v })));
-                  combinations = cartesian(args);
-              }
-
-              variantsPayload = combinations.map((combo: any[]) => {
-                  const title = combo.map(c => c.value).join(" / ");
-                  const optionsMap: Record<string, string> = {};
-                  combo.forEach(c => {
-                      optionsMap[c.title] = c.value;
-                  });
-
-                  return {
-                      title: title,
-                      options: optionsMap
-                  };
-              });
-
-          } else {
-              variantsPayload = [];
-          }
-
-          const payload = {
-              ...newProduct,
-              images: newProduct.image_url ? [{ url: newProduct.image_url }] : [],
-              options: prodOptions,
-              variants: variantsPayload
-          };
-
-          const res = await fetch(`${BACKEND_URL}/store/market/products`, {
-              method: "POST",
-              headers: { 
-                  "Authorization": `Bearer ${token}`, 
-                  "Content-Type": "application/json", 
-                  "x-publishable-api-key": publishableKey 
-              },
-              body: JSON.stringify(payload)
-          });
-          
-          if (res.ok) {
-              alert("Product created successfully!");
-              setShowCreateModal(false); 
-              loadSellerProducts(token || "");
-              setNewProduct({ title: "", subtitle: "", handle: "", description: "", price: 0, inventory_quantity: 10, image_url: "" });
-              setProdOptions([]);
-          } else {
-              const err = await res.json();
-              alert("Error: " + (err.error || err.message));
-          }
-      } catch (e) { 
-          console.error(e);
-          alert("Error connecting to server"); 
-      } finally { 
-          setIsCreatingProduct(false); 
-      }
+        } catch (err) { } finally { setIsLoadingProducts(false) }
   }
 
     const handleConfirmReturn = async (orderId: string) => {
-      if(!confirm("Confirm that you have received the returned item from the Shipper?")) return;
+        if (!confirm("Confirm that you have received the returned item from the Shipper?")) return;
       
       setIsConfirmingReturn(orderId);
       const token = localStorage.getItem("medusa_token");
@@ -531,6 +425,18 @@ export default function SellerDashboard() {
                </button>
                {isLoggedIn && <button type="button" onClick={handleLogout} className="w-full text-center text-gray-500 text-xs hover:text-gray-900 mt-2 uppercase tracking-wide font-medium">Log out</button>}
              </form>
+
+                <div className="mt-6 text-center text-gray-600">
+                    <p className="text-sm">
+                        Don't have an account?{" "}
+                        <button
+                            onClick={() => router.push("/dk/partner/register")}
+                            className="text-gray-900 font-semibold hover:underline hover:text-gray-700 transition"
+                        >
+                            Register
+                        </button>
+                    </p>
+                </div>
            </div>
         </div>
       )
@@ -549,15 +455,15 @@ export default function SellerDashboard() {
           </div>
           <nav className="flex-1 p-4 space-y-1">
               <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
-                  <ShoppingBag className="w-4 h-4"/> Orders
+                        <ShoppingBag className="w-4 h-4" /> Orders
               </button>
               <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
-                  <TagIcon className="w-4 h-4"/> Products
+                        <TagIcon className="w-4 h-4" /> Products
               </button>
           </nav>
           <div className="p-4 border-t border-gray-100 bg-gray-50/30">
               <div className="flex items-center gap-3 px-3 py-2 mb-1">
-                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><User className="w-3 h-3"/></div>
+                        <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-gray-500"><User className="w-3 h-3" /></div>
                   <div className="text-xs text-gray-500 font-medium truncate w-32">User Account</div>
               </div>
               <button onClick={handleLogout} className="flex items-center gap-3 w-full px-3 py-1.5 text-gray-500 hover:text-gray-900 rounded-md transition text-xs font-medium">
@@ -693,7 +599,7 @@ export default function SellerDashboard() {
                         <p className="text-sm text-gray-500 mt-1">Manage your product inventory</p>
                     </div>
                     <button onClick={() => setShowCreateModal(true)} className="px-3 py-1.5 bg-gray-900 text-white rounded-md shadow-sm text-xs font-medium hover:bg-gray-800 flex items-center gap-2 transition">
-                        <Plus className="w-3 h-3"/> Add Product
+                                <Plus className="w-3 h-3" /> Add Product
                     </button>
                 </div>
 
@@ -714,7 +620,7 @@ export default function SellerDashboard() {
                                       <p>No products found.</p>
                                   </td></tr>
                               ) : products.map((p: any) => (
-                                 <tr key={p.id} className="hover:bg-gray-50 transition-colors">
+                                        <tr key={p.id} className="hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setSelectedProduct(p)}>
                                      <td className="px-6 py-4">
                                          <div className="flex items-center gap-4">
                                              <div className="w-12 h-12 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-gray-400 overflow-hidden relative">
@@ -752,109 +658,175 @@ export default function SellerDashboard() {
         )}
       </main>
 
-      {/* --- MODAL TẠO SẢN PHẨM (ADVANCED UI) --- */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-in zoom-in duration-200">
-                <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50 sticky top-0 z-10">
+            {/* --- MODAL TẠO SẢN PHẨM (ADVANCED UI WITH SIZE & COLOR VARIANTS) --- */}
+            <CreateProductModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onSuccess={() => {
+                    const token = localStorage.getItem("medusa_token")
+                    if (token) loadSellerProducts(token)
+                }}
+            />
+
+            {/* --- MODAL SỬA SẢN PHẨM --- */}
+            <EditProductModal
+                isOpen={!!editingProduct}
+                onClose={() => setEditingProduct(null)}
+                onSuccess={() => {
+                    const token = localStorage.getItem("medusa_token")
+                    if (token) loadSellerProducts(token)
+                }}
+                product={editingProduct}
+            />
+
+            {/* MODAL PRODUCT DETAIL */}
+            {selectedProduct && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity" onClick={() => setSelectedProduct(null)}></div>
+                    <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col z-50 border-2 border-gray-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        {/* Header */}
+                        <div className="p-6 border-b-2 border-gray-100 flex justify-between items-start bg-gradient-to-br from-gray-50 to-white shrink-0">
+                            <div className="flex items-start gap-4">
+                                <div className="w-16 h-16 bg-gray-100 rounded-xl border-2 border-gray-200 flex items-center justify-center text-gray-400 overflow-hidden">
+                                    {selectedProduct.thumbnail ? (
+                                        <img src={selectedProduct.thumbnail} alt={selectedProduct.title} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Photo className="w-6 h-6" />
+                                    )}
+                                </div>
                     <div>
-                        <h2 className="text-lg font-bold text-gray-900">Add new product</h2>
-                        <p className="text-xs text-gray-500">Enter detailed information to list for sale</p>
+                                    <h2 className="text-xl font-bold text-gray-900">{selectedProduct.title}</h2>
+                                    <p className="text-sm text-gray-500 mt-1">{selectedProduct.subtitle || 'No subtitle'}</p>
+                                    <p className="text-xs text-gray-400 font-mono mt-1">Handle: {selectedProduct.handle}</p>
                     </div>
-                    <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-700 transition p-1 rounded-md hover:bg-gray-200"><XMark/></button>
+                            </div>
+                            <button type="button" onClick={() => setSelectedProduct(null)} className="text-gray-400 hover:text-gray-700 bg-gray-100 p-2 rounded-xl transition-colors">
+                                <XMark className="w-5 h-5" />
+                            </button>
                 </div>
                 
-                <div className="p-8 space-y-6">
-                    {/* General */}
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Product Name <span className="text-red-500">*</span></label>
-                            <input className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" 
-                                value={newProduct.title} onChange={e=>setNewProduct({...newProduct, title: e.target.value})} placeholder="VD: Áo Thun Basic"/>
+                        {/* Body - Scrollable */}
+                        <div className="flex-1 overflow-y-auto p-6">
+                            <div className="space-y-6">
+                                {/* Basic Info */}
+                                <div className="bg-white border-2 border-gray-200 rounded-xl p-5">
+                                    <h3 className="text-lg font-bold text-gray-900 mb-4 pb-3 border-b-2 border-gray-100">Basic Information</h3>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
+                                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Status</p>
+                                            <span className={`inline-flex px-3 py-1 rounded-full text-xs font-bold border ${selectedProduct.status === 'published'
+                                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                                : 'bg-gray-100 text-gray-600 border-gray-200'
+                                                }`}>
+                                                {selectedProduct.status}
+                                            </span>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Sale Price (USD) <span className="text-red-500">*</span></label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-gray-400"><CurrencyDollar /></span>
-                                <input type="number" className="w-full border border-gray-300 pl-9 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" 
-                                    value={newProduct.price} onChange={e=>setNewProduct({...newProduct, price: parseInt(e.target.value)})}/>
+                                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Price</p>
+                                            <p className="text-lg font-bold text-gray-900">
+                                                {selectedProduct.display_price ? `$${selectedProduct.display_price}` : 'Not set'}
+                                            </p>
                             </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Handle (Optional)</label>
-                            <div className="relative">
-                                <span className="absolute left-3 top-2.5 text-gray-400"><Tag /></span>
-                                <input className="w-full border border-gray-300 pl-9 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition font-mono text-sm" 
-                                    value={newProduct.handle} onChange={e=>setNewProduct({...newProduct, handle: e.target.value})} placeholder="ao-thun"/>
+                                        <div className="col-span-2">
+                                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Description</p>
+                                            <p className="text-gray-700">{selectedProduct.description || 'No description provided'}</p>
                             </div>
                         </div>
                     </div>
 
-                    {/* Image */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Hình ảnh (URL)</label>
-                        <div className="flex gap-3">
-                            <div className="relative flex-1">
-                                <span className="absolute left-3 top-2.5 text-gray-400"><Photo /></span>
-                                <input className="w-full border border-gray-300 pl-9 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" 
-                                    value={newProduct.image_url} onChange={e=>setNewProduct({...newProduct, image_url: e.target.value})} placeholder="https://..."/>
+                                {/* Images */}
+                                {selectedProduct.images && selectedProduct.images.length > 0 && (
+                                    <div className="bg-white border-2 border-gray-200 rounded-xl p-5">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-4 pb-3 border-b-2 border-gray-100">Product Images</h3>
+                                        <div className="grid grid-cols-4 gap-3">
+                                            {selectedProduct.images.map((img: any, idx: number) => (
+                                                <div key={idx} className="aspect-square bg-gray-100 rounded-lg border-2 border-gray-200 overflow-hidden">
+                                                    <img src={img.url} alt={`Image ${idx + 1}`} className="w-full h-full object-cover" />
                             </div>
-                            {newProduct.image_url ? (
-                                <img src={newProduct.image_url} alt="Preview" className="w-10 h-10 object-cover rounded-lg border border-gray-200 shadow-sm" />
-                            ) : (
-                                <div className="w-10 h-10 bg-gray-100 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-400 text-xs">IMG</div>
-                            )}
+                                            ))}
                         </div>
                     </div>
+                                )}
 
-                    <div className="grid grid-cols-2 gap-6">
-                         <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Product Description</label>
-                            <textarea className="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none h-24 resize-none transition" 
-                                value={newProduct.description} onChange={e => setNewProduct({...newProduct, description: e.target.value})} placeholder="Details..."/>
+                                {/* Variants & Inventory */}
+                                {selectedProduct.variants && selectedProduct.variants.length > 0 && (
+                                    <div className="bg-white border-2 border-gray-200 rounded-xl p-5">
+                                        <h3 className="text-lg font-bold text-gray-900 mb-4 pb-3 border-b-2 border-gray-100">
+                                            Product Variants ({selectedProduct.variants.length})
+                                        </h3>
+                                        <div className="space-y-3">
+                                            {selectedProduct.variants.map((variant: any, idx: number) => (
+                                                <div key={variant.id || idx} className="flex items-center justify-between p-4 bg-gradient-to-br from-gray-50 to-white border-2 border-gray-200 rounded-xl">
+                                                    <div className="flex-1">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <p className="font-bold text-gray-900">{variant.title}</p>
                         </div>
+                                                        {variant.options && variant.options.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {variant.options.map((opt: any, optIdx: number) => (
+                                                                    <span key={optIdx} className="px-2 py-1 bg-gray-600 text-white rounded text-xs font-semibold">
+                                                                        {opt.value}
+                                                                    </span>
+                                                                ))}
                     </div>
-
-                    <hr className="border-gray-100"/>
-
-                    {/* Options & Variants */}
-                    <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                        <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"><TagIcon className="w-4 h-4"/> Options</h3>
-                        <div className="flex gap-2 mb-3">
-                            <input className="border border-gray-300 p-2 rounded-lg text-sm w-1/3 outline-none focus:border-blue-500" placeholder="Name (VD: Size)" value={optionName} onChange={e=>setOptionName(e.target.value)} />
-                            <input className="border border-gray-300 p-2 rounded-lg text-sm flex-1 outline-none focus:border-blue-500" placeholder="Values (VD: S, M, L)" value={optionValues} onChange={e=>setOptionValues(e.target.value)} />
-                            <button onClick={handleAddOption} className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-100 transition shadow-sm">Add</button>
+                                                        )}
                         </div>
-                        
-                        {/* List Options */}
-                        <div className="space-y-2">
-                            {prodOptions.map((opt, idx) => (
-                                <div key={idx} className="flex justify-between items-center bg-white p-2.5 rounded-lg text-sm border border-gray-200 shadow-sm">
-                                    <div className="flex gap-2">
-                                        <span className="font-semibold text-gray-900 bg-gray-100 px-2 py-0.5 rounded">{opt.title}</span>
-                                        <span className="text-gray-600">{opt.values.join(", ")}</span>
+                                                    <div className="flex items-center gap-4 ml-4">
+                                                        {variant.prices && variant.prices.length > 0 && (
+                                                            <div className="text-right">
+                                                                <p className="text-xs text-gray-500 font-semibold uppercase">Price</p>
+                                                                <p className="text-lg font-bold text-gray-900">
+                                                                    ${(variant.prices[0].amount / 100).toFixed(2)}
+                                                                </p>
                                     </div>
-                                    <button onClick={() => handleRemoveOption(idx)} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md transition"><Trash className="w-4 h-4"/></button>
+                                                        )}
+                                                        <div className="text-right">
+                                                            <p className="text-xs text-gray-500 font-semibold uppercase">Stock</p>
+                                                            <p className="text-2xl font-bold text-gray-900">
+                                                                {variant.inventory_quantity ?? 0}
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                 </div>
                             ))}
                         </div>
                     </div>
+                                )}
 
-                    {/* Inventory */}
+                                {/* Total Inventory Summary */}
+                                <div className="bg-gradient-to-br from-gray-50 to-white border-2 border-gray-200 rounded-xl p-5">
+                                    <div className="flex items-center justify-between">
                     <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-1">Tồn kho tổng</label>
-                         <div className="relative">
-                            <span className="absolute left-3 top-2.5 text-gray-400"><ArchiveBox /></span>
-                            <input className="w-full border border-gray-300 pl-9 p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition" type="number"
-                                value={newProduct.inventory_quantity} onChange={e => setNewProduct({...newProduct, inventory_quantity: parseInt(e.target.value)})} />
+                                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Total Inventory</p>
+                                            <p className="text-3xl font-bold text-gray-900">{selectedProduct.display_inventory ?? 0}</p>
+                                        </div>
+                                        <div className="w-16 h-16 bg-gray-600 rounded-xl flex items-center justify-center">
+                                            <ArchiveBox className="w-8 h-8 text-white" />
+                                        </div>
+                                    </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3 sticky bottom-0">
-                    <button onClick={() => setShowCreateModal(false)} className="px-5 py-2 text-gray-600 hover:bg-white border border-transparent hover:border-gray-200 rounded-lg transition font-medium">Cancel</button>
-                    <button onClick={handleCreateProduct} disabled={isCreatingProduct} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium shadow-md flex items-center">
-                        {isCreatingProduct ? <><Spinner className="animate-spin mr-2" /> Creating...</> : "Publish Now"}
+                        {/* Footer */}
+                        <div className="bg-gray-50 px-6 py-4 border-t-2 border-gray-200 flex items-center justify-between shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditingProduct(selectedProduct);
+                                    setSelectedProduct(null);
+                                }}
+                                className="px-6 py-2.5 bg-gray-900 text-white font-semibold rounded-md hover:bg-black shadow-sm transition-all text-sm flex items-center gap-2"
+                            >
+                                <PencilSquare className="w-4 h-4" />
+                                Edit Product
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setSelectedProduct(null)}
+                                className="px-6 py-2.5 bg-gray-600 text-white font-semibold rounded-xl hover:bg-gray-700 transition-all text-sm"
+                            >
+                                Close
                     </button>
                 </div>
             </div>

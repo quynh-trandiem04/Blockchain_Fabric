@@ -18,11 +18,11 @@ export default async function orderPlacedHandler({
   const remoteQuery = container.resolve("remoteQuery");
   const marketplaceService = container.resolve("marketplace") as any;
   
-  // 🔥 Resolve User Module để tra cứu thông tin Shipper
+    // Resolve User Module để tra cứu thông tin Shipper
   const userModuleService = container.resolve(Modules.USER);
 
   try {
-      console.log(`[Subscriber] 📦 Bắt đầu xử lý đơn hàng Medusa: ${data.id}`);
+        console.log(`[Subscriber] Bắt đầu xử lý đơn hàng Medusa: ${data.id}`);
 
       // =================================================================
       // BƯỚC 1: QUERY ĐƠN HÀNG
@@ -45,7 +45,7 @@ export default async function orderPlacedHandler({
       const order = orderResult[0];
 
       if (!order) {
-          console.error(`[Subscriber] ❌ Không tìm thấy đơn hàng ${data.id}`);
+            console.error(`[Subscriber] Không tìm thấy đơn hàng ${data.id}`);
           return;
       }
 
@@ -112,7 +112,7 @@ export default async function orderPlacedHandler({
       }
 
       // =================================================================
-      // 🔥 BƯỚC QUAN TRỌNG: LẤY SHIPPER COMPANY CODE TỪ DB 🔥
+        // BƯỚC QUAN TRỌNG: LẤY SHIPPER COMPANY CODE TỪ DB
       // =================================================================
       let shipperCode = "GHN"; 
       // FIX LỖI SYNTAX: Khai báo rõ kiểu string | null
@@ -130,7 +130,7 @@ export default async function orderPlacedHandler({
             
               if (shipperUser && shipperUser.metadata?.company_code) {
                   shipperCode = shipperUser.metadata.company_code as string;
-                  console.log(`[Subscriber] 🔗 User linked to Carrier Code: ${shipperCode}`);
+                    console.log(`[Subscriber] User linked to Carrier Code: ${shipperCode}`);
 
                   // 2. Query bảng Carrier (Marketplace Module) để lấy Public Key
                   // Giả sử service có hàm listCarriers và cột tìm kiếm là 'code' hoặc 'id'
@@ -145,23 +145,23 @@ export default async function orderPlacedHandler({
                               shipperPublicKey = carrierData.metadata.rsa_public_key;
                   }
                       } else {
-                          console.warn(`[Subscriber] ⚠️ Không tìm thấy Carrier nào với code: ${shipperCode}`);
+                            console.warn(`[Subscriber] Không tìm thấy Carrier nào với code: ${shipperCode}`);
                       }
                   } catch (marketErr: any) {
-                      console.error(`[Subscriber] ❌ Lỗi query Marketplace Carrier: ${marketErr.message}`);
+                        console.error(`[Subscriber] Lỗi query Marketplace Carrier: ${marketErr.message}`);
                   }
                   
               } else {
                   console.warn(`[Subscriber] User ${shipperUserId} không có metadata.company_code.`);
               }
           } catch (e: any) {
-              console.error(`[Subscriber] ❌ Lỗi tra cứu User: ${e.message}`);
+                console.error(`[Subscriber] Lỗi tra cứu User: ${e.message}`);
           }
       } else {
           console.log("[Subscriber] Không tìm thấy shipper_id. Dùng mặc định GHN.");
       }
       
-      console.log(`[Subscriber] ✅ Shipper Config -> Code: ${shipperCode}, HasKey: ${shipperPublicKey}`);
+        console.log(`[Subscriber] Shipper Config -> Code: ${shipperCode}, HasKey: ${shipperPublicKey}`);
 
       // =================================================================
       // BƯỚC 5: SUBMIT LÊN BLOCKCHAIN
@@ -174,10 +174,10 @@ export default async function orderPlacedHandler({
               if (sellers.length > 0) {
                   sellerPublicKey = sellers[0].metadata?.rsa_public_key;
               }
-          } catch (e) { console.warn(`⚠️ Lỗi tìm seller ${sellerID}:`, e); }
+            } catch (e) { console.warn(`Lỗi tìm seller ${sellerID}:`, e); }
 
           if (!sellerPublicKey) {
-              console.error(`❌ BỎ QUA: Không có Public Key cho Seller ${sellerID}`);
+                console.error(`BỎ QUA: Không có Public Key cho Seller ${sellerID}`);
               continue; 
           }
 
@@ -225,16 +225,16 @@ export default async function orderPlacedHandler({
               console.log('payload', payload);
               console.log(`[Submit] ${splitOrderID} -> Shipper: ${shipperCode}, HasShipperKey: ${!!shipperPublicKey}`);
               const txId = await fabricService.createOrder(payload, sellerID);
-              console.log(`✅ [${splitOrderID}] Ghi thành công! TX: ${txId}`);
+                console.log(`[${splitOrderID}] Ghi thành công! TX: ${txId}`);
           } catch (err: any) {
-              console.error(`❌ [${splitOrderID}] Lỗi ghi Blockchain:`, err.message);
+                console.error(`[${splitOrderID}] Lỗi ghi Blockchain:`, err.message);
           }
 
           subIndex++;
       }
 
   } catch (error: any) {
-      console.error(`[Subscriber] ❌ Lỗi tổng quát:`, error);
+        console.error(`[Subscriber] Lỗi tổng quát:`, error);
   }
 }
 

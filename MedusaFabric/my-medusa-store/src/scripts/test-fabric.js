@@ -8,23 +8,23 @@ const path = require('path');
 const mockContainer = { resolve: (name) => ({}) };
 
 async function main() {
-    console.log("🚀 DEBUGGING FABRIC TRANSACTION...");
+    console.log("DEBUGGING FABRIC TRANSACTION...");
     try {
         const fabricService = new FabricService(mockContainer);
         
         // 1. Thử kết nối Gateway
         console.log("1. Connecting Gateway as 'seller_admin'...");
         const { contract, gateway } = await fabricService._getContract('seller');
-        console.log("✅ Gateway Connected.");
+        console.log("Gateway Connected.");
 
     // [MỚI] Đọc file Key RSA vừa tạo
     const sellerPubPath = path.join(process.cwd(), 'keys', 'seller_public_key.pem');
     let sellerPubKey = "";
         try {
         sellerPubKey = fs.readFileSync(sellerPubPath, 'utf8');
-        console.log("✅ Đã đọc Seller Public Key thành công.");
+            console.log("Dã đọc Seller Public Key thành công.");
         } catch (e) {
-        console.error("❌ LỖI: Không tìm thấy file 'keys/seller_public_key.pem'. Hãy kiểm tra lại thư mục keys.");
+            console.error("LỗI: Không tìm thấy file 'keys/seller_public_key.pem'. Hãy kiểm tra lại thư mục keys.");
         return;
         }
 
@@ -34,7 +34,7 @@ async function main() {
             paymentMethod: "COD",
         shipperCompanyID: "GHN", 
         _sellerPublicKey: sellerPubKey, // <--- Đưa Key thật vào đây
-        product_lines: [{name: "Ao thun", quantity: 2}],
+            product_lines: [{ name: "Ao thun", quantity: 2 }],
             amount_untaxed: 100,
             amount_total: 110,
             shipping_address: "Test Address",
@@ -43,12 +43,12 @@ async function main() {
         
         // Gọi hàm createOrder của service
         await fabricService.createOrder(dummyOrder);
-        console.log("✅ Submit Success!");
+        console.log("Submit Success!");
 
         gateway.disconnect();
 
     } catch (error) {
-        console.error("\n❌ TRANSACTION FAILED - DETAILED LOGS:");
+        console.error("\nTRANSACTION FAILED - DETAILED LOGS:");
         
         // IN CHI TIẾT LỖI TỪ PEER
         if (error.responses) {

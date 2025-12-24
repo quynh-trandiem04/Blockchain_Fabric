@@ -11,7 +11,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const userModuleService = container.resolve(Modules.USER);
 
   try {
-    console.log(`🚫 Deleting rejected seller ID: ${id}...`);
+    console.log(`Deleting rejected seller ID: ${id}...`);
 
     // 1. Lấy thông tin Seller trước để biết User ID là gì
     const seller = await marketplaceService.retrieveSeller(id).catch(() => null);
@@ -31,11 +31,11 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         console.log(`   -> Deleted Medusa User (Email freed)`);
     }
 
-    console.log("✅ Reject & Delete success");
+    console.log("Reject & Delete success");
     res.json({ message: "Đã từ chối và xóa dữ liệu thành công. Email đã có thể đăng ký lại." });
 
   } catch (error: any) {
-    console.error("❌ Reject Error:", error);
+    console.error("Reject Error:", error);
     res.status(500).json({ error: error.message || "Lỗi Server khi xóa." });
   }
 };

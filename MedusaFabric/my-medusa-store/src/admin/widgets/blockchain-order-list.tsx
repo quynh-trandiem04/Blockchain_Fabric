@@ -56,6 +56,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
     const [medusaOrder, setMedusaOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [isRemitting, setIsRemitting] = useState(false);
+    const [isCancelling, setIsCancelling] = useState(false);
 
     const originalId = blockchainOrder.blockchain_id.replace(/_\d+$/, '');
 
@@ -98,6 +99,36 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
             toast.error("Network error during remittance.");
         } finally {
             setIsRemitting(false);
+        }
+    };
+
+    const handleCancelOrder = async () => {
+        if (!confirm(`Confirm cancel order ${blockchainOrder.blockchain_id}?\n\nNote: Orders can only be cancelled when in CREATED or PAID status.`)) {
+            return;
+        }
+
+        setIsCancelling(true);
+        try {
+            const res = await fetch(`/admin/fabric/orders/${blockchainOrder.blockchain_id}/cancel`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                toast.success("Order cancelled successfully!");
+                onRefresh();
+                onClose();
+            } else {
+                toast.error("ERROR: " + (result.error || "Failed to cancel order."));
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Network error during order cancellation.");
+        } finally {
+            setIsCancelling(false);
         }
     };
 
@@ -249,6 +280,19 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                         </Button>
                     </div>
 
+                    <div className="flex gap-2">
+                        {/* Nút Cancel Order - chỉ hiện khi CREATED hoặc PAID */}
+                        {(blockchainOrder.status === 'CREATED' || blockchainOrder.status === 'PAID') && (
+                            <Button
+                                variant="danger"
+                                onClick={handleCancelOrder}
+                                isLoading={isCancelling}
+                            >
+                                Cancel Order
+                            </Button>
+                        )}
+
+                        {/* Nút Remit COD - chỉ hiện khi COD PENDING_REMITTANCE */}
                     {blockchainOrder.payment_method === 'COD' && blockchainOrder.cod_status === 'PENDING_REMITTANCE' && (
                         <Button 
                             variant="primary" 
@@ -259,6 +303,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                             <CurrencyDollar /> Confirm COD Payment
                         </Button>
                     )}
+                    </div>
                 </Drawer.Footer>
             </Drawer.Content>
         </Drawer>

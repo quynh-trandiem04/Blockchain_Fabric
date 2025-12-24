@@ -11,7 +11,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
   const marketplaceService = container.resolve("marketplace") as any;
 
   try {
-    console.log(`🚫 Rejecting Shipper User ID: ${id}...`);
+    console.log(`Rejecting Shipper User ID: ${id}...`);
 
     const user = await userModuleService.retrieveUser(id).catch(() => null);
     
@@ -38,7 +38,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     res.json({ message: "Đã từ chối và xóa dữ liệu thành công." });
 
   } catch (error: any) {
-    console.error("❌ Reject Error:", error);
+    console.error("Reject Error:", error);
     res.status(500).json({ error: error.message });
   }
 };

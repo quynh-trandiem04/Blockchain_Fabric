@@ -13,7 +13,7 @@ const FabricServiceClass = require("../../../../../../../services/fabric");
 
 export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const orderId = req.params.id; 
-  console.log(`[Decrypt API - Shipper] 🔍 Attempting decrypt for Order: ${orderId}`);
+    console.log(`[Decrypt API - Shipper] Attempting decrypt for Order: ${orderId}`);
 
   let actorId: string | undefined;
   let authIdentityId: string | undefined;
@@ -38,14 +38,14 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
               
               authIdentityId = decoded.auth_identity_id; 
           } catch (err) {
-              console.warn("[Decrypt API - Shipper] ⚠️ Token verification failed.");
+                console.warn("[Decrypt API - Shipper] Token verification failed.");
           }
       }
   }
 
   // 3. TRA CỨU DB (Fallback cuối cùng)
   if (!actorId && authIdentityId && DB_URL) {
-      console.log(`[Decrypt API - Shipper] 🔄 Attempting DB lookup for Auth ID: ${authIdentityId}`);
+        console.log(`[Decrypt API - Shipper] Attempting DB lookup for Auth ID: ${authIdentityId}`);
       const dbClient = new Client({
           connectionString: DB_URL,
           ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
@@ -59,10 +59,10 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
           );
           if (linkRes.rows.length > 0) {
               actorId = linkRes.rows[0].user_id; 
-              console.log(`[Decrypt API - Shipper] ✅ DB lookup successful. Found actorId: ${actorId}`);
+                console.log(`[Decrypt API - Shipper] DB lookup successful. Found actorId: ${actorId}`);
           }
       } catch (e) {
-          console.error("[Decrypt API - Shipper] ❌ DB Lookup Error:", e);
+            console.error("[Decrypt API - Shipper] DB Lookup Error:", e);
       } finally {
           await dbClient.end();
         }
@@ -70,7 +70,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
   // 4. KIỂM TRA QUYỀN TRUY CẬP
   if (!actorId) {
-      console.warn("[Decrypt API - Shipper] 🚫 UNAUTHORIZED: User ID not found.");
+        console.warn("[Decrypt API - Shipper] UNAUTHORIZED: User ID not found.");
       return res.status(401).json({ error: "UNAUTHORIZED: Missing user ID." });
   }
 
@@ -90,7 +90,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
       // Check Role
       if (user.metadata?.fabric_role !== 'shipperorgmsp') {
-           console.warn(`[Decrypt API - Shipper] 🚫 Access Denied. User role is ${user.metadata?.fabric_role}`);
+            console.warn(`[Decrypt API - Shipper] Access Denied. User role is ${user.metadata?.fabric_role}`);
            return res.status(403).json({ error: "Access denied. Only Shippers can perform this action." });
       }
 
@@ -98,10 +98,10 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
       const shipperPrivateKey = user.metadata?.rsa_private_key as string; 
     const shipperCompanyID = user.metadata?.company_code as string;
     
-      console.log(`[Decrypt API - Shipper] 🔍 Actor: ${user.email} (Company: ${shipperCompanyID})`);
+        console.log(`[Decrypt API - Shipper] Actor: ${user.email} (Company: ${shipperCompanyID})`);
     
       if (!shipperPrivateKey) {
-          console.error(`[Decrypt API - Shipper] ❌ Missing Private Key for User: ${actorId}`);
+            console.error(`[Decrypt API - Shipper] Missing Private Key for User: ${actorId}`);
           return res.status(500).json({ error: "Missing shipper private key in user metadata." });
     }
 
@@ -115,7 +115,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
       // 7. Xử lý kết quả trả về
       if (decryptedData && decryptedData.decrypted_shipper_data) {
-          console.log(`[Decrypt API - Shipper] ✅ Decrypt SUCCESS for ${orderId}.`);
+            console.log(`[Decrypt API - Shipper] Decrypt SUCCESS for ${orderId}.`);
           
           // Trả về dữ liệu public + private đã giải mã
           // Frontend Shipper cần cả status, paymentMethod từ public data
@@ -126,12 +126,12 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
           });
       } else {
           const errorMessage = decryptedData?.error || "Data not found or decryption failed.";
-          console.warn(`[Decrypt API - Shipper] ⚠️ Failed: ${errorMessage}`);
+            console.warn(`[Decrypt API - Shipper] Failed: ${errorMessage}`);
           return res.status(400).json({ error: errorMessage });
       }
 
   } catch (error: any) {
-      console.error(`[Decrypt API - Shipper] ❌ Runtime Error: ${error.message}`);
+        console.error(`[Decrypt API - Shipper] Runtime Error: ${error.message}`);
     return res.status(500).json({ error: error.message });
   }
 };

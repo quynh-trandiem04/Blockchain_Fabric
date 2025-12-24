@@ -3,6 +3,7 @@
 import { MedusaRequest, MedusaResponse } from "@medusajs/framework";
 import { Modules } from "@medusajs/utils";
 import jwt from "jsonwebtoken";
+import { Client } from "pg";
 
 const FabricService = require("../../../../../../services/fabric");
 
@@ -59,6 +60,176 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     console.log(`      -> Verification Company Code: ${companyCode}`);
 
     await fabricService.shipOrder(id, companyCode);
+
+    // 6. TRỪ KHO TỰ ĐỘNG sau khi ship thành công
+    const dbClient = new Client({ connectionString: process.env.DATABASE_URL });
+
+    try {
+      await dbClient.connect();
+
+      // Extract original order ID (remove _1, _2 suffix for split orders)
+      const originalOrderId = id.includes('_') ? id.substring(0, id.lastIndexOf('_')) : id;
+      console.log(`[ShipOrder] Original Order ID: ${originalOrderId} (from ${id})`);
+
+      // Lấy thông tin order
+      const orderQuery = `SELECT id, metadata FROM "order" WHERE id = $1`;
+      const orderResult = await dbClient.query(orderQuery, [originalOrderId]);
+
+      if (orderResult.rows.length === 0) {
+        console.log(`[ShipOrder] Order ${originalOrderId} not found in database`);
+        return res.json({
+          success: true,
+          message: "Đã xác nhận lấy hàng thành công (Shipped)!",
+        });
+      }
+
+      console.log(`[ShipOrder] Found order in database: ${originalOrderId}`);
+
+      const order = orderResult.rows[0];
+      const metadata = order.metadata || {};
+
+      // Kiểm tra xem đã trừ kho chưa
+      if (metadata.inventory_reduced) {
+        console.log(`[ShipOrder] Inventory already reduced for order ${id}`);
+        return res.json({
+          success: true,
+          message: "Đã xác nhận lấy hàng thành công (Shipped)!",
+        });
+      }
+
+      // Lấy line items
+      const lineItemsQuery = `
+            SELECT oli.id, oli.variant_id, oli.title, oi.quantity
+            FROM order_line_item oli
+            JOIN order_item oi ON oli.id = oi.item_id
+            WHERE oi.order_id = $1
+        `;
+      const lineItemsResult = await dbClient.query(lineItemsQuery, [originalOrderId]);
+
+      if (lineItemsResult.rows.length === 0) {
+        console.log(`[ShipOrder] No line items found for order ${originalOrderId}`);
+        return res.json({
+          success: true,
+          message: "Đã xác nhận lấy hàng thành công (Shipped)!",
+        });
+      }
+
+      console.log(`[ShipOrder] Found ${lineItemsResult.rows.length} line items`);
+
+      const inventoryModule = req.scope.resolve(Modules.INVENTORY);
+      const productModule = req.scope.resolve(Modules.PRODUCT);
+      const productsToCheck = new Set<string>();
+
+      // Trừ inventory cho từng variant
+      for (const item of lineItemsResult.rows) {
+        const { variant_id, quantity, title } = item;
+
+        try {
+          const inventoryLinkQuery = `
+                    SELECT inventory_item_id
+                    FROM product_variant_inventory_item
+                    WHERE variant_id = $1
+                `;
+          const inventoryLinkResult = await dbClient.query(inventoryLinkQuery, [variant_id]);
+
+          if (inventoryLinkResult.rows.length === 0) {
+            console.log(`No inventory item for variant ${variant_id}`);
+            continue;
+          }
+
+          const inventoryItemId = inventoryLinkResult.rows[0].inventory_item_id;
+
+          // Get product_id
+          const productQuery = `SELECT product_id FROM product_variant WHERE id = $1`;
+          const productResult = await dbClient.query(productQuery, [variant_id]);
+          if (productResult.rows.length > 0) {
+            productsToCheck.add(productResult.rows[0].product_id);
+          }
+
+          // Lấy inventory levels
+          const inventoryLevels = await inventoryModule.listInventoryLevels({
+            inventory_item_id: inventoryItemId
+          });
+
+          // Trừ inventory
+          for (const level of inventoryLevels) {
+            const currentStock = level.stocked_quantity || 0;
+            const newStock = Math.max(0, currentStock - quantity);
+
+            await inventoryModule.updateInventoryLevels([{
+              inventory_item_id: inventoryItemId,
+              location_id: level.location_id,
+              stocked_quantity: newStock
+            }]);
+
+            console.log(`Reduced inventory for ${title}: ${currentStock} → ${newStock} (Qty: -${quantity})`);
+          }
+
+        } catch (invError: any) {
+          console.error(`Failed to reduce inventory for variant ${variant_id}:`, invError.message);
+        }
+      }
+
+      // Kiểm tra và auto-unpublish nếu tổng kho = 0
+      for (const productId of productsToCheck) {
+        try {
+          const variantsQuery = `
+                    SELECT pv.id
+                    FROM product_variant pv
+                    WHERE pv.product_id = $1 AND pv.deleted_at IS NULL
+                `;
+          const variantsResult = await dbClient.query(variantsQuery, [productId]);
+
+          let totalInventory = 0;
+
+          for (const variant of variantsResult.rows) {
+            const inventoryLinkQuery = `
+                        SELECT inventory_item_id
+                        FROM product_variant_inventory_item
+                        WHERE variant_id = $1
+                    `;
+            const inventoryLinkResult = await dbClient.query(inventoryLinkQuery, [variant.id]);
+
+            if (inventoryLinkResult.rows.length > 0) {
+              const inventoryItemId = inventoryLinkResult.rows[0].inventory_item_id;
+              const inventoryLevels = await inventoryModule.listInventoryLevels({
+                inventory_item_id: inventoryItemId
+              });
+
+              for (const level of inventoryLevels) {
+                totalInventory += level.stocked_quantity || 0;
+              }
+            }
+          }
+
+          if (totalInventory === 0) {
+            await productModule.updateProducts(productId, {
+              status: 'draft'
+            });
+
+            console.log(`Product ${productId} auto-unpublished: Total inventory = 0`);
+          }
+
+        } catch (productError: any) {
+          console.error(`Failed to check/update product ${productId}:`, productError.message);
+        }
+      }
+
+      // Đánh dấu đã trừ kho
+      const updateMetadataQuery = `
+            UPDATE "order"
+            SET metadata = metadata || '{"inventory_reduced": true}'::jsonb
+            WHERE id = $1
+        `;
+      await dbClient.query(updateMetadataQuery, [originalOrderId]);
+
+      console.log(`[ShipOrder] Completed reducing inventory for order ${originalOrderId}`);
+
+    } catch (error: any) {
+      console.error(`[ShipOrder] Inventory reduction error:`, error.message);
+    } finally {
+      await dbClient.end();
+    }
 
     return res.json({
       success: true,

@@ -107,7 +107,7 @@ const RoleGuardWidget = () => {
             background: 'rgba(255, 255, 255, 0.98)', zIndex: 9999,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
         }}>
-            <Heading level="h1" className="text-red-600 text-4xl mb-4">⛔ ĐANG CHUYỂN HƯỚNG</Heading>
+            <Heading level="h1" className="text-red-600 text-4xl mb-4">ĐANG CHUYỂN HƯỚNG</Heading>
             <div className="bg-gray-100 p-6 rounded-lg border border-gray-300 text-center max-w-md">
                 <Text className="text-lg font-bold mb-2">Xin chào: {debugInfo.email}</Text>
                 <Text className="mb-4 text-gray-700">{debugInfo.reason}</Text>

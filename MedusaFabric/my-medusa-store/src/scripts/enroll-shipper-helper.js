@@ -38,7 +38,7 @@ async function enrollShipperIdentity(enrollmentID, companyCodeAttr) {
         }
 
         let caURL = caInfo.url.replace(/:\/\/[^:]+:/, `://${FABRIC_HOST}:`);
-        console.log(`🔌 Connecting to CA at: ${caURL}`);
+        console.log(`Connecting to CA at: ${caURL}`);
         
         const tlsOptions = {
             trustedRoots: caTLSCACerts,
@@ -58,7 +58,7 @@ async function enrollShipperIdentity(enrollmentID, companyCodeAttr) {
         // --- 1. Check Admin (shipper_admin) ---
         const adminIdentity = await wallet.get('shipper_admin');
         if (!adminIdentity) {
-            throw new Error('⚠️ Admin "shipper_admin" not found. Please run "node enrollShipper.js" first!');
+            throw new Error('Admin "shipper_admin" not found. Please run "node enrollShipper.js" first!');
         }
 
         const provider = wallet.getProviderRegistry().getProvider(adminIdentity.type);
@@ -68,13 +68,13 @@ async function enrollShipperIdentity(enrollmentID, companyCodeAttr) {
         const identityService = ca.newIdentityService();
         try {
             await identityService.getOne(enrollmentID, adminUser);
-            console.log(`⚠️ User "${enrollmentID}" đã tồn tại trên CA. Đang xóa để đăng ký lại...`);
+            console.log(`User "${enrollmentID}" đã tồn tại trên CA. Đang xóa để đăng ký lại...`);
             await identityService.delete(enrollmentID, adminUser);
             console.log(`🗑️ Đã xóa user "${enrollmentID}" khỏi CA.`);
         } catch (error) { }
 
         // --- 3. Đăng ký User mới ---
-        console.log(`✨ Registering user "${enrollmentID}"...`);
+        console.log(`Registering user "${enrollmentID}"...`);
         const secret = await ca.register({
             affiliation: '',
             enrollmentID: enrollmentID,
@@ -82,7 +82,7 @@ async function enrollShipperIdentity(enrollmentID, companyCodeAttr) {
             attrs: [{ name: 'companyCode', value: companyCodeAttr, ecert: true }]
         }, adminUser);
         
-        console.log(`🔑 Secret generated for "${enrollmentID}"`);
+        console.log(`Secret generated for "${enrollmentID}"`);
 
         // --- 4. Enroll User mới ---
         const enrollment = await ca.enroll({
@@ -100,10 +100,10 @@ async function enrollShipperIdentity(enrollmentID, companyCodeAttr) {
         };
 
         await wallet.put(enrollmentID, x509Identity);
-        console.log(`✅ Wallet created successfully for "${enrollmentID}"`);
+        console.log(`Wallet created successfully for "${enrollmentID}"`);
 
     } catch (error) {
-        console.error(`❌ Enroll Failed: ${error.message}`);
+        console.error(`Enroll Failed: ${error.message}`);
         throw error; 
     }
 }

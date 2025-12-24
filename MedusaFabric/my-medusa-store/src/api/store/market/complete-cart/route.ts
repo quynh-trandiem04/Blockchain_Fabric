@@ -78,7 +78,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
                 sellerPublicKey = sellers[0].metadata?.rsa_public_key || null;
             }
         } catch (err) {
-            console.warn(`⚠️ Could not fetch public key for seller ${sellerID}, using default fallback.`);
+                console.warn(`Could not fetch public key for seller ${sellerID}, using default fallback.`);
         }
 
         // --- TÍNH TOÁN TIỀN ---
@@ -129,7 +129,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
             _sellerPublicKey: sellerPublicKey 
         };
 
-        console.log(`🚀 Blockchain: ${splitOrderID} | Seller: ${sellerID} | Encrypt with Custom Key: ${!!sellerPublicKey}`);
+            console.log(`Blockchain: ${splitOrderID} | Seller: ${sellerID} | Encrypt with Custom Key: ${!!sellerPublicKey}`);
         
         // Gọi Service (Service sẽ tự động dùng _sellerPublicKey nếu có)
         const txId = await fabricService.createOrder(payload);

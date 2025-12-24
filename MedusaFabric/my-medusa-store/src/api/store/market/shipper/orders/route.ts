@@ -15,7 +15,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   const userModuleService = req.scope.resolve(Modules.USER);
 
   console.log("========================================");
-  console.log("🚀 [Shipper API] GET /store/market/shipper/orders called");
+    console.log("[Shipper API] GET /store/market/shipper/orders called");
 
   try {
     // 1. TỰ XÁC THỰC TOKEN
@@ -38,7 +38,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     const user = await userModuleService.retrieveUser(actorId);
     const shipperCompanyID = user.metadata?.company_code as string;
     
-    console.log(`👤 User: ${user.email} | Filtering for: ${shipperCompanyID}`);
+        console.log(`User: ${user.email} | Filtering for: ${shipperCompanyID}`);
 
     if (!shipperCompanyID) {
         return res.status(400).json({ message: "Account does not have a linked Company Code." });
@@ -46,20 +46,18 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
 
     // 3. Gọi Service Fabric
     const fabricOrders = await fabricService.listShipperOrders(shipperCompanyID); 
-    console.log(`📦 [Fabric] Found ${fabricOrders.length} split orders on Blockchain`);
+        console.log(`[Fabric] Found ${fabricOrders.length} split orders on Blockchain`);
     
     if (!fabricOrders || fabricOrders.length === 0) {
         return res.json({ orders: [] });
     }
 
     // 4. Lấy danh sách ID gốc (FIX BUG TẠI ĐÂY)
-    // ❌ Cũ: split('_')[0] -> Sai (chỉ lấy được chữ "order")
-    // ✅ Mới: Dùng regex thay thế đuôi _ số ở cuối
     const medusaOrderIds: string[] = [...new Set<string>(
         fabricOrders.map((o: any) => String(o.blockchain_id).replace(/_\d+$/, ''))
     )];
     
-    console.log(`🔍 [Debug] Original DB IDs to query:`, medusaOrderIds);
+        console.log(`[Debug] Original DB IDs to query:`, medusaOrderIds);
 
     // 5. Query Medusa DB
     const medusaOrders = await orderModuleService.listOrders(
@@ -71,7 +69,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         }
     );
     
-    console.log(`🗄️ [DB] Found ${medusaOrders.length} matching original orders`);
+        console.log(`[DB] Found ${medusaOrders.length} matching original orders`);
 
     // 6. Merge Data
     const mergedOrders = fabricOrders.map((fOrder: any) => {
@@ -103,12 +101,12 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
         };
     });
 
-    console.log(`✅ [Final] Returning ${mergedOrders.length} orders to UI`);
+        console.log(`[Final] Returning ${mergedOrders.length} orders to UI`);
 
     return res.json({ orders: mergedOrders });
 
   } catch (error: any) {
-    console.error("🔥 [Shipper API] Error:", error);
+        console.error("[Shipper API] Error:", error);
     return res.status(500).json({ message: error.message });
   }
 };

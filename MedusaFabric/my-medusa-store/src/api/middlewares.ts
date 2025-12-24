@@ -30,7 +30,7 @@ const assignSellerOnCreate = async (req: MedusaRequest, res: MedusaResponse, nex
 
         if (user && user.metadata?.fabric_role === SELLER_ROLE && user.metadata?.company_code) {
             
-            console.log(`🛒 [Middleware] Auto-assigning product to Seller: ${user.metadata.company_code}`);
+      console.log(`[Middleware] Auto-assigning product to Seller: ${user.metadata.company_code}`);
             
             // [FIX LỖI TẠI ĐÂY]: Ép kiểu req thành any để truy cập body
             const requestBody = (req as any).body || {};
@@ -71,7 +71,7 @@ const protectApiData = async (req: MedusaRequest, res: MedusaResponse, next: Med
     const isAdmin = ALLOWED_ADMIN_ROLES.includes(role);
     const isSeller = role === SELLER_ROLE;
 
-    console.log(`🛡️ Middleware Check: ${user.email} | Role: ${role} | Method: ${req.method} | Path: ${path}`);
+    console.log(`[Middleware] Check: ${user.email} | Role: ${role} | Method: ${req.method} | Path: ${path}`);
 
     if (isAdmin) return next();
 
@@ -80,7 +80,7 @@ const protectApiData = async (req: MedusaRequest, res: MedusaResponse, next: Med
     }
     
     if (PROTECTED_API_ROUTES.some(r => path.startsWith(r))) {
-        console.log(`⛔ [BLOCKED] Access Denied for ${user.email}`);
+      console.log(`[BLOCKED] Access Denied for ${user.email}`);
         res.status(403).json({ message: "Forbidden: Access Denied for Non-Admin" });
         return;
     }
@@ -128,8 +128,6 @@ export default defineMiddlewares({
           next();
         },
       ],
-      // 🔥 QUAN TRỌNG: Tắt Authentication của Medusa framework cho route này
-      // Để ta tự xử lý Auth trong route handler hoặc middleware riêng
       auth: false, 
     },
   ],

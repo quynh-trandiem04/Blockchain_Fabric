@@ -8,14 +8,14 @@ const grpc = require('@grpc/grpc-js');
 const CCP_PATH = path.resolve(process.cwd(), 'connection-profile.yaml');
 
 async function main() {
-    console.log("🚀 STARTING CONNECTION DIAGNOSTIC...\n");
+    console.log("STARTING CONNECTION DIAGNOSTIC...\n");
 
     // 1. Kiểm tra file Connection Profile
     if (!fs.existsSync(CCP_PATH)) {
-        console.error(`❌ ERROR: Connection Profile not found at ${CCP_PATH}`);
+        console.error(`ERROR: Connection Profile not found at ${CCP_PATH}`);
         return;
     }
-    console.log(`✅ Found Connection Profile: ${CCP_PATH}`);
+    console.log(`Found Connection Profile: ${CCP_PATH}`);
 
     let ccp;
     try {
@@ -29,9 +29,9 @@ async function main() {
              // Fallback nếu không tìm thấy, thử load thường
              ccp = yaml.load(fileContent);
         }
-        console.log(`✅ Loaded YAML successfully.`);
+        console.log(`Loaded YAML successfully.`);
     } catch (e) {
-        console.error(`❌ ERROR: Failed to parse YAML:`, e.message);
+        console.error(`ERROR: Failed to parse YAML:`, e.message);
         return;
     }
 
@@ -42,7 +42,7 @@ async function main() {
             await testNodeConnection(peerName, ccp.peers[peerName]);
         }
     } else {
-        console.warn("⚠️ No peers defined in profile.");
+        console.warn("No peers defined in profile.");
     }
 
     // 3. Test Kết nối từng Orderer
@@ -52,7 +52,7 @@ async function main() {
             await testNodeConnection(ordererName, ccp.orderers[ordererName]);
         }
     } else {
-        console.warn("⚠️ No orderers defined in profile.");
+        console.warn("No orderers defined in profile.");
     }
 }
 
@@ -72,23 +72,23 @@ async function testNodeConnection(name, config) {
         // Nếu path bắt đầu bằng // (network path), nodejs xử lý bình thường
         try {
             if (fs.existsSync(pemPath)) {
-                console.log(`   ✅ File exists.`);
+                console.log(`   File exists.`);
                 pemContent = fs.readFileSync(pemPath);
-                console.log(`   ✅ File read success (Size: ${pemContent.length} bytes).`);
+                console.log(`File read success (Size: ${pemContent.length} bytes).`);
             } else {
-                console.error(`   ❌ ERROR: File DOES NOT EXIST at path!`);
+                console.error(`   ERROR: File DOES NOT EXIST at path!`);
                 console.error(`      -> Please check Z drive mapping or network path.`);
                 return;
             }
         } catch (e) {
-            console.error(`   ❌ ERROR reading file: ${e.message}`);
+            console.error(`   ERROR reading file: ${e.message}`);
             return;
         }
     } else if (config.tlsCACerts?.pem) {
-        console.log(`   ✅ TLS Cert provided as PEM string (Hardcoded).`);
+        console.log(`   TLS Cert provided as PEM string (Hardcoded).`);
         pemContent = Buffer.from(config.tlsCACerts.pem);
     } else {
-        console.error(`   ❌ ERROR: No TLS Certificate found (path or pem missing).`);
+        console.error(`   ERROR: No TLS Certificate found (path or pem missing).`);
         return;
     }
 
@@ -115,12 +115,12 @@ async function testNodeConnection(name, config) {
         
         client.waitForReady(deadline, (err) => {
             if (err) {
-                console.error(`   ❌ CONNECTION FAILED: ${err.message}`);
+                console.error(`   CONNECTION FAILED: ${err.message}`);
                 // Phân tích lỗi
                 if (err.message.includes('14')) console.error("      -> Có thể do lỗi mạng (Firewall, IP sai, Port sai) hoặc Server chưa bật.");
                 if (err.message.includes('Handshake')) console.error("      -> Lỗi SSL Handshake (Cert sai, Hostname override sai).");
             } else {
-                console.log(`   ✅ CONNECTION SUCCESSFUL! (gRPC Ready)`);
+                console.log(`CONNECTION SUCCESSFUL! (gRPC Ready)`);
             }
             client.close();
             resolve();

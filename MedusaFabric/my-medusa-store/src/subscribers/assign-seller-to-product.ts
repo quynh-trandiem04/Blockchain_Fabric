@@ -35,7 +35,7 @@ export default async function assignSellerToProduct({
     });
 
     if (!sellers || sellers.length === 0) {
-        console.warn(`⚠️ Không tìm thấy Seller nào có mã: ${companyCode}`);
+      console.warn(`Không tìm thấy Seller nào có mã: ${companyCode}`);
         return;
     }
 
@@ -48,10 +48,10 @@ export default async function assignSellerToProduct({
       }
     ]);
 
-    console.log(`✅ Đã liên kết Product ${productId} <-> Seller ${seller.id}`);
+    console.log(`Đã liên kết Product ${productId} <-> Seller ${seller.id}`);
 
   } catch (error) {
-    console.error(`❌ Lỗi trong subscriber assign-seller:`, error);
+    console.error(`Lỗi trong subscriber assign-seller:`, error);
   }
 }
 

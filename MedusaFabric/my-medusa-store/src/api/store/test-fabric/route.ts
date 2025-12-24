@@ -47,7 +47,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     // 2. Gọi hàm createOrder trực tiếp
     const txId = await fabricService.createOrder(dummyPayload);
 
-    console.log(`✅ [API TEST] Success! TX ID: ${txId}`);
+    console.log(`[API TEST] Success! TX ID: ${txId}`);
 
     // 3. Trả về kết quả cho Postman
     res.status(200).json({
@@ -57,7 +57,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     });
 
   } catch (error: any) {
-    console.error("❌ [API TEST] Failed:", error);
+    console.error("[API TEST] Failed:", error);
     res.status(500).json({
       message: "Fabric Connection Failed",
       error: error.message,

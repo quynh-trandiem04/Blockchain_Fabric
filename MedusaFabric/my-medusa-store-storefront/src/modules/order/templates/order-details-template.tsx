@@ -78,6 +78,7 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
   const [subOrders, setSubOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isReturning, setIsReturning] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState<string | null>(null);
 
   const publishableApiKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY;
   const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000";
@@ -151,6 +152,35 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
           setIsReturning(null);
       }
   };
+
+    // 4. Handle Cancel Order
+    const handleCancelOrder = async (subOrderId: string) => {
+        if (!confirm("Are you sure you want to cancel this order? This action cannot be undone.")) return;
+
+        setIsCancelling(subOrderId);
+        try {
+            const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${subOrderId}/cancel`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-publishable-api-key": publishableApiKey || ""
+                }
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                alert("Order cancelled successfully! Inventory has been restored.");
+                window.location.reload();
+            } else {
+                alert((result.error || "Cannot cancel this order"));
+            }
+        } catch (err) {
+            alert("Network error. Please try again.");
+        } finally {
+            setIsCancelling(null);
+        }
+    };
 
   // Helper Badge Style
   const getStatusBadgeStyle = (status: string) => {
@@ -247,7 +277,7 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
                                 </div>
             </div>
 
-                            {/* 🔥🔥 DANH SÁCH SẢN PHẨM RIÊNG BIỆT CHO GÓI NÀY 🔥🔥 */}
+                                    {/* DANH SÁCH SẢN PHẨM RIÊNG BIỆT CHO GÓI NÀY */}
                             <PackageItems 
                                 items={getItemsForSubOrder(sub.seller_id)} 
                                 currencyCode={order.currency_code} 
@@ -281,8 +311,41 @@ const OrderDetailsTemplate: React.FC<OrderDetailsTemplateProps> = ({
 
         {/* --- SUMMARY SECTION --- */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 border-t border-gray-200 pt-8 mt-4">
-        <ShippingDetails order={order} />
-        <OrderSummary order={order} />
+            <ShippingDetails order={order} />
+            <div>
+                <OrderSummary order={order} />
+
+                {/* Cancel/Return Actions Below Total */}
+                <div className="mt-6 flex flex-col gap-3">
+                    {subOrders.map((sub) => (
+                        <React.Fragment key={sub.blockchain_id}>
+                            {/* Cancel Button - Only for CREATED or PAID status */}
+                            {(sub.status === 'CREATED' || sub.status === 'PAID') && (
+                                <Button
+                                    variant="danger"
+                                    className="bg-red-600 text-white rounded-none uppercase font-medium text-[9px] px-3 py-1.5 h-auto w-full"
+                                    onClick={() => handleCancelOrder(sub.blockchain_id)}
+                                    isLoading={isCancelling === sub.blockchain_id}
+                                >
+                                    Cancel Order - PKG {subOrders.indexOf(sub) + 1}
+                                </Button>
+                            )}
+
+                            {/* Return Button - Only for DELIVERED status */}
+                            {sub.status === 'DELIVERED' && (
+                                <Button
+                                    variant="secondary"
+                                    className="border border-black text-black hover:bg-black hover:text-white rounded-none uppercase font-bold text-[10px] px-6 py-2 h-auto w-full transition-all"
+                                    onClick={() => handleRequestReturn(sub.blockchain_id)}
+                                    isLoading={isReturning === sub.blockchain_id}
+                                >
+                                    Request Return - PKG {subOrders.indexOf(sub) + 1}
+                                </Button>
+                            )}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </div>
         </div>
         
         <div className="border-t border-gray-200 pt-4">

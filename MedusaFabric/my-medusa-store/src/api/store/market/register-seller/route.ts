@@ -5,7 +5,7 @@ import { Modules } from "@medusajs/utils";
 import { Client } from "pg"; 
 
 export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
-  const { email, password, shop_name, phone } = req.body as any;
+    const { email, password, business_name, phone } = req.body as any;
   const container = req.scope;
 
   const userModuleService = container.resolve(Modules.USER);
@@ -110,8 +110,8 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     // 6. Tạo Seller Profile
     console.log("5. Creating Seller Profile...");
     const seller = await marketplaceService.createSellers({
-        name: shop_name,
-        handle: shop_name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, ''),
+            name: business_name,
+            handle: business_name.toLowerCase().replace(/ /g, '-').replace(/[^\w-]/g, ''),
         company_code: user.metadata?.company_code,
         email: email,
         phone: phone,
@@ -122,7 +122,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     res.json({ message: "Đăng ký thành công! Vui lòng chờ Admin phê duyệt.", seller_id: seller.id });
 
   } catch (error: any) {
-    console.error("❌ Register Error:", error);
+        console.error(" Register Error:", error);
     
     // Rollback
     if (createdUserId) await userModuleService.deleteUsers([createdUserId]);

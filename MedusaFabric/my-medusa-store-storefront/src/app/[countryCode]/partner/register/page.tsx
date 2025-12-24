@@ -1,16 +1,14 @@
-// my-medusa-store-storefront\src\app\[countryCode]\shipper\register\page.tsx
-
 "use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 
-export default function ShipperRegisterPage() {
+export default function PartnerRegisterPage() {
   const router = useRouter()
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    carrier_name: "",
+    business_name: "",
     phone: "",
   })
   const [loading, setLoading] = useState(false)
@@ -35,7 +33,7 @@ export default function ShipperRegisterPage() {
       return
     }
     try {
-      const res = await fetch("http://localhost:9000/store/market/register-shipper", {
+      const res = await fetch("http://localhost:9000/store/market/register-seller", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,7 +59,7 @@ export default function ShipperRegisterPage() {
 
       if (res.ok) {
         setMessage("Registration successful! Please wait for admin approval.")
-        setFormData({ email: "", password: "", carrier_name: "", phone: "" })
+        setFormData({ email: "", password: "", business_name: "", phone: "" })
       } else {
         setMessage("Error: Registration failed")
         console.log(`Error: ${data.error || data.message || "Unknown error"}`)
@@ -77,18 +75,18 @@ export default function ShipperRegisterPage() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold mb-8 text-center text-gray-900">Shipper Registration</h1>
+        <h1 className="text-3xl font-bold mb-8 text-center text-gray-900">Partner Registration</h1>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
           <div>
-            <label className="block text-sm font-semibold mb-2 text-gray-800">Carrier Name</label>
+            <label className="block text-sm font-semibold mb-2 text-gray-800">Business Name</label>
             <input
               type="text"
-              name="carrier_name"
+              name="business_name"
               required
               className="w-full border border-gray-300 p-3 rounded-md focus:outline-none focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
-              placeholder="e.g. Fast Delivery"
-              value={formData.carrier_name}
+              placeholder="e.g. ABC Trading Company"
+              value={formData.business_name}
               onChange={handleChange}
             />
           </div>
@@ -100,7 +98,7 @@ export default function ShipperRegisterPage() {
               name="email"
               required
               className="w-full border border-gray-300 p-3 rounded-md focus:outline-none focus:border-gray-600 focus:ring-1 focus:ring-gray-600"
-              placeholder="shipper@example.com"
+              placeholder="partner@example.com"
               value={formData.email}
               onChange={handleChange}
             />
@@ -151,7 +149,7 @@ export default function ShipperRegisterPage() {
           <p className="text-sm">
             Already have an account?{" "}
             <button
-              onClick={() => router.push("/dk/shipper")}
+              onClick={() => router.push("/dk/partner")}
               className="text-gray-900 font-semibold hover:underline hover:text-gray-700 transition"
             >
               Sign In

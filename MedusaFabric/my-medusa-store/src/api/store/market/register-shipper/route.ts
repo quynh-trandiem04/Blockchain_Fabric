@@ -130,7 +130,7 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     res.json({ message: "Đăng ký Shipper thành công! Vui lòng chờ Admin phê duyệt.", carrier_id: carrier.id });
 
   } catch (error: any) {
-    console.error("❌ Register Shipper Error:", error);
+        console.error("Register Shipper Error:", error);
     
     // Rollback (Xóa rác nếu lỗi giữa chừng)
     if (createdUserId) await userModuleService.deleteUsers([createdUserId]);

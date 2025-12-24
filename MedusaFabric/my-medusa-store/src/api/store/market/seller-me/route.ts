@@ -25,7 +25,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   try {
     // 1. Decode Token
     const decoded: any = jwt.verify(token, JWT_SECRET);
-    console.log("🎟️ Decoded Token Payload:", decoded);
+    console.log("Decoded Token Payload:", decoded);
 
     // Lấy Auth ID từ token (Token v2 thường để ở 'sub' hoặc 'auth_identity_id')
     const authId = decoded.auth_identity_id || decoded.sub;
@@ -44,7 +44,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     );
 
     if (linkRes.rows.length === 0) {
-        console.error(`❌ No Link found for AuthID: ${authId}`);
+      console.error(`No Link found for AuthID: ${authId}`);
         // Fallback: In ra danh sách bảng để debug nếu tên bảng vẫn sai
         const tables = await dbClient.query(`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename LIKE 'link_%'`);
         console.log("Existing Link Tables:", tables.rows.map(r => r.tablename));
@@ -53,7 +53,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     }
 
     const userId = linkRes.rows[0].user_id;
-    console.log(`✅ Resolved User ID from DB: ${userId}`);
+    console.log(`Resolved User ID from DB: ${userId}`);
 
     // 3. Lấy thông tin User
     const user = await userModuleService.retrieveUser(userId, { 
@@ -67,7 +67,7 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
     res.json({ user });
 
   } catch (error: any) {
-    console.error("❌ Seller Me Error:", error);
+    console.error("Seller Me Error:", error);
     res.status(401).json({ message: "Unauthorized", error: error.message });
   } finally {
       await dbClient.end();

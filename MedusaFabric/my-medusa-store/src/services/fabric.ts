@@ -23,7 +23,7 @@ try {
     SELLER_PUBLIC_KEY = fs.readFileSync(path.join(KEY_PATH, 'seller_public_key.pem'), 'utf8');
     SHIPPER_PUBLIC_KEY = fs.readFileSync(path.join(KEY_PATH, 'shipper_public_key.pem'), 'utf8');
 } catch (e) {
-    console.warn("⚠️ Warning: Chưa load được RSA Keys. Hãy kiểm tra thư mục 'keys'.");
+    console.warn("Warning: Chưa load được RSA Keys. Hãy kiểm tra thư mục 'keys'.");
 }
 
 // --- CERTIFICATES (COPY MỚI NHẤT TỪ UBUNTU) ---
@@ -92,6 +92,7 @@ AQUFBwMBMA8GA1UdEwEB/wQFMAMBAf8wKQYDVR0OBCIEIJf3xZ1W+ftkl8urCAdP
 aCTV/M/GlT8I
 -----END CERTIFICATE-----`; 
 
+
 // === Helper Mã Hóa ===
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -147,7 +148,7 @@ class FabricService {
         this.wallet = null; 
     }
 
-    async _getContract(role){
+    async _getContract(role) {
         let userId = 'seller_admin';
         
         if (role === 'admin') {
@@ -171,7 +172,7 @@ class FabricService {
 
         const identity = await this.wallet.get(userId);
         if (!identity) {
-            console.error(`[FabricService] ❌ Identity '${userId}' not found in wallet!`);
+            console.error(`[FabricService] Identity '${userId}' not found in wallet!`);
             throw new Error(`Identity '${userId}' not found in wallet.`);
         }
 
@@ -187,7 +188,7 @@ class FabricService {
     }
 
     // --- Create Order ---
-    async createOrder(data, sellerCompanyId){
+    async createOrder(data, sellerCompanyId) {
         const { contract } = await this._getContract('seller'); 
 
         const sellerPayload = JSON.stringify({
@@ -287,14 +288,14 @@ class FabricService {
                 return { error: "Decryption failed." };
             }
             
-            // 🔥 MERGE DỮ LIỆU ĐỂ TRẢ VỀ ĐẦY ĐỦ 🔥
+            // MERGE Dữ LIỆU ĐỂ TRẢ Về ĐẦY ĐỦ
             return { 
                 ...orderData, // Chứa status, paymentMethod, codStatus, createdAt...
                 ...decrypted, // Chứa customerName, items, amount...
                 decrypted_seller_data: decrypted 
             };
         } catch (e) {
-            console.error(`[FabricService] ❌ Runtime Error in Decrypt: ${e.message}`);
+            console.error(`[FabricService] Runtime Error in Decrypt: ${e.message}`);
             throw new Error(`Fabric Query/Process Error: ${e.message}`); 
         }
     }
@@ -333,7 +334,7 @@ class FabricService {
             };
 
         } catch (e) {
-            console.error(`[FabricService] ❌ Runtime Error in Decrypt Shipper: ${e.message}`);
+            console.error(`[FabricService] Runtime Error in Decrypt Shipper: ${e.message}`);
             throw new Error(`Fabric Query/Process Error: ${e.message}`); 
         }
     }
@@ -445,6 +446,13 @@ class FabricService {
         return { success: true };
     }
 
+    // Hủy đơn hàng (Admin only, chỉ khi status = CREATED hoặc PAID)
+    async cancelOrder(orderId) {
+        const { contract } = await this._getContract('admin');
+        console.log(`[Fabric] Admin canceling order: ${orderId}`);
+        await contract.submitTransaction('CancelOrder', orderId);
+        return { success: true };
+    }
     // =========================================================================
     // 4. RETURN FLOW (Trả hàng)
     // =========================================================================
@@ -452,8 +460,7 @@ class FabricService {
     // Khách yêu cầu trả hàng
     async requestReturn(orderId) {
         const { contract } = await this._getContract('admin');
-        await contract.submitTransaction('RequestReturn', orderId);
-        return { success: true };
+        await contract.submitTransaction('RequestReturn', orderId); return { success: true };
     }
 
     async shipReturn(orderId, shipperCompanyID) {

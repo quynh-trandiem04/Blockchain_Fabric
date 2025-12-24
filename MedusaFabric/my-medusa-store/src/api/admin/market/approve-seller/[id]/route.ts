@@ -17,11 +17,11 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
     const seller = await marketplaceService.retrieveSeller(id);
     if (!seller) return res.status(404).json({ error: "Seller not found" });
 
-    console.log(`✅ Approving Seller: ${seller.name} (${seller.company_code})...`);
+    console.log(`Approving Seller: ${seller.name} (${seller.company_code})...`);
 
     // 1. [MỚI] SINH CẶP KHÓA RSA RIÊNG CHO SELLER
     // -------------------------------------------------------------
-    console.log(`🔑 Generating unique RSA keys for Seller: ${seller.company_code}...`);
+    console.log(`Generating unique RSA keys for Seller: ${seller.company_code}...`);
     const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
       modulusLength: 2048,
       publicKeyEncoding: { type: 'spki', format: 'pem' },
@@ -59,25 +59,25 @@ export const POST = async (req: MedusaRequest, res: MedusaResponse) => {
         ]);
         console.log("   -> Updated User Profile with Private Key");
     } else {
-        console.warn("⚠️ Warning: Seller has no admin_user_id linked!");
+      console.warn("Warning: Seller has no admin_user_id linked!");
     }
 
     // 4. [AUTO] Tạo Wallet (Identity trên Blockchain)
     // -------------------------------------------------------------
-    console.log(`⚡ Auto-enrolling wallet for ${seller.company_code}...`);
+    console.log(`Auto-enrolling wallet for ${seller.company_code}...`);
     try {
         if (seller.company_code) {
             await enrollSellerIdentity(seller.company_code, seller.company_code); 
-            console.log("✅ Wallet created successfully!");
+        console.log("Wallet created successfully!");
         }
     } catch (e: any) {
-        console.warn("⚠️ Enroll failed:", e.message);
+      console.warn("Enroll failed:", e.message);
     }
 
     res.json({ message: "Approved & Keys Generated successfully!" });
 
   } catch (error: any) {
-    console.error("❌ Approve Seller Error:", error);
+    console.error("Approve Seller Error:", error);
     res.status(500).json({ error: error.message });
   }
 };

@@ -19,8 +19,8 @@ async function main() {
             "organizations": {
                 "Seller": {
                     "mspid": "SellerOrgMSP",
-                    "peers": [ "peer0.seller.com" ],
-                    "certificateAuthorities": [ "ca.seller.com" ]
+                    "peers": ["peer0.seller.com"],
+                    "certificateAuthorities": ["ca.seller.com"]
                 }
             },
             "peers": {
@@ -66,23 +66,23 @@ async function main() {
 
         console.log("====================================================");
         if (history.length === 0) {
-            console.log("⚠️ Không tìm thấy lịch sử nào (ID chưa từng tồn tại).");
+            console.log("Không tìm thấy lịch sử nào (ID chưa từng tồn tại).");
         } else {
             history.forEach((record, index) => {
                 const date = new Date(record.timestamp.seconds.low * 1000).toLocaleString();
                 console.log(`\n📅 Thời gian: ${date}`);
-                console.log(`🔹 TxID: ${record.txId}`);
+                console.log(`TxID: ${record.txId}`);
                 console.log(`🔹 Hành động: ${record.isDelete ? "🗑️ ĐÃ XÓA (DELETE)" : "📝 GHI/SỬA (WRITE)"}`);
                 
                 if (!record.isDelete) {
                     try {
                         // Dữ liệu tại thời điểm đó
-                        console.log(`📦 Dữ liệu:`, JSON.stringify(record.value, null, 2));
+                        console.log(`Dữ liỆu:`, JSON.stringify(record.value, null, 2));
                     } catch (e) {
-                        console.log(`📦 Dữ liệu: ${record.value}`);
+                        console.log(`Dữ liỆu: ${record.value}`);
                     }
                 } else {
-                    console.log(`📦 Dữ liệu: (Trống vì đã xóa)`);
+                    console.log(`Dữ liỆu: (Trống vì đã xóa)`);
                 }
                 console.log("---------------------------------------");
             });
@@ -92,7 +92,7 @@ async function main() {
         gateway.disconnect();
 
     } catch (error) {
-        console.error(`❌ Lỗi: ${error.message}`);
+        console.error(`Lỗi: ${error.message}`);
     }
 }
 
