@@ -10,39 +10,69 @@ export const GET = async (req: MedusaRequest, res: MedusaResponse) => {
   try {
     const fabricService = new FabricServiceClass(req.scope);
 
-    let orderData: any = null;
+    // 1. Thử tìm đơn gốc (trường hợp không tách đơn)
+    let originalOrder: any = null; // Khai báo kiểu any
+    try {
+        originalOrder = await fabricService.queryOrder(orderId, 'admin');
+    } catch (e) { /* Ignore not found */ }
 
-    // BƯỚC 2: Nếu không thấy, thử tìm với suffix "_1" (Logic tách đơn)
-    if (!orderData || orderData.error) {
-        const splitId = `${orderId}_1`;
+    // 2. Tìm tất cả đơn tách (Split Orders)
+    // FIX: Khai báo kiểu mảng là any[] để tránh lỗi 'never'
+    const splitOrders: any[] = []; 
+    
+    let splitIndex = 1;
+    let foundSplit = true;
+
+    while (foundSplit && splitIndex <= 10) { 
+        const splitId = `${orderId}_${splitIndex}`;
         try {
-            console.log(`[Admin API] Original ID not found. Trying split ID: ${splitId}`);
-            // Gọi queryOrder với ID đã thêm suffix
-            orderData = await fabricService.queryOrder(splitId, 'admin');
+            const data = await fabricService.queryOrder(splitId, 'admin');
+            if (data && !data.error) {
+                // FIX: Thêm thuộc tính isSplit vào object
+                splitOrders.push({ ...data, isSplit: true });
+            } else {
+                if (splitIndex === 1) foundSplit = false;
+            }
         } catch (e) {
-             console.warn(`[Admin API] Split ID ${splitId} also failed.`);
+            foundSplit = false; 
         }
+        splitIndex++;
     }
 
-    // BƯỚC 3: Kiểm tra kết quả cuối cùng
-    if (!orderData || orderData.error) {
-      console.warn(`[Admin API] ❌ Order ${orderId} not found on chain.`);
-      return res.status(404).json({ 
-          status: "NOT_SYNCED", 
-          paymentMethod: "-" 
+    // 3. Logic trả về kết quả
+    
+    // Trường hợp A: Có đơn tách (Split Orders)
+    if (splitOrders.length > 0) {
+        return res.json({
+            isSplit: true,
+            // FIX: TypeScript giờ đã hiểu splitOrders là any[]
+            orders: splitOrders.map((o: any) => ({
+                id: o.orderID,
+                status: o.status,
+                paymentMethod: o.paymentMethod,
+                codStatus: o.codStatus || (o.paymentMethod === 'COD' ? 'PENDING' : ""),
+                updatedAt: o.updatedAt
+            }))
       });
     }
 
-    // BƯỚC 4: Trả về dữ liệu chuẩn cho UI
-    console.log(`[Admin API] ✅ Found data for ${orderId}: ${orderData.status}`);
-
+    // Trường hợp B: Chỉ có đơn gốc (Original Order)
+    if (originalOrder && !originalOrder.error) {
     return res.json({
-      status: orderData.status,
-      paymentMethod: orderData.paymentMethod,
-      // Đảm bảo trả về codStatus nếu có
-      codStatus: orderData.codStatus || (orderData.paymentMethod === 'COD' ? 'PENDING' : ""),
-        updatedAt: orderData.updatedAt
-    });
+            isSplit: false,
+            orders: [{
+                id: originalOrder.orderID,
+                status: originalOrder.status,
+                paymentMethod: originalOrder.paymentMethod,
+                codStatus: originalOrder.codStatus || (originalOrder.paymentMethod === 'COD' ? 'PENDING' : ""),
+                updatedAt: originalOrder.updatedAt
+            }]
+        });
+    }
+
+    // Trường hợp C: Không tìm thấy gì
+    console.warn(`[Admin API] ❌ Order ${orderId} not found on chain.`);
+    return res.status(404).json({ status: "NOT_SYNCED", paymentMethod: "-" });
 
   } catch (error: any) {
     console.error(`[Admin API] System Error querying ${orderId}:`, error.message);

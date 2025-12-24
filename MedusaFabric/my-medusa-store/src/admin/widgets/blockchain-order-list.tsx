@@ -9,7 +9,7 @@ import {
 } from "@medusajs/ui";
 import { 
     Spinner, Photo, Envelope, CurrencyDollar, 
-    MagnifyingGlass, Funnel, Clock 
+    MagnifyingGlass, Funnel, Plus, Minus
 } from "@medusajs/icons"; 
 
 // --- 1. Error Boundary ---
@@ -57,6 +57,9 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
     const [loading, setLoading] = useState(true);
     const [isRemitting, setIsRemitting] = useState(false);
     const [isCancelling, setIsCancelling] = useState(false);
+    const [isConfirmingPayment, setIsConfirmingPayment] = useState(false); 
+    
+    const [showAllItems, setShowAllItems] = useState(false);
 
     const originalId = blockchainOrder.blockchain_id.replace(/_\d+$/, '');
 
@@ -75,9 +78,37 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
         fetchMedusaOrder();
     }, [originalId]);
 
-    const handleRemitCOD = async () => {
-        if (!confirm("Xác nhận đã nhận đủ tiền COD từ đơn vị vận chuyển?")) return;
+    const handleConfirmPayment = async () => {
+        if (!confirm("Confirm payment received for this sub-order?")) return;
         
+        setIsConfirmingPayment(true);
+        try {
+            // Gọi đúng API confirm-payment cho sub-order ID
+            const res = await fetch(`/admin/fabric/orders/${blockchainOrder.blockchain_id}/confirm-payment`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                toast.success("Payment confirmed successfully!");
+                onRefresh(); // Refresh list để cập nhật status thành PAID
+                onClose();   // Đóng drawer
+            } else {
+                toast.error("ERROR: " + (result.error || "Failed to confirm payment."));
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Network error.");
+        } finally {
+            setIsConfirmingPayment(false);
+        }
+    };
+
+    const handleRemitCOD = async () => {
+        if (!confirm("Confirm received COD?")) return;
         setIsRemitting(true);
         try {
             const res = await fetch(`/admin/fabric/orders/${blockchainOrder.blockchain_id}/remit`, {
@@ -148,13 +179,18 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: currencyCode }).format(amount).replace('EUR', '€');
     };
 
+    const DISPLAY_LIMIT = 1;
+    const visibleItems = showAllItems ? subOrderItems : subOrderItems.slice(0, DISPLAY_LIMIT);
+    const hiddenCount = Math.max(0, subOrderItems.length - DISPLAY_LIMIT);
+
     return (
         <Drawer open={true} onOpenChange={(open) => !open && onClose()}>
-            <Drawer.Content>
+            <Drawer.Content className="flex flex-col h-full max-h-screen"> 
                 <Drawer.Header>
                     <Drawer.Title>Split Order Details</Drawer.Title>
                 </Drawer.Header>
-                <Drawer.Body className="p-0">
+
+                <Drawer.Body className="p-0 flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex items-center justify-center h-64">
                             <Spinner className="animate-spin text-ui-fg-interactive" />
@@ -180,7 +216,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                 </div>
                                 
                                 <div className="flex justify-between items-start pt-2 border-t border-ui-border-base">
-                                    <Text size="small" className="text-ui-fg-subtle">Shipper (Carrier)</Text>
+                                    <Text size="small" className="text-ui-fg-subtle">Shipper</Text>
                                     <div className="flex flex-col items-end">
                                         <div className="flex items-center gap-1">
                                             <span className="h-2 w-2 rounded-full"></span>
@@ -201,10 +237,8 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                 </div>
                                 <div className="flex justify-between items-center pt-2 border-t border-ui-border-base">
                                     <Text size="small" className="text-ui-fg-subtle">Created date</Text>
-                                    <Text size="small" className="font-medium font-mono">
-                                        {blockchainOrder.created_at 
-                                            ? new Date(blockchainOrder.created_at).toLocaleString('en-GB') 
-                                            : new Date(blockchainOrder.created_at).toLocaleString('en-GB')}
+                                    <Text size="small" className="font-mono font-medium">
+                                        {blockchainOrder.created_at ? new Date(blockchainOrder.created_at).toLocaleString('en-GB') : "-"}
                                     </Text>
                                 </div>
                                 <div className="flex justify-between items-center pt-2 border-t border-ui-border-base">
@@ -222,24 +256,24 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                 </div>
                             </div>
 
-                            {/* Items List */}
+                            {/* Items List - With Scroll & Show More */}
                             <div>
-                                <Heading level="h3" className="mb-4">Items in this Package</Heading>
+                                <div className="flex justify-between items-center mb-4">
+                                    <Heading level="h3">Items in Package</Heading>
+                                    <Text size="small" className="text-ui-fg-muted">{subOrderItems.length} items</Text>
+                                </div>
+                                
                                 <div className="flex flex-col gap-y-4">
-                                    {subOrderItems.length > 0 ? subOrderItems.map((item: any) => (
-                                        <div key={item.id} className="flex gap-x-4 items-start border-b border-ui-border-base pb-4 last:border-0">
+                                    {visibleItems.length > 0 ? visibleItems.map((item: any) => (
+                                        <div key={item.id} className="flex gap-x-4 items-start border-b border-ui-border-base pb-4 last:border-0 last:pb-0">
                                             <div className="h-10 w-10 rounded-md overflow-hidden bg-ui-bg-subtle border border-ui-border-base flex items-center justify-center shrink-0">
-                                                {item.thumbnail ? (
-                                                    <img src={item.thumbnail} alt={item.title} className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <Photo className="text-ui-fg-subtle" />
-                                                )}
+                                                {item.thumbnail ? <img src={item.thumbnail} alt={item.title} className="h-full w-full object-cover" /> : <Photo className="text-ui-fg-subtle" />}
                                             </div>
                                             
                                             <div className="flex-1">
                                                 <div className="flex justify-between">
-                                                    <Text className="text-ui-fg-base font-medium">{item.title}</Text>
-                                                    <Text className="text-ui-fg-base">{formatMoney(item.unit_price * item.quantity)}</Text>
+                                                    <Text className="text-ui-fg-base font-medium text-sm line-clamp-1">{item.title}</Text>
+                                                    <Text className="text-ui-fg-base text-sm">{formatMoney(item.unit_price * item.quantity)}</Text>
                                                 </div>
                                                 <Text size="small" className="text-ui-fg-subtle">{item.variant?.title}</Text>
                                                 <div className="flex items-center gap-2 mt-1">
@@ -249,28 +283,42 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                             </div>
                                         </div>
                                     )) : (
-                                        <Text className="text-ui-fg-subtle italic">
-                                            No items found matching this seller ID ({blockchainOrder.seller_id}). 
-                                        </Text>
+                                        <Text className="text-ui-fg-subtle italic">No items found.</Text>
                                     )}
                                 </div>
+
+                                {/* Show More / Show Less Button */}
+                                {subOrderItems.length > DISPLAY_LIMIT && (
+                                    <button 
+                                        onClick={() => setShowAllItems(!showAllItems)} 
+                                        className="mt-3 text-xs text-ui-fg-interactive hover:text-ui-fg-interactive-hover flex items-center justify-center gap-1 font-medium w-full py-2 bg-ui-bg-subtle rounded-md border border-transparent hover:border-ui-border-base transition-all"
+                                    >
+                                        {showAllItems ? (
+                                            <><Minus className="w-3 h-3"/> Show Less</>
+                                        ) : (
+                                            <><Plus className="w-3 h-3"/> Show {hiddenCount} more items</>
+                                        )}
+                                    </button>
+                                )}
                             </div>
 
                             {/* Totals Section */}
-                            <div className="border-t border-ui-border-base pt-4 space-y-2">
+                            <div className="border-t border-ui-border-base pt-4 space-y-2 pb-4">
                                 <div className="flex justify-between items-center">
                                     <Text className="text-ui-fg-subtle">Subtotal (This Seller)</Text>
                                     <Text className="font-medium">{formatMoney(subTotalItems)}</Text>
                                 </div>
                                 <div className="flex justify-between items-center">
-                                    <Text className="text-ui-fg-subtle">Shipping Fee (Original Order)</Text>
+                                    <Text className="text-ui-fg-subtle">Shipping (Original)</Text>
                                     <Text className="font-medium">{formatMoney(originalShippingFee)}</Text>
                                 </div>
                             </div>
                         </div>
                     )}
                 </Drawer.Body>
-                <Drawer.Footer className="flex justify-between items-center">
+                
+                {/* Footer CỐ ĐỊNH Ở DƯỚI CÙNG, KHÔNG BỊ ĐẨY ĐI */}
+                <Drawer.Footer className="flex justify-between items-center border-t border-ui-border-base pt-4 bg-ui-bg-base z-10 shrink-0">
                     <div className="flex gap-2">
                         <Drawer.Close asChild>
                             <Button variant="secondary">Close</Button>
@@ -281,13 +329,20 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                     </div>
 
                     <div className="flex gap-2">
-                        {/* Nút Cancel Order - chỉ hiện khi CREATED hoặc PAID */}
+                        {blockchainOrder.payment_method === 'PREPAID' && blockchainOrder.status === 'CREATED' && (
+                        <Button
+                        variant="primary"
+                        onClick={handleConfirmPayment}
+                        isLoading={isConfirmingPayment}
+                        className="bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200"
+                        >
+                        <CurrencyDollar /> Confirm Payment
+                        </Button>
+                        )}
+
+                        {/* Cancel Order */}
                         {(blockchainOrder.status === 'CREATED' || blockchainOrder.status === 'PAID') && (
-                            <Button
-                                variant="danger"
-                                onClick={handleCancelOrder}
-                                isLoading={isCancelling}
-                            >
+                            <Button variant="danger" onClick={handleCancelOrder} isLoading={isCancelling}>
                                 Cancel Order
                             </Button>
                         )}
@@ -327,7 +382,6 @@ const BlockchainOrderList = () => {
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
-  // 🔥 Default Sort by Created At
   const [sortKey, setSortKey] = useState<SortKey>('created_at'); 
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
@@ -335,7 +389,6 @@ const BlockchainOrderList = () => {
   const sortMenuRef = useRef<HTMLDivElement>(null);
   const ITEMS_PER_PAGE = 10;
 
-  // 🔥🔥🔥 AGGRESSIVE DOM KILLER: ẨN GIAO DIỆN MẶC ĐỊNH 🔥🔥🔥
   useLayoutEffect(() => {
     const hideDefaultInterface = () => {
         const widgetEl = widgetRef.current;
@@ -360,7 +413,7 @@ const BlockchainOrderList = () => {
                 // Nếu child KHÔNG PHẢI là container chứa Widget -> Ẩn
                 if (!child.contains(widgetEl)) {
                     child.style.display = 'none';
-                    child.style.visibility = 'hidden'; // Double kill
+                    child.style.visibility = 'hidden';
                     child.setAttribute('data-hidden-by-custom-widget', 'true');
                 }
             });
@@ -410,10 +463,8 @@ const BlockchainOrderList = () => {
         });
         if (res.ok) {
             const data = await res.json();
-            // 🔥 MAP DỮ LIỆU ĐỂ CÓ TRƯỜNG updated_at CHUẨN 🔥
             const mappedOrders = (data.orders || []).map((o: any) => ({
                 ...o,
-                // Ưu tiên updatedAt (từ Blockchain), fallback về createdAt
                 updated_at: o.updatedAt || o.updated_at || o.created_at
             }));
             setOrders(mappedOrders);
