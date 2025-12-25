@@ -8,7 +8,7 @@ import { useRouter, useParams } from "next/navigation"
 import {
     Photo, Tag, CurrencyDollar, ArchiveBox, XMark, CheckCircle,
     ArrowRightOnRectangle, Spinner, MagnifyingGlass, Funnel,
-    ShoppingBag, Tag as TagIcon, Plus, Trash, User, PencilSquare, Clock, ComputerDesktop
+    ShoppingBag, Tag as TagIcon, Plus, Trash, User, PencilSquare, Clock, ComputerDesktop,
 } from "@medusajs/icons"
 import CreateProductModal from "./create-product-modal"
 import EditProductModal from "./edit-product-modal"
@@ -17,22 +17,13 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localh
 
 // --- ICONS ---
 const Icons = {
-    Sort: () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 6h18M6 12h12m-9 6h6" />
-        </svg>
-    ),
-    Check: () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-    ),
-    XMark: () => (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-    )
+    Sort: () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18M6 12h12m-9 6h6" /></svg>),
+    Check: () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>),
+    XMark: () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>),
+    Banknotes: () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="5" width="20" height="14" rx="2" /><line x1="2" y1="10" x2="22" y2="10" /></svg>),
+    BuildingStorefront: () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M5 21V7l8-4 8 4v14M8 21v-4h8v4" /></svg>),
+    ChartBar: () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20V10m6 10V4M6 20v-6" /></svg>),
+    Truck: () => (<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>)
 };
 
 // --- AUDIT TRAIL COMPONENT---
@@ -145,7 +136,7 @@ export default function SellerDashboard() {
     const [loginError, setLoginError] = useState("")
     const [isLoadingLogin, setIsLoadingLogin] = useState(false)
 
-    const [activeTab, setActiveTab] = useState<'orders' | 'products'>('orders');
+    const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'finance'>('orders');
 
     const [orders, setOrders] = useState<OrderRow[]>([])
     const [isLoadingOrders, setIsLoadingOrders] = useState(false)
@@ -167,6 +158,9 @@ export default function SellerDashboard() {
     const [sortDir, setSortDir] = useState<SortDirection>('desc');
     const [showSortMenu, setShowSortMenu] = useState(false);
     const sortMenuRef = useRef<HTMLDivElement>(null);
+    const [settingsForm, setSettingsForm] = useState({ carrier_name: "", phone: "", email: "", shipping_fee: 10 });
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -214,268 +208,108 @@ export default function SellerDashboard() {
         return <span className="text-[10px] text-gray-400 uppercase">{method}</span>;
     }
 
-    // --- LOGIC FILTER & SORT (ONLY CREATED_AT) ---
-    const processedOrders = useMemo(() => {
-        let filtered = orders.filter(o => {
-            const status = o.decryptedData?.status || "";
-            const payment = o.decryptedData?.paymentMethod || "";
-            const matchSearch =
-                o.display_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                o.publicData.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (o.decryptedData?.shipping_phone || "").includes(searchQuery);
+    // --- LOGIC TÍNH TOÁN FINANCE (ĐÃ UPDATE) ---
+    const financeStats = useMemo(() => {
+        let stats = {
+            platform_holding: 0,    // Tiền sàn giữ
+            shipper_holding: 0,     // Tiền shipper giữ (Bổ sung cái này để hiển thị)
+            withdrawable: 0,        // Doanh thu thực nhận
+            pending_count: 0
+        };
 
-            const matchStatus = statusFilter === "ALL" || status === statusFilter;
-            const matchPayment = paymentFilter === "ALL" || payment === paymentFilter;
+        const now = new Date().getTime();
+        const FIVE_MINUTES_MS = 5 * 60 * 1000; // 5 phút demo
 
-            return matchSearch && matchStatus && matchPayment;
-        });
+        orders.forEach(o => {
+            const data = o.decryptedData;
+            // Dùng data public nếu chưa decrypt xong
+            const status = data?.status || o.publicData.medusa_status;
+            const codStatus = data?.codStatus || o.publicData.cod_status;
+            const paymentMethod = data?.paymentMethod || o.publicData.medusa_payment;
+            
+            const amount = data?.amount_untaxed || 0;
 
-        return filtered.sort((a, b) => {
-            // Only sort by created_at
-            const timeA = new Date(a.created_at).getTime();
-            const timeB = new Date(b.created_at).getTime();
+            // Bỏ qua đơn hủy/hoàn (vì chưa settled hoặc đã hoàn tiền)và mới tạo
+            if (['CREATED', 'CANCELLED', 'SHIPPED', 'RETURNED', 'RETURN_IN_TRANSIT', 'RETURN_REQUESTED'].includes(status)) return;
 
-            if (timeA < timeB) return sortDir === 'asc' ? -1 : 1;
-            if (timeA > timeB) return sortDir === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
-
-    // --- ACTIONS ---
-    const checkUserRole = async (token: string) => {
-        setIsCheckingRole(true);
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
-
-        try {
-            const res = await fetch(`${BACKEND_URL}/store/market/seller-me`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    "x-publishable-api-key": publishableKey
-                }
-            })
-
-            // Nếu Token lỗi (User khách hoặc hết hạn) -> Redirect về trang mua hàng
-            if (!res.ok) {
-                console.warn("Auth failed or token expired");
-                localStorage.removeItem("medusa_token");
-                setIsAuthorized(false);
-                setIsLoggedIn(false);
+            // 1. Withdrawable
+            if (status === 'SETTLED') {
+                stats.withdrawable += amount;
                 return;
             }
 
-            const { user } = await res.json()
-            const role = user.metadata?.fabric_role;
-            const status = user.metadata?.approver_status;
+            if (status === 'DELIVERED') {
+                // Tìm thời điểm ConfirmDelivery trong history
+                const deliveryEvent = o.history?.find((h: any) => h.action === 'ConfirmDelivery' || h.action === 'ConfirmCODDelivery');
+                console.log("Order", o.id, "Delivery Event:", deliveryEvent);
+                if (deliveryEvent && deliveryEvent.timestamp) {
+                    const deliveryTime = new Date(deliveryEvent.timestamp).getTime();
+                    // Điều kiện: Thời gian kể từ lúc giao > 5 phút
+                    const isOver5Minutes = (now - deliveryTime) >= FIVE_MINUTES_MS;
 
-            if (role !== 'sellerorgmsp') {
-                alert("This account is not authorized as a Seller.");
-                setIsAuthorized(false);
-            } else if (status === 'pending') {
-                alert("This account is still pending approval.");
-                setIsAuthorized(false);
-            } else if (status === 'rejected') {
-                alert("This account has been rejected.");
-                setIsAuthorized(false);
-            } else {
-                setIsAuthorized(true)
-                loadData(token)
-            }
-        } catch (e) {
-            console.error("Connection error:", e);
-            setIsAuthorized(false)
-        } finally {
-            setIsCheckingRole(false)
-        }
-    }
-
-    const loadData = (token: string) => {
-        loadSellerOrders(token);
-        loadSellerProducts(token);
-    }
-
-    const loadSellerOrders = async (tokenOverride?: string) => {
-        console.log("loadSellerOrders...")
-        setIsLoadingOrders(true)
-        const token = tokenOverride || localStorage.getItem("medusa_token")
-        if (!token) return
-
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
-
-        try {
-            // GỌI API LIST MỚI TỪ BLOCKCHAIN
-            const res = await fetch(`${BACKEND_URL}/store/fabric/orders/list`, {
-                headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    "x-publishable-api-key": publishableKey
-                }
-            })
-
-            if (res.ok) {
-                const { orders: rawOrders } = await res.json()
-
-                console.log(`[Frontend Debug] Orders received count (Fabric): ${rawOrders.length}`);
-
-                const mappedOrders: OrderRow[] = []
-
-                await Promise.all(
-                    rawOrders.map(async (order: any) => {
-                        const row: OrderRow = {
-                            id: order.id,
-                            display_id: `#${order.display_id}`,
-                            created_at: order.created_at,
-                            history: order.history || [], 
-                            seller_id: order.seller_id || order.publicData?.seller_id,
-                            shipper_id: order.shipper_id || order.publicData?.shipper_id, 
-                            
-                            publicData: {
-                                email: order.publicData.email || "Loading...",
-                                total: order.publicData.total || 0,
-                                currency_code: order.publicData.currency_code || "USD",
-                                medusa_status: order.publicData.medusa_status,
-                                medusa_payment: order.publicData.medusa_payment,
-                                cod_status: order.publicData.cod_status
-                            },
-                            status: "Pending",
-                            decryptedData: null
+                    if (isOver5Minutes) {
+                        // 2. Platform Holding
+                        if (paymentMethod === 'PREPAID') {
+                            stats.platform_holding += amount;
+                        } else if (paymentMethod === 'COD' && (codStatus === 'REMITTED')) {
+                            stats.platform_holding += amount;
                         }
 
-                        try {
-                            const resDecrypt = await fetch(`${BACKEND_URL}/store/fabric/orders/${order.id}/decrypt/seller`, {
-                                headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey }
-                            })
-                            if (resDecrypt.ok) {
-                                const data = await resDecrypt.json();
-                                row.status = "Success";
-                                row.decryptedData = data;
-
-                                if (data) {
-                                    row.publicData.email = data.customerName || row.publicData.email;
-                                    row.publicData.total = data.amount_total || data.amount_untaxed || 0;
-
-                                    // Update status cho chính xác nhất
-                                    if (data.status) {
-                                        row.publicData.medusa_status = data.status;
-                                        if (row.decryptedData) row.decryptedData.status = data.status;
-                                    }
-
-                                    // Cập nhật Payment sau khi decrypt nếu có
-                                    if (data.paymentMethod) {
-                                        row.publicData.medusa_payment = data.paymentMethod;
-                                    }
-                                }
-                            } else {
-                                const errorData = await resDecrypt.json();
-                                console.warn(`[Frontend] Decrypt FAILED for ${order.id}.`);
-                                row.status = "Error"
-                                row.error = errorData.error || "Syncing...";
-                            }
-                        } catch (e) {
-                            console.error(`[Frontend] Network Error during Decrypt for ${order.id}`, e);
-                            row.status = "Error"
+                        // 3. Shipper Holding
+                        else if (paymentMethod === 'COD' && (codStatus === 'PENDING_REMITTANCE')) {
+                            stats.shipper_holding += amount;
+                            stats.pending_count++;
                         }
-                        mappedOrders.push(row)
-                    })
-                )
-                // Default sort desc by created_at
-                const sorted = mappedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-                setOrders(sorted);
-
-                if (selectedOrder) {
-                    const updated = sorted.find(o => o.id === selectedOrder.id);
-                    if (updated) setSelectedOrder(updated);
+                    }
                 }
             }
-        } catch (err) { } finally { setIsLoadingOrders(false) }
-    }
+        });
 
-    const loadSellerProducts = async (tokenOverride?: string) => {
-        setIsLoadingProducts(true)
-        const token = tokenOverride || localStorage.getItem("medusa_token")
-        if (!token) {
-            setIsLoadingProducts(false)
-            return
-        }
+        return stats;
+    }, [orders]);
 
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""
+        // 🔥 DANH SÁCH SETTLEMENT HISTORY (CHỈ HIỂN THỊ CÁC ĐƠN THỎA MÃN ĐIỀU KIỆN FINANCE) 🔥
+    const settlementOrders = useMemo(() => {
+        const now = new Date().getTime(); const FIVE_MINUTES_MS = 5 * 60 * 1000;
+        return orders.filter(o => {
+            const data = o.decryptedData; if(!data) return false;
+            const status = data.status || o.publicData.medusa_status;
+            const codStatus = data.codStatus || o.publicData.cod_status;
+            const paymentMethod = data.paymentMethod || o.publicData.medusa_payment;
 
-        try {
-            // 1) lấy list trước
-            const res = await fetch(`${BACKEND_URL}/store/market/products/list`, {
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                    "x-publishable-api-key": publishableKey,
-                },
-            })
+            // 1. Nếu đã Settled -> Hiển thị
+            if (status === 'SETTLED') return true;
 
-            if (!res.ok) return
-
-            const data = await res.json()
-            const list = data.products || []
-
-            // Không enrich lại, chỉ lấy trực tiếp display_inventory từ API /list
-            setProducts(list)
-        } catch (err) {
-            console.error("loadSellerProducts error", err)
-        } finally {
-            setIsLoadingProducts(false)
-        }
-    }
-
-
-    const handleConfirmReturn = async (orderId: string) => {
-        if (!confirm("Confirm that you have received the returned item from the Shipper?")) return;
-
-        setIsConfirmingReturn(orderId);
-        const token = localStorage.getItem("medusa_token");
-        const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "";
-
-        try {
-            const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/confirm-return`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`,
-                    "x-publishable-api-key": publishableKey
+            // 2. Nếu Delivered -> Check Time
+            if (status === 'DELIVERED') {
+                const deliveryEvent = o.history?.find((h: any) => h.action === 'ConfirmDelivery' || h.action === 'ConfirmCODDelivery');
+                if (deliveryEvent && deliveryEvent.timestamp) {
+                    const deliveryTime = new Date(deliveryEvent.timestamp).getTime();
+                    const isOver5Minutes = (now - deliveryTime) >= FIVE_MINUTES_MS;
+                    if (isOver5Minutes) {
+                        // Check các điều kiện con
+                        if (paymentMethod === 'PREPAID') return true; // Platform Holding
+                        if (paymentMethod === 'COD' && codStatus === 'REMITTED') return true; // Platform Holding
+                        if (paymentMethod === 'COD' && codStatus === 'PENDING_REMITTANCE') return true; // Shipper Holding
+                    }
                 }
-            });
-
-            const result = await res.json();
-
-            if (res.ok) {
-                alert("Success! Return confirmed.");
-                loadSellerOrders(token || "");
-                if (selectedOrder?.id === orderId) setSelectedOrder(null); // Đóng modal
-            } else {
-                alert("Error: " + (result.message || "Failed"));
             }
-        } catch (err) {
-            alert("Error connecting to server");
-        } finally {
-            setIsConfirmingReturn(null);
-        }
-    }
+            return false;
+        });
+    }, [orders]);
 
-    // --- AUTH FLOW ---
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault(); setLoginError(""); setIsLoadingLogin(true);
-        try {
-            const res = await fetch(`${BACKEND_URL}/auth/user/emailpass`, {
-                method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password })
-            })
-            const data = await res.json()
-            if (res.ok && data.token) {
-                localStorage.setItem("medusa_token", data.token)
-                setIsLoggedIn(true)
-                await checkUserRole(data.token);
-            } else { setLoginError("Email or password is incorrect."); }
-        } catch (err) { setLoginError("Error connecting to server."); }
-        finally { setIsLoadingLogin(false); }
-    }
 
+    // ... (Giữ nguyên các hàm fetch data cũ) ...
+    const processedOrders = useMemo(() => { let filtered = orders.filter(o => { const status = o.decryptedData?.status || ""; const payment = o.decryptedData?.paymentMethod || ""; const matchSearch = o.id.toLowerCase().includes(searchQuery.toLowerCase()) || o.publicData.email.toLowerCase().includes(searchQuery.toLowerCase()) || (o.decryptedData?.shipping_phone || "").includes(searchQuery); const matchStatus = statusFilter === "ALL" || status === statusFilter; const matchPayment = paymentFilter === "ALL" || payment === paymentFilter; return matchSearch && matchStatus && matchPayment; }); return filtered.sort((a, b) => { const timeA = new Date(a.created_at).getTime(); const timeB = new Date(b.created_at).getTime(); if (timeA < timeB) return sortDir === 'asc' ? -1 : 1; if (timeA > timeB) return sortDir === 'asc' ? 1 : -1; return 0; }); }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
+    const checkUserRole = async (token: string) => { setIsCheckingRole(true); const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""; try { const res = await fetch(`${BACKEND_URL}/store/market/seller-me`, { headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey } }); if (!res.ok) { localStorage.removeItem("medusa_token"); setIsAuthorized(false); setIsLoggedIn(false); return; } const { user } = await res.json(); const role = user.metadata?.fabric_role; if (role !== 'sellerorgmsp') { alert("This account is not authorized as a Seller."); setIsAuthorized(false); } else { setIsAuthorized(true); loadData(token); } } catch (e) { setIsAuthorized(false) } finally { setIsCheckingRole(false) } }
+    const loadData = (token: string) => { loadSellerOrders(token); loadSellerProducts(token); }
+    const loadSellerOrders = async (tokenOverride?: string) => { setIsLoadingOrders(true); const token = tokenOverride || localStorage.getItem("medusa_token"); if (!token) return; const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""; try { const res = await fetch(`${BACKEND_URL}/store/fabric/orders/list`, { headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey } }); if (res.ok) { const { orders: rawOrders } = await res.json(); const mappedOrders: OrderRow[] = []; await Promise.all(rawOrders.map(async (order: any) => { const row: OrderRow = { id: order.id, display_id: `#${order.display_id}`, created_at: order.created_at, history: order.history || [], seller_id: order.seller_id || order.publicData?.seller_id, shipper_id: order.shipper_id || order.publicData?.shipper_id, publicData: { email: order.publicData.email || "Loading...", total: order.publicData.total || 0, currency_code: order.publicData.currency_code || "USD", medusa_status: order.publicData.medusa_status, medusa_payment: order.publicData.medusa_payment, cod_status: order.publicData.cod_status }, status: "Pending", decryptedData: null }; try { const resDecrypt = await fetch(`${BACKEND_URL}/store/fabric/orders/${order.id}/decrypt/seller`, { headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey } }); if (resDecrypt.ok) { const data = await resDecrypt.json(); row.status = "Success"; row.decryptedData = data; if (data) { row.publicData.email = data.customerName || row.publicData.email; row.publicData.total = data.amount_total || data.amount_untaxed || 0; if (data.status) { row.publicData.medusa_status = data.status; if (row.decryptedData) row.decryptedData.status = data.status; } if (data.paymentMethod) { row.publicData.medusa_payment = data.paymentMethod; } } } else { row.status = "Error"; row.error = "Syncing..."; } } catch (e) { row.status = "Error"; } mappedOrders.push(row) })); const sorted = mappedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()); setOrders(sorted); if (selectedOrder) { const updated = sorted.find(o => o.id === selectedOrder.id); if (updated) setSelectedOrder(updated); } } } catch (err) { } finally { setIsLoadingOrders(false) } }
+    const loadSellerProducts = async (tokenOverride?: string) => { setIsLoadingProducts(true); const token = tokenOverride || localStorage.getItem("medusa_token"); if (!token) { setIsLoadingProducts(false); return; } const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""; try { const res = await fetch(`${BACKEND_URL}/store/market/products/list`, { headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "x-publishable-api-key": publishableKey, }, }); if (!res.ok) return; const data = await res.json(); setProducts(data.products || []) } catch (err) { } finally { setIsLoadingProducts(false) } }
+    const handleConfirmReturn = async (orderId: string) => { if (!confirm("Confirm that you have received the returned item from the Shipper?")) return; setIsConfirmingReturn(orderId); const token = localStorage.getItem("medusa_token"); const publishableKey = process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || ""; try { const res = await fetch(`${BACKEND_URL}/store/fabric/orders/${orderId}/confirm-return`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "x-publishable-api-key": publishableKey } }); const result = await res.json(); if (res.ok) { alert("Success! Return confirmed."); loadSellerOrders(token || ""); if (selectedOrder?.id === orderId) setSelectedOrder(null); } else { alert("Error: " + (result.message || "Failed")); } } catch (err) { alert("Error connecting to server"); } finally { setIsConfirmingReturn(null); } }
+    const handleLogin = async (e: React.FormEvent) => { e.preventDefault(); setLoginError(""); setIsLoadingLogin(true); try { const res = await fetch(`${BACKEND_URL}/auth/user/emailpass`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }); const data = await res.json(); if (res.ok && data.token) { localStorage.setItem("medusa_token", data.token); setIsLoggedIn(true); await checkUserRole(data.token); } else { setLoginError("Email or password is incorrect."); } } catch (err) { setLoginError("Error connecting to server."); } finally { setIsLoadingLogin(false); } }
     const handleLogout = () => { localStorage.removeItem("medusa_token"); window.location.reload(); }
+    const handleSaveSettings = async (e: React.FormEvent) => { e.preventDefault(); setIsSavingSettings(true); const token = localStorage.getItem("medusa_token"); try { const res = await fetch(`${BACKEND_URL}/store/market/shipper/update`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}`, "x-publishable-api-key": process.env.NEXT_PUBLIC_MEDUSA_PUBLISHABLE_KEY || "" }, body: JSON.stringify(settingsForm) }); if (res.ok) { alert("Settings updated."); setCurrentUser({ ...currentUser, metadata: { ...currentUser.metadata, ...settingsForm } }); } else { alert("Failed to update"); } } catch (err) { alert("Connection error."); } finally { setIsSavingSettings(false); } }
+    const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' }) : "-";
 
     useEffect(() => {
         const token = localStorage.getItem("medusa_token")
@@ -545,6 +379,10 @@ export default function SellerDashboard() {
                     <button onClick={() => setActiveTab('orders')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
                         <ShoppingBag className="w-4 h-4" /> Orders
                     </button>
+                    {/* 🔥 TAB FINANCE (MỚI) 🔥 */}
+                    <button onClick={() => setActiveTab('finance')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'finance' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
+                        <Icons.Banknotes /> Finance
+                    </button>
                     <button onClick={() => setActiveTab('products')} className={`flex items-center gap-3 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'products' ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
                         <TagIcon className="w-4 h-4" /> Products
                     </button>
@@ -593,8 +431,8 @@ export default function SellerDashboard() {
                                     <option value="SHIPPED">Shipped</option>
                                     <option value="DELIVERED">Delivered</option>
                                     <option value="RETURN_REQUESTED">Return Requested</option>
-                                    <option value="RETURN_IN_TRANSIT">Return In Transit)</option>
-                                    <option value="RETURNED">Returned )</option>
+                                    <option value="RETURN_IN_TRANSIT">Return In Transit</option>
+                                    <option value="RETURNED">Returned</option>
                                     <option value="DELIVERED_COD_PENDING">Delivered (COD Pending)</option>
                                     <option value="COD_REMITTED">COD Remitted</option>
                                     <option value="SETTLED">Settled</option>
@@ -638,9 +476,19 @@ export default function SellerDashboard() {
                                         <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">No orders found.</td></tr>
                                     ) : processedOrders.map(order => (
                                         <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-gray-50 cursor-pointer transition-colors">
-                                            <td className="px-6 py-4 font-medium text-gray-900">{order.display_id}</td>
-                                            <td className="px-6 py-4 text-gray-500">
-                                                {new Date(order.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                            <td className="px-6 py-4 font-medium text-gray-900">{order.id}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="font-medium text-ui-fg-base">
+                                                    {order.created_at
+                                                        ? new Date(order.created_at).toLocaleDateString('en-GB')
+                                                        : formatDate(order.created_at)}
+                                                </span>
+                                                <br />
+                                                <span className="text-[10px] text-ui-fg-muted">
+                                                    {order.created_at
+                                                        ? new Date(order.created_at).toLocaleTimeString('en-GB')
+                                                        : ''}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 text-gray-900">
                                                 <div className="flex flex-col">
@@ -674,6 +522,135 @@ export default function SellerDashboard() {
                             <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
                                 <span>Showing {processedOrders.length} results</span>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* TAB: FINANCE */}
+                {activeTab === 'finance' && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 max-w-5xl mx-auto">
+                        <div className="flex justify-between items-end mb-8">
+                            <div>
+                                <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Finance & Settlement</h1>
+                                <p className="text-sm text-gray-500 mt-1">Track your revenue and pending settlements.</p>
+                            </div>
+                            <div className="px-3 py-1.5 bg-green-50 border border-green-200 rounded-full flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                                <span className="text-[10px] font-bold text-green-700 uppercase tracking-wide">Blockchain Sync</span>
+                            </div>
+                        </div>
+
+                        {/* MONEY CARDS - CẬP NHẬT GRID-COLS-3 ĐỂ NẰM CÙNG HÀNG */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            {/* Card 1: Platform Holding (Chờ đối soát) */}
+                            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <Icons.BuildingStorefront />
+                                </div>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span> Held by Platform
+                                </p>
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatPrice(financeStats.platform_holding, "USD")}</h3>
+                                <p className="text-xs text-gray-500 mt-2">Payment Pending</p>
+                                <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+                                    <div className="bg-blue-500 h-full w-3/4"></div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Shipper Holding (Chờ Shipper nộp tiền) */}
+                             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity"><Icons.Truck /></div>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-yellow-500"></span> Held by Shipper</p>
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatPrice(financeStats.shipper_holding, "USD")}</h3>
+                                <p className="text-xs text-gray-500 mt-2">COD collected, pending remittance.</p>
+                                <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden"><div className="bg-yellow-500 h-full w-1/2"></div></div>
+                            </div>
+
+                            {/* Card 3: Settled Balance (Thực nhận) */}
+                            <div className="bg-gray-900 p-6 rounded-2xl border border-gray-900 shadow-lg relative overflow-hidden group text-white">
+                                <div className="absolute right-0 top-0 p-5 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <Icons.Banknotes />
+                                </div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Settled Balance
+                                </p>
+                                <h3 className="text-3xl font-bold text-white tracking-tight">{formatPrice(financeStats.withdrawable, "USD")}</h3>
+                                <p className="text-xs text-gray-400 mt-2">Total settled amount.</p>
+                                <div className="w-full bg-gray-800 h-1.5 mt-4 rounded-full overflow-hidden">
+                                    <div className="bg-green-500 h-full w-full"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* TRANSACTION TABLE */}
+                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Settlement History</h3>
+                                <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded">
+                                    {settlementOrders.length} transactions
+                                </span>
+                            </div>
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-3">Order ID</th>
+                                        <th className="px-6 py-3">Date</th>
+                                        <th className="px-6 py-3">Method</th>
+                                        <th className="px-6 py-3">Status</th>
+                                        <th className="px-6 py-3 text-right">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-sm">
+                                    {settlementOrders.slice(0, 10).map((order) => {
+                                        const status = order.decryptedData?.status || order.publicData.medusa_status;
+                                        const codStatus = order.decryptedData?.codStatus || order.publicData.cod_status;
+                                        const amount = order.decryptedData?.amount_untaxed || order.publicData.total || 0;
+                                        let statusBadge = <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded text-[10px] font-bold border border-gray-200 uppercase">Processing</span>;
+                                        if (status === 'SETTLED') {
+                                            statusBadge = <span className="px-2 py-0.5 bg-white text-black border border-gray-300 rounded text-[10px] font-bold uppercase">Settled</span>;
+                                        } else if (order.publicData.medusa_payment === 'COD') {
+                                            if (codStatus === 'REMITTED') {
+                                                statusBadge = <span className="px-2 py-0.5 bg-black text-white border border-black rounded text-[10px] font-bold uppercase">Platform Holding</span>;
+                                            } else if (codStatus === 'PENDING_REMITTANCE') {
+                                                statusBadge = <span className="px-2 py-0.5 bg-gray-200 text-gray-900 border border-gray-300 rounded text-[10px] font-bold uppercase">Shipper Holding</span>;
+                                            }
+                                        } else if (order.publicData.medusa_payment === 'PREPAID') {
+                                            statusBadge = <span className="px-2 py-0.5 bg-black text-white border border-black rounded text-[10px] font-bold uppercase">Platform Holding</span>;
+                                        }
+                                        return (
+                                            <tr key={order.id} className="hover:bg-gray-50 transition">
+                                                <td className="px-6 py-4 font-mono text-xs font-bold text-gray-900">
+                                                    {order.id}
+                                                </td>
+
+                                                <td className="px-6 py-4">
+                                                    <span className="font-medium text-ui-fg-base">
+                                                        {order.created_at
+                                                            ? new Date(order.created_at).toLocaleDateString('en-GB')
+                                                            : formatDate(order.created_at)}
+                                                    </span>
+                                                    <br />
+                                                    <span className="text-[10px] text-ui-fg-muted">
+                                                        {order.created_at
+                                                            ? new Date(order.created_at).toLocaleTimeString('en-GB')
+                                                            : ''}
+                                                    </span>
+                                                </td>
+
+                                                <td className="px-6 py-4 text-xs font-bold text-gray-600 uppercase">
+                                                    {order.publicData.medusa_payment}
+                                                </td>
+
+                                                <td className="px-6 py-4">{statusBadge}</td>
+
+                                                <td className="px-6 py-4 text-right font-medium text-gray-900">
+                                                    {formatPrice(amount, order.publicData.currency_code)}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
@@ -929,7 +906,7 @@ export default function SellerDashboard() {
                         {/* Header */}
                         <div className="p-5 border-b border-gray-100 flex justify-between items-start bg-white z-10 shrink-0">
                             <div>
-                                <h2 className="text-lg font-semibold text-gray-900">Order {selectedOrder.display_id}</h2>
+                                <h2 className="text-lg font-semibold text-gray-900">Order {selectedOrder.id}</h2>
                                 <p className="text-xs text-gray-500 mt-1">{new Date(selectedOrder.created_at).toLocaleString()}</p>
                             </div>
                             <button type="button" onClick={() => setSelectedOrder(null)} className="text-gray-400 hover:text-gray-700 bg-gray-50 p-1.5 rounded-md transition-colors">

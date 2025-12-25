@@ -195,6 +195,7 @@ export default function ShipperDashboard() {
   const [sortDir, setSortDir] = useState<SortDirection>('desc');
   const [showSortMenu, setShowSortMenu] = useState(false);
   const sortMenuRef = useRef<HTMLDivElement>(null);
+  const formatDate = (d: string) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute:'2-digit' }) : "-";
 
     const [settingsForm, setSettingsForm] = useState({
         carrier_name: "",
@@ -894,7 +895,19 @@ export default function ShipperDashboard() {
                                         processedOrders.map((order) => (
                                             <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-gray-50 cursor-pointer transition-colors group">
                                                 <td className="px-6 py-4 text-xs font-bold text-black font-mono">{order.display_id}</td>
-                                                <td className="px-6 py-4 text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className="font-medium text-ui-fg-base">
+                                                        {order.created_at
+                                                            ? new Date(order.created_at).toLocaleDateString('en-GB')
+                                                            : formatDate(order.created_at)}
+                                                    </span>
+                                                    <br />
+                                                    <span className="text-[10px] text-ui-fg-muted">
+                                                        {order.created_at
+                                                            ? new Date(order.created_at).toLocaleTimeString('en-GB')
+                                                            : ''}
+                                                    </span>
+                                                </td>
                                                 <td className="px-6 py-4 text-xs text-gray-900">
                                                     <div className="flex flex-col">
                                                         <span className="font-medium">{order.decryptedData?.customerName || "Hidden"}</span>
@@ -1020,7 +1033,15 @@ export default function ShipperDashboard() {
                                     {pendingRemittanceOrders.map((order) => (
                                         <tr key={order.id} className="hover:bg-gray-50 transition">
                                             <td className="px-6 py-4 font-mono text-xs font-bold">{order.display_id}</td>
-                                            <td className="px-6 py-4 text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
+                                            <td className="px-6 py-4">
+                                                <span className="font-medium text-ui-fg-base">
+                                                    {new Date(order.created_at).toLocaleDateString('en-GB')}
+                                                </span>
+                                                <br />
+                                                <span className="text-[10px] text-ui-fg-muted">
+                                                    {new Date(order.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                                                </span>
+                                            </td>
                                             <td className="px-6 py-4 text-right font-bold text-gray-900">{formatPrice(order.decryptedData?.cod_amount, order.publicData.currency_code)}</td>
                                             <td className="px-6 py-4 text-center">
                                                 <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-gray-100 text-gray-800 border border-gray-300 uppercase">Holding Cash</span>
