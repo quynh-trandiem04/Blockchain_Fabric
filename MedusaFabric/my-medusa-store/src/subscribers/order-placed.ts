@@ -190,10 +190,10 @@ export default async function orderPlacedHandler({
               subShipping = Math.round(totalShippingFee / Object.keys(sellerGroups).length);
           }
 
-          const subTotal = subTotalItems + subShipping;
+          const subTotal = subTotalItems;
           const splitOrderID = `${order.id}_${subIndex}`;
-          const codAmount = paymentMethod === "COD" ? subTotalItems : 0;
-
+          const codAmount = paymentMethod === "COD" ? subTotal : 0;
+          console.log(`Xử lý đơn con ${splitOrderID}: Seller ${sellerID}, Items: ${items.length}, SubTotal: ${subTotal}, Shipping: ${subShipping}, COD: ${codAmount}`);
           const productLines = items.map((i: any) => ({
               product_name: i.variant_title ? `${i.title} (${i.variant_title})` : i.title,
               quantity: i.quantity,
@@ -213,7 +213,7 @@ export default async function orderPlacedHandler({
               
               product_lines: productLines,
               amount_untaxed: subTotalItems,
-              amount_total: subTotal,
+              amount_total: subTotal + subShipping,
               shipping_total: subShipping,
               cod_amount: codAmount,
 

@@ -257,6 +257,32 @@ export default function ShipperDashboard() {
         return stats;
     }, [orders]);
 
+    // 2. LOGIC LẤY LIST ĐƠN HÀNG PENDING REMITTANCE
+    const pendingRemittanceOrders = useMemo(() => {
+        return orders.filter(o => {
+            const data = o.decryptedData;
+            // Chỉ lấy đơn đã decrypt thành công
+            if (!data) return false;
+            
+            // Lấy các thông tin
+            const paymentMethod = data.paymentMethod || o.publicData.payment_method_id;
+            const codStatus = data.codStatus || "PENDING"; // Mặc định là PENDING nếu chưa có
+            const status = data.status || o.publicData.status;
+
+            // Loại bỏ đơn đã hủy hẳn (Cancelled)
+            if (['CANCELLED'].includes(status)) return false;
+
+            // Logic lọc:
+            // 1. Phải là COD
+            // 2. Tiền phải đang ở trạng thái PENDING_REMITTANCE
+            const isCOD = paymentMethod === 'COD';
+            const isPendingMoney = (codStatus === 'PENDING_REMITTANCE');
+
+            return isCOD && isPendingMoney;
+        });
+    }, [orders]);
+
+
   const processedOrders = useMemo(() => {
       let filtered = orders.filter(o => {
           const status = o.decryptedData?.status || "";
@@ -895,7 +921,7 @@ export default function ShipperDashboard() {
                                                     <div className="flex flex-col items-end">
                                                         <span className="font-bold text-gray-900">{order.decryptedData ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) : "-"}</span>
                                                         {order.decryptedData?.paymentMethod === 'COD' && (
-                                                            <span className="text-[9px] text-gray-500 bg-gray-100 px-1 rounded border border-gray-200 mt-1">COD: {formatPrice(order.decryptedData?.cod_amount - order.decryptedData?.shipping_fee, order.publicData.currency_code)}</span>
+                                                            <span className="text-[9px] text-gray-500 bg-gray-100 px-1 rounded border border-gray-200 mt-1">COD: {formatPrice(order.decryptedData?.cod_amount, order.publicData.currency_code)}</span>
                                                         )}
                                                     </div>
                                                 </td>
@@ -978,9 +1004,7 @@ export default function ShipperDashboard() {
                         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
                                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Pending Remittance Orders</h3>
-                                <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded">
-                                    {financeStats.pending_count} orders pending
-                                </span>
+                                <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded">{financeStats.pending_count} orders pending</span>
                             </div>
                             <table className="w-full text-left">
                                 <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -989,28 +1013,21 @@ export default function ShipperDashboard() {
                                         <th className="px-6 py-3">Date</th>
                                         <th className="px-6 py-3 text-right">COD Amount</th>
                                         <th className="px-6 py-3 text-center">Status</th>
-                                        <th className="px-6 py-3 text-right">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 text-sm">
-                                    {orders
-                                        .filter(o => o.decryptedData?.paymentMethod === 'COD' && o.decryptedData?.status === 'DELIVERED' && (!o.decryptedData?.codStatus || o.decryptedData.codStatus === 'PENDING'))
-                                        .map((order) => (
+                                    {/* Sử dụng biến filtered riêng 'pendingRemittanceOrders' thay vì filter inline */}
+                                    {pendingRemittanceOrders.map((order) => (
                                         <tr key={order.id} className="hover:bg-gray-50 transition">
                                             <td className="px-6 py-4 font-mono text-xs font-bold">{order.display_id}</td>
                                             <td className="px-6 py-4 text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
                                             <td className="px-6 py-4 text-right font-bold text-gray-900">{formatPrice(order.decryptedData?.cod_amount, order.publicData.currency_code)}</td>
                                             <td className="px-6 py-4 text-center">
-                                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 uppercase">
-                                                    Holding Cash
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button className="text-xs font-medium text-blue-600 hover:underline">Remit Now</button>
+                                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-gray-100 text-gray-800 border border-gray-300 uppercase">Holding Cash</span>
                                             </td>
                                         </tr>
                                     ))}
-                                    {financeStats.pending_count === 0 && (
+                                    {pendingRemittanceOrders.length === 0 && (
                                         <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic text-xs">No pending COD remittances. Good job!</td></tr>
                                     )}
                                 </tbody>
@@ -1277,9 +1294,7 @@ export default function ShipperDashboard() {
                                     <span>
                                     {formatPrice(
                                         selectedOrder.decryptedData?.paymentMethod === "COD"
-                                        ? (selectedOrder.decryptedData?.cod_amount || 0) -
-                                            (selectedOrder.decryptedData?.shipping_fee || 0)
-                                        : 0,
+                                        ? (selectedOrder.decryptedData?.cod_amount || 0)  : 0,
                                         selectedOrder.publicData.currency_code
                                     )}
                                     </span>

@@ -19,7 +19,7 @@ const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localh
 const UI_OPTIONS = {
   PREPAID: {
     id: "pp_system_default", 
-    label: "PREPAID (Chuyển khoản / Ví điện tử)",
+    label: "PREPAID (Prepaid Payment)",
     icon: <CreditCard />,
   },
   COD: {
