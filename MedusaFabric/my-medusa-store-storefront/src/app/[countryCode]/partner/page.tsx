@@ -986,10 +986,6 @@ export default function SellerDashboard() {
                                     <span>Subtotal</span>
                                     <span>{formatPrice(selectedOrder.decryptedData?.amount_untaxed || selectedOrder.publicData.total, selectedOrder.publicData.currency_code)}</span>
                                 </div>
-                                <div className="flex justify-between text-xs text-gray-500">
-                                    <span>Shipping Fee</span>
-                                    <span>{formatPrice(selectedOrder.decryptedData?.shipping_fee, selectedOrder.publicData.currency_code)}</span>
-                                </div>
                                 <div className="flex justify-between font-semibold text-base text-gray-900 mt-2 pt-2 border-t border-gray-100">
                                     <span>Total</span>
                                     <span>

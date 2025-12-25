@@ -6,8 +6,9 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 // Import Icons
 import {
-    MagnifyingGlass, Funnel, Spinner, XMark, CheckCircle,
-    ArrowRightOnRectangle, User, CurrencyDollar, Clock, ComputerDesktop, ArrowPath, ChartBar
+    MagnifyingGlass, Funnel, Spinner, XMark, CheckCircle, RocketLaunch,
+    ArrowRightOnRectangle, User, CurrencyDollar, Clock, ComputerDesktop, 
+    BuildingStorefront
 } from "@medusajs/icons"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -44,6 +45,23 @@ const Icons = {
       <circle cx="5.5" cy="18.5" r="2.5"></circle>
       <circle cx="18.5" cy="18.5" r="2.5"></circle>
     </svg>
+    ),
+    // 🔥 THÊM CÁC ICON BỊ THIẾU VÀO ĐÂY 🔥
+    ArrowPath: () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+    ),
+    ChartBar: () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 20V10m6 10V4M6 20v-6" />
+        </svg>
+    ),
+    Banknotes: () => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="2" y="5" width="20" height="14" rx="2" />
+            <line x1="2" y1="10" x2="22" y2="10" />
+        </svg>
   )
 };
 
@@ -122,9 +140,9 @@ interface OrderRow {
     payment_method_id: string;
     fulfillment_status: string;
     status: string;
+    cod_status?: string; 
   };
   status: "Pending" | "Success" | "Error";
-  // Blockchain Data
   decryptedData: {
       customerName: string;
       shipping_address: string;
@@ -148,8 +166,6 @@ type SortDirection = 'asc' | 'desc';
 export default function ShipperDashboard() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  
-  // Router & Params
   const router = useRouter()
   const params = useParams()
   const countryCode = params?.countryCode || "us"
@@ -161,21 +177,17 @@ export default function ShipperDashboard() {
 
   const [activeTab, setActiveTab] = useState<'orders' | 'settings' | 'finance'>('orders');
 
-    // State dữ liệu Orders
   const [orders, setOrders] = useState<OrderRow[]>([])
   const [isLoadingData, setIsLoadingData] = useState(false)
   const [isLoadingLogin, setIsLoadingLogin] = useState(false)
   const [loginError, setLoginError] = useState("")
   
-  // --- STATE ACTION BUTTONS ---
   const [isShipping, setIsShipping] = useState<string | null>(null);
   const [isDelivering, setIsDelivering] = useState<string | null>(null);
   const [isReturning, setIsReturning] = useState<string | null>(null);
   
-  // State Modal Chi tiết
   const [selectedOrder, setSelectedOrder] = useState<OrderRow | null>(null);
 
-  // State Filter & Sort
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [paymentFilter, setPaymentFilter] = useState("ALL");
@@ -205,44 +217,39 @@ export default function ShipperDashboard() {
     // --- LOGIC TÍNH TOÁN ĐỐI SOÁT (FINANCE) ---
     const financeStats = useMemo(() => {
         let stats = {
-            cod_on_hand: 0,        // Tiền đang giữ (Phải nộp về sàn)
-            total_remitted: 0,     // Tiền đã nộp về sàn
-            total_earnings: 0,     // Tổng phí ship kiếm được
+            cod_on_hand: 0,        // Tiền shipper đang giữ (COD chưa remitted)
+            total_remitted: 0,     // Tiền shipper đã nộp về sàn
+            total_earnings: 0,     // Tổng phí ship thực nhận
             pending_count: 0,
             remitted_count: 0
         };
 
         orders.forEach(o => {
-            // Lấy data ưu tiên từ decrypted
             const status = o.decryptedData?.status || o.publicData.status;
-            const codStatus = o.decryptedData?.codStatus || "PENDING";
+            const codStatus = o.decryptedData?.codStatus || o.publicData.cod_status;
             const paymentMethod = o.decryptedData?.paymentMethod || o.publicData.payment_method_id;
             
-            // Lấy số tiền
             const codAmount = o.decryptedData?.cod_amount || 0;
             const shippingFee = o.decryptedData?.shipping_fee || 0;
 
-            // Bỏ qua đơn lỗi/hủy
-            if (['CANCELLED', 'RETURNED', 'RETURN_IN_TRANSIT'].includes(status)) return;
-
-            // 1. Tính toán COD (Chỉ tính với đơn COD)
+            // 1. cod_on_hand: payment=COD & codStatus=PENDING_REMITTANCE (bất kể status đơn hàng)
             if (paymentMethod === 'COD') {
-                if (status === 'DELIVERED' || status === 'DELIVERED_COD_PENDING') {
-                    // Đã giao nhưng chưa Remit -> Shipper đang giữ tiền
-                    if (codStatus === 'PENDING' || !codStatus) {
-                        stats.cod_on_hand += codAmount;
-                        stats.pending_count++;
-                    }
-                    // Đã Remit -> Đã nộp tiền
-                    else if (codStatus === 'REMITTED' || codStatus === 'COD_REMITTED' || codStatus === 'SETTLED') {
-                        stats.total_remitted += codAmount;
-                        stats.remitted_count++;
-                    }
+                if (codStatus === 'PENDING_REMITTANCE' || !codStatus) { 
+                    stats.cod_on_hand += codAmount;
+                    stats.pending_count++;
                 }
             }
 
-            // 2. Tính doanh thu (Earnings) - Tính khi đơn đã giao thành công
-            if (['DELIVERED', 'SETTLED', 'COD_REMITTED', 'DELIVERED_COD_PENDING'].includes(status)) {
+            // 2. total_remitted: payment=COD & codStatus=REMITTED (bất kể status đơn hàng)
+            if (paymentMethod === 'COD') {
+                if (codStatus === 'REMITTED') {
+                    stats.total_remitted += codAmount;
+                    stats.remitted_count++;
+                }
+            }
+
+            // 3. total_earnings: status in [List thành công] (bất kể payment method)
+            if (['DELIVERED', 'SETTLED', 'RETURN_REQUESTED', 'RETURN_IN_TRANSIT', 'RETURNED'].includes(status)) {
                 stats.total_earnings += shippingFee;
             }
         });
@@ -254,7 +261,6 @@ export default function ShipperDashboard() {
       let filtered = orders.filter(o => {
           const status = o.decryptedData?.status || "";
           const payment = o.decryptedData?.paymentMethod || "";
-          
           const matchSearch = 
             o.display_id.toLowerCase().includes(searchQuery.toLowerCase()) || 
             o.publicData.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -267,17 +273,14 @@ export default function ShipperDashboard() {
       });
 
       return filtered.sort((a, b) => {
-          // Chỉ sort theo created_at
           const timeA = new Date(a.created_at).getTime();
           const timeB = new Date(b.created_at).getTime();
-
           if (timeA < timeB) return sortDir === 'asc' ? -1 : 1;
           if (timeA > timeB) return sortDir === 'asc' ? 1 : -1;
           return 0;
       });
     }, [orders, searchQuery, statusFilter, paymentFilter, sortKey, sortDir]);
 
-  // Helper Format Tiền
   const formatPrice = (amount: number | undefined, currency: string | undefined) => {
     if (amount === undefined || amount === null) return "0";
     const code = (currency || "USD").toUpperCase();
@@ -288,7 +291,6 @@ export default function ShipperDashboard() {
 
   const getBlockchainStatusBadge = (status: string) => {
       if (!status) return <span className="text-[10px] bg-gray-50 text-gray-400 px-2 py-0.5 border border-gray-200 uppercase font-medium">Syncing...</span>;
-
       const s = status.toUpperCase();
       let styleClass = "bg-gray-50 text-gray-500 border-gray-200"; // Default
 
@@ -586,7 +588,9 @@ export default function ShipperDashboard() {
                     total: 0,
                     payment_method_id: order.payment_method,
                     fulfillment_status: "unknown",
-                    status: order.status
+                    status: order.status,
+                    // Map COD Status từ API nếu có
+                    cod_status: order.cod_status || "PENDING"
                 },
                 status: "Pending",
                 decryptedData: null
@@ -622,19 +626,23 @@ export default function ShipperDashboard() {
                         paymentMethod: data.paymentMethod,
                         amount_untaxed: data.amount_untaxed || 0,
                         sellerCompanyID: data.sellerCompanyID,
-                        updatedAt: data.updatedAt 
+                        updatedAt: data.updatedAt,
+                        codStatus: data.codStatus || order.cod_status
                     };
 
                     row.publicData.email = data.customerName; 
                     row.publicData.status = data.status;
+                    row.publicData.cod_status = data.codStatus;
                 }
-              } else {
+              } 
+              else {
                 row.status = "Error"
                 row.error = "Decrypt Error"
               }
             } catch (e) { row.status = "Error" }
             loadedOrders.push(row)
-          })
+            }
+        )
         )
         // Default sort by created_at DESC
         const sortedOrders = loadedOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -778,7 +786,7 @@ export default function ShipperDashboard() {
                                 <p className="text-sm text-gray-500 mt-1">Overview of assigned shipments</p>
                             </div>
                             <button onClick={() => loadShipperOrders()} className="px-3 py-1.5 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 text-xs font-medium shadow-sm transition flex items-center gap-2 uppercase">
-                                <span className={isLoadingData ? "animate-spin" : ""}>⟳</span> Refresh
+                                <span className={isLoadingData ? "animate-spin" : ""}>⟳</span>
                             </button>
                         </div>
 
@@ -843,18 +851,19 @@ export default function ShipperDashboard() {
                         {/* Table */}
                         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
                             <table className="w-full text-left border-collapse">
-                                <thead>
-                                    <tr className="border-b border-gray-200 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                <thead className="bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <tr>
                                         <th className="px-6 py-4">Order ID</th>
                                         <th className="px-6 py-4">Created Date</th>
                                         <th className="px-6 py-4">Customer</th>
                                         <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4">COD Status</th>
                                         <th className="px-6 py-4 text-right">Fee / COD</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {processedOrders.length === 0 && !isLoadingData ? (
-                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-400 italic text-xs">No orders found.</td></tr>
+                                        <tr><td colSpan={6} className="px-6 py-12 text-center text-gray-400 italic text-xs">No orders found.</td></tr>
                                     ) : (
                                         processedOrders.map((order) => (
                                             <tr key={order.id} onClick={() => setSelectedOrder(order)} className="hover:bg-gray-50 cursor-pointer transition-colors group">
@@ -867,11 +876,26 @@ export default function ShipperDashboard() {
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">{order.decryptedData ? getBlockchainStatusBadge(order.decryptedData.status) : <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-400">Syncing...</span>}</td>
+                                                
+                                                <td className="px-6 py-4">
+                                                    {order.decryptedData?.paymentMethod === 'COD' ? (
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase ${
+                                                            (order.decryptedData?.codStatus === 'REMITTED' || order.decryptedData?.codStatus === 'SETTLED')
+                                                            ? 'bg-white text-black border-gray-300'
+                                                            : 'bg-gray-100 text-gray-700 border-gray-300'
+                                                        }`}>
+                                                            {order.decryptedData?.codStatus || 'PENDING'}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[10px] text-gray-400">-</span>
+                                                    )}
+                                                </td>
+
                                                 <td className="px-6 py-4 text-xs text-right">
                                                     <div className="flex flex-col items-end">
                                                         <span className="font-bold text-gray-900">{order.decryptedData ? formatPrice(order.decryptedData.shipping_fee, order.publicData.currency_code) : "-"}</span>
                                                         {order.decryptedData?.paymentMethod === 'COD' && (
-                                                            <span className="text-[9px] text-gray-500 bg-gray-100 px-1 rounded border border-gray-200 mt-1">COD: {formatPrice(order.decryptedData.cod_amount, order.publicData.currency_code)}</span>
+                                                            <span className="text-[9px] text-gray-500 bg-gray-100 px-1 rounded border border-gray-200 mt-1">COD: {formatPrice(order.decryptedData?.cod_amount - order.decryptedData?.shipping_fee, order.publicData.currency_code)}</span>
                                                         )}
                                                     </div>
                                                 </td>
@@ -907,7 +931,7 @@ export default function ShipperDashboard() {
                             {/* Card 1: COD On Hand (Liability) */}
                             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
                                 <div className="absolute right-0 top-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
-                                    <CurrencyDollar className="w-12 h-12"/>
+                                    <Icons.Box />
                                 </div>
                                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-orange-500"></span> COD On Hand (Liability)
@@ -922,7 +946,7 @@ export default function ShipperDashboard() {
                             {/* Card 2: Total Remitted */}
                             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
                                 <div className="absolute right-0 top-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
-                                    <ArrowPath className="w-12 h-12"/>
+                                    <Icons.ArrowPath />
                                 </div>
                                 <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-blue-500"></span> Total Remitted
@@ -937,7 +961,7 @@ export default function ShipperDashboard() {
                             {/* Card 3: Revenue (Earnings) */}
                             <div className="bg-gray-900 p-6 rounded-2xl border border-gray-900 shadow-lg relative overflow-hidden group text-white">
                                 <div className="absolute right-0 top-0 p-5 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <ChartBar className="w-12 h-12"/>
+                                    <Icons.ChartBar />
                                 </div>
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
                                     <span className="w-2 h-2 rounded-full bg-green-500"></span> Total Earnings

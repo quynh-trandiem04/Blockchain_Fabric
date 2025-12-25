@@ -192,7 +192,7 @@ export default async function orderPlacedHandler({
 
           const subTotal = subTotalItems + subShipping;
           const splitOrderID = `${order.id}_${subIndex}`;
-          const codAmount = paymentMethod === "COD" ? subTotal : 0;
+          const codAmount = paymentMethod === "COD" ? subTotalItems : 0;
 
           const productLines = items.map((i: any) => ({
               product_name: i.variant_title ? `${i.title} (${i.variant_title})` : i.title,
