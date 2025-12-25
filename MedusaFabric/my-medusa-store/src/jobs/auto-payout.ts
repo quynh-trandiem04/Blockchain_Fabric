@@ -79,7 +79,7 @@ export const config = {
   name: "auto-payout-scanner",
   // Chạy mỗi 1 phút để demo cho nhanh thấy kết quả
   // Cú pháp cron: * * * * * (Phút Giờ Ngày Tháng Thứ)
-  schedule: "*/5  * * * *",
+  schedule: "*/10  * * * *",
   // schedule: "0 0 1 1 *",
   data: {},
 };

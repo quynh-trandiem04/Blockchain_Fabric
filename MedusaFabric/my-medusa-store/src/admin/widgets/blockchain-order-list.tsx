@@ -404,15 +404,7 @@ const OrderDrawer = ({ blockchainOrder, onClose, onRefresh }: { blockchainOrder:
                                 </div>
                             </div>
 
-                            <div className="border-t-2 border-ui-border-base pt-6 pb-4">
-                                <div className="flex items-center justify-between mb-6">
-                                    <div className="flex items-center gap-2">
-                                        <Heading level="h3">Audit Trail</Heading>
-                                        <Badge size="small" color="grey">Immutable</Badge>
-                                    </div>
-                                </div>
-                                <AuditTrail history={historyData} />
-                            </div>
+                            <div className="border-t-2 border-ui-border-base pt-6 pb-4"><div className="flex items-center justify-between mb-6"><div className="flex items-center gap-2"><Heading level="h3">Audit Trail</Heading><Badge size="small" color="grey">Immutable</Badge></div></div><AuditTrail history={historyData} sellerId={blockchainOrder.seller_id} shipperId={blockchainOrder.shipper_id} /></div>
 
                         </div>
                     )}
