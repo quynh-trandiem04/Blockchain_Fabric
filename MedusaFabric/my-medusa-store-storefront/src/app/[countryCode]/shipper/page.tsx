@@ -6,8 +6,8 @@ import { useState, useEffect, useMemo, useRef } from "react"
 import { useRouter, useParams } from "next/navigation"
 // Import Icons
 import {
-    MagnifyingGlass, Funnel, Spinner, XMark, CheckCircle, RocketLaunch,
-    ArrowRightOnRectangle, User, CurrencyDollar, Clock, ComputerDesktop, BuildingStorefront
+    MagnifyingGlass, Funnel, Spinner, XMark, CheckCircle,
+    ArrowRightOnRectangle, User, CurrencyDollar, Clock, ComputerDesktop, ArrowPath, ChartBar
 } from "@medusajs/icons"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_MEDUSA_BACKEND_URL || "http://localhost:9000"
@@ -159,8 +159,7 @@ export default function ShipperDashboard() {
   const [isAuthorized, setIsAuthorized] = useState(false) 
   const [currentUser, setCurrentUser] = useState<any>(null);
 
-    // State Tab
-    const [activeTab, setActiveTab] = useState<'orders' | 'settings'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'settings' | 'finance'>('orders');
 
     // State dữ liệu Orders
   const [orders, setOrders] = useState<OrderRow[]>([])
@@ -203,7 +202,54 @@ export default function ShipperDashboard() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- LOGIC FILTER & SORT ---
+    // --- LOGIC TÍNH TOÁN ĐỐI SOÁT (FINANCE) ---
+    const financeStats = useMemo(() => {
+        let stats = {
+            cod_on_hand: 0,        // Tiền đang giữ (Phải nộp về sàn)
+            total_remitted: 0,     // Tiền đã nộp về sàn
+            total_earnings: 0,     // Tổng phí ship kiếm được
+            pending_count: 0,
+            remitted_count: 0
+        };
+
+        orders.forEach(o => {
+            // Lấy data ưu tiên từ decrypted
+            const status = o.decryptedData?.status || o.publicData.status;
+            const codStatus = o.decryptedData?.codStatus || "PENDING";
+            const paymentMethod = o.decryptedData?.paymentMethod || o.publicData.payment_method_id;
+            
+            // Lấy số tiền
+            const codAmount = o.decryptedData?.cod_amount || 0;
+            const shippingFee = o.decryptedData?.shipping_fee || 0;
+
+            // Bỏ qua đơn lỗi/hủy
+            if (['CANCELLED', 'RETURNED', 'RETURN_IN_TRANSIT'].includes(status)) return;
+
+            // 1. Tính toán COD (Chỉ tính với đơn COD)
+            if (paymentMethod === 'COD') {
+                if (status === 'DELIVERED' || status === 'DELIVERED_COD_PENDING') {
+                    // Đã giao nhưng chưa Remit -> Shipper đang giữ tiền
+                    if (codStatus === 'PENDING' || !codStatus) {
+                        stats.cod_on_hand += codAmount;
+                        stats.pending_count++;
+                    }
+                    // Đã Remit -> Đã nộp tiền
+                    else if (codStatus === 'REMITTED' || codStatus === 'COD_REMITTED' || codStatus === 'SETTLED') {
+                        stats.total_remitted += codAmount;
+                        stats.remitted_count++;
+                    }
+                }
+            }
+
+            // 2. Tính doanh thu (Earnings) - Tính khi đơn đã giao thành công
+            if (['DELIVERED', 'SETTLED', 'COD_REMITTED', 'DELIVERED_COD_PENDING'].includes(status)) {
+                stats.total_earnings += shippingFee;
+            }
+        });
+
+        return stats;
+    }, [orders]);
+
   const processedOrders = useMemo(() => {
       let filtered = orders.filter(o => {
           const status = o.decryptedData?.status || "";
@@ -707,6 +753,7 @@ export default function ShipperDashboard() {
                     <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'orders' ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
                         <Icons.Box /> Orders
                     </button>
+                    <button onClick={() => setActiveTab('finance')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'finance' ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}><CurrencyDollar className="w-4 h-4" /> Finance</button>
                     <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-gray-100 text-gray-900 font-bold' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-900'}`}>
                         <Icons.Settings /> Settings
                     </button>
@@ -837,6 +884,113 @@ export default function ShipperDashboard() {
                             <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 flex items-center justify-between text-[10px] text-gray-500 uppercase font-bold">
                                 <span>Total: {processedOrders.length} orders</span>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 🔥 TAB FINANCE (MỚI) 🔥 */}
+                {activeTab === 'finance' && (
+                    <div className="max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <div className="flex justify-between items-end mb-8">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Automated Reconciliation</h2>
+                                <p className="text-sm text-gray-500 mt-1">Real-time COD tracking & settlement status from Blockchain.</p>
+                            </div>
+                            <div className="px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide">Ledger Synced</span>
+                            </div>
+                        </div>
+
+                        {/* Money Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            {/* Card 1: COD On Hand (Liability) */}
+                            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <CurrencyDollar className="w-12 h-12"/>
+                                </div>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-orange-500"></span> COD On Hand (Liability)
+                                </p>
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatPrice(financeStats.cod_on_hand, "USD")}</h3>
+                                <p className="text-xs text-gray-500 mt-2">Amount collected from customers, pending remittance to Platform.</p>
+                                <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+                                    <div className="bg-orange-500 h-full w-2/3"></div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: Total Remitted */}
+                            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm relative overflow-hidden group">
+                                <div className="absolute right-0 top-0 p-5 opacity-5 group-hover:opacity-10 transition-opacity">
+                                    <ArrowPath className="w-12 h-12"/>
+                                </div>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500"></span> Total Remitted
+                                </p>
+                                <h3 className="text-3xl font-bold text-gray-900 tracking-tight">{formatPrice(financeStats.total_remitted, "USD")}</h3>
+                                <p className="text-xs text-gray-500 mt-2">Total COD amount successfully transferred to Platform.</p>
+                                <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+                                    <div className="bg-blue-500 h-full w-full"></div>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Revenue (Earnings) */}
+                            <div className="bg-gray-900 p-6 rounded-2xl border border-gray-900 shadow-lg relative overflow-hidden group text-white">
+                                <div className="absolute right-0 top-0 p-5 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <ChartBar className="w-12 h-12"/>
+                                </div>
+                                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Total Earnings
+                                </p>
+                                <h3 className="text-3xl font-bold text-white tracking-tight">{formatPrice(financeStats.total_earnings, "USD")}</h3>
+                                <p className="text-xs text-gray-400 mt-2">Gross shipping revenue from completed orders.</p>
+                                <div className="w-full bg-gray-800 h-1.5 mt-4 rounded-full overflow-hidden">
+                                    <div className="bg-green-500 h-full w-full"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Transactions Table */}
+                        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Pending Remittance Orders</h3>
+                                <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded">
+                                    {financeStats.pending_count} orders pending
+                                </span>
+                            </div>
+                            <table className="w-full text-left">
+                                <thead className="bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                    <tr>
+                                        <th className="px-6 py-3">Order ID</th>
+                                        <th className="px-6 py-3">Date</th>
+                                        <th className="px-6 py-3 text-right">COD Amount</th>
+                                        <th className="px-6 py-3 text-center">Status</th>
+                                        <th className="px-6 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-sm">
+                                    {orders
+                                        .filter(o => o.decryptedData?.paymentMethod === 'COD' && o.decryptedData?.status === 'DELIVERED' && (!o.decryptedData?.codStatus || o.decryptedData.codStatus === 'PENDING'))
+                                        .map((order) => (
+                                        <tr key={order.id} className="hover:bg-gray-50 transition">
+                                            <td className="px-6 py-4 font-mono text-xs font-bold">{order.display_id}</td>
+                                            <td className="px-6 py-4 text-xs text-gray-500">{new Date(order.created_at).toLocaleDateString('en-GB')}</td>
+                                            <td className="px-6 py-4 text-right font-bold text-gray-900">{formatPrice(order.decryptedData?.cod_amount, order.publicData.currency_code)}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-100 uppercase">
+                                                    Holding Cash
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button className="text-xs font-medium text-blue-600 hover:underline">Remit Now</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {financeStats.pending_count === 0 && (
+                                        <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-400 italic text-xs">No pending COD remittances. Good job!</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
