@@ -10,7 +10,7 @@ const yaml = require('js-yaml');
 
 const CCP_PATH = path.resolve(process.cwd(), 'connection-profile.yaml');
 const CHANNEL_NAME = 'orderchannel';
-const CC_NAME = 'ecommerce';
+const CC_NAME = 'my-ecommerce-chaincode';
 
 /**
  * Blockchain Event Listener

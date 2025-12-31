@@ -10,7 +10,7 @@ export default async function autoPayoutJob(
   container: MedusaContainer
 ) {
   const fabricService = new FabricService(container);
-  
+
   console.log("[CronJob] ------------------------------------------------");
   console.log("[CronJob] Scanning Blockchain orders for Auto-Payout...");
 
@@ -20,54 +20,59 @@ export default async function autoPayoutJob(
 
     if (!allOrders || allOrders.length === 0) {
       console.log("[CronJob] No orders found on ledger.");
-        return;
+      return;
     }
 
     const now = new Date();
 
     // 2. Lọc sơ bộ các đơn "có khả năng" được thanh toán để giảm tải query
     const candidates = allOrders.filter((o: any) => {
-        // Đã thanh toán rồi thì bỏ qua
-        if (o.status === 'SETTLED') return false;
+      const status = o.status;
+      const paymentMethod = o.payment_method || o.paymentMethod;
+      const codStatus = o.cod_status || o.codStatus;
 
-        // Trường hợp PREPAID: Phải là DELIVERED
-        if (o.payment_method === 'PREPAID' && o.status === 'DELIVERED') return true;
+      // đã settled thì bỏ
+      if (status === "SETTLED") return false;
 
-        // Trường hợp COD: Phải là REMITTED (Đã nộp tiền về sàn)
-        if (o.payment_method === 'COD' && o.cod_status === 'REMITTED') return true;
+      // PREPAID: chỉ cần DELIVERED
+      if (paymentMethod === "PREPAID" && status === "DELIVERED") return true;
 
-        return false;
+      // COD: bắt buộc DELIVERED + REMITTED
+      if (paymentMethod === "COD" && status === "DELIVERED" && codStatus === "REMITTED") return true;
+
+      return false;
     });
+
 
     console.log(`[CronJob] Found ${candidates.length} candidate(s) for payout.`);
 
     // 3. Kiểm tra chi tiết từng đơn (Check thời gian)
     for (const cand of candidates) {
-        try {
-            // Query chi tiết để lấy deliveryTimestamp (Vì list tóm tắt không có trường này)
-            // Dùng role 'admin' để query
-            const fullOrder = await fabricService.queryOrder(cand.blockchain_id, 'admin');
+      try {
+        // Query chi tiết để lấy deliveryTimestamp (Vì list tóm tắt không có trường này)
+        // Dùng role 'admin' để query
+        const fullOrder = await fabricService.queryOrder(cand.blockchain_id, 'admin');
 
-            if (!fullOrder || !fullOrder.deliveryTimestamp) continue;
+        if (!fullOrder || !fullOrder.deliveryTimestamp) continue;
 
-            const deliveryTime = new Date(fullOrder.deliveryTimestamp);
-            // Tính số phút đã trôi qua: (Hiện tại - Giao hàng) / 60000
-                    const diffMinutes = (now.getTime() - deliveryTime.getTime()) / 60000;
+        const deliveryTime = new Date(fullOrder.deliveryTimestamp);
+        // Tính số phút đã trôi qua: (Hiện tại - Giao hàng) / 60000
+        const diffMinutes = (now.getTime() - deliveryTime.getTime()) / 60000;
 
-            // console.log(`   -> Check ${cand.blockchain_id}: Delivered ${diffMinutes.toFixed(1)} mins ago.`);
+        // console.log(`   -> Check ${cand.blockchain_id}: Delivered ${diffMinutes.toFixed(1)} mins ago.`);
 
-            // DEMO: 5 Phút (Thực tế có thể là 7 ngày)
-            if (diffMinutes >= 5) {
+        // DEMO: 5 Phút (Thực tế có thể là 7 ngày)
+        if (diffMinutes >= 5) {
           console.log(`>>> Executing PAYOUT for: ${cand.blockchain_id}`);
-                
-                await fabricService.payoutToSeller(cand.blockchain_id);
-                
-          console.log(`[CronJob] Payout SUCCESS: ${cand.blockchain_id}`);
-                    }
 
-        } catch (err: any) {
-        console.error(`[CronJob] Failed to payout ${cand.blockchain_id}: ${err.message}`);
+          await fabricService.payoutToSeller(cand.blockchain_id);
+
+          console.log(`[CronJob] Payout SUCCESS: ${cand.blockchain_id}`);
         }
+
+      } catch (err: any) {
+        console.error(`[CronJob] Failed to payout ${cand.blockchain_id}: ${err.message}`);
+      }
     }
 
   } catch (error) {

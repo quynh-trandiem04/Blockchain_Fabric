@@ -47,7 +47,7 @@ organizations:
 
 orderers:
   orderer0.example.com:
-    url: grpcs://192.168.40.11:7050
+    url: grpcs://192.168.245.11:7050
     grpcOptions:
       ssl-target-name-override: orderer0.example.com
     tlsCACerts:
@@ -69,7 +69,7 @@ orderers:
         -----END CERTIFICATE-----
 
   orderer1.example.com:
-    url: grpcs://192.168.40.11:8050
+    url: grpcs://192.168.245.11:8050
     grpcOptions:
       ssl-target-name-override: orderer1.example.com
     tlsCACerts:
@@ -91,13 +91,13 @@ orderers:
         -----END CERTIFICATE-----
 
   orderer2.example.com:
-    url: grpcs://192.168.40.11:9050
+    url: grpcs://192.168.245.11:9050
     grpcOptions:
       ssl-target-name-override: orderer2.example.com
     tlsCACerts:
       pem: |
         -----BEGIN CERTIFICATE-----
-        MIICQzCCAeqgAwIBAgIRAPg+L67lbDgvZPE54LyOA6kwCgYIKoZIzj0EAwMwbDEL
+        MIICQzCCAeqgAwIBAgIRAPg+L67lbDgvZPE54LyOA6kwCgYIKoZIzj0EAwIwbDEL
         MAkGA1UEBhMCVVMxEzARBgNVBAgTCkNhbGlmb3JuaWExFjAUBgNVBAcTDVNhbiBG
         cmFuY2lzY28xFDASBgNVBAoTC2V4YW1wbGUuY29tMRowGAYDVQQDExF0bHNjYS5l
         eGFtcGxlLmNvbTAeFw0yNTEyMTQxNTQ5MDBaFw0zNTEyMTIxNTQ5MDBaMGwxCzAJ
@@ -114,7 +114,7 @@ orderers:
 
 peers:
   peer0.seller.com:
-    url: grpcs://192.168.40.11:9051
+    url: grpcs://192.168.245.11:9051
     grpcOptions:
       ssl-target-name-override: peer0.seller.com
     tlsCACerts:
@@ -135,7 +135,7 @@ peers:
         4mk=
         -----END CERTIFICATE-----
   peer0.ecommerce.com:
-    url: grpcs://192.168.40.11:7051
+    url: grpcs://192.168.245.11:7051
     grpcOptions:
       ssl-target-name-override: peer0.ecommerce.com
     tlsCACerts:
@@ -157,7 +157,7 @@ peers:
         -----END CERTIFICATE-----
 
   peer0.shipper.com:
-    url: grpcs://192.168.40.11:11051
+    url: grpcs://192.168.245.11:11051
     grpcOptions:
       ssl-target-name-override: peer0.shipper.com
     tlsCACerts:
@@ -185,7 +185,7 @@ certificateAuthorities:
   
   # CA SELLER
   ca.seller.com: 
-    url: https://192.168.40.11:8054 
+    url: https://192.168.245.11:8054 
     caName: ca-seller 
     tlsCACerts:
       pem: |
@@ -207,7 +207,7 @@ certificateAuthorities:
 
   # CA ECOMMERCE
   ca.ecommerce.com: 
-    url: https://192.168.40.11:7054 
+    url: https://192.168.245.11:7054 
     caName: ca-ecommerce
     tlsCACerts:
       pem: |
@@ -229,7 +229,7 @@ certificateAuthorities:
 
   # CA SHIPPER
   ca.shipper.com:
-    url: https://192.168.40.11:9054 
+    url: https://192.168.245.11:9054 
     caName: ca-shipper
     tlsCACerts:
       pem: |
