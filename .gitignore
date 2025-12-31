@@ -1,0 +1,10 @@
+# Fabric / secrets
+**/vendor/**
+**/*_sk
+**/msp/**
+**/fabric-ca/**
+**/crypto-config/**
+**/wallet/**
+
+# Node
+node_modules/
